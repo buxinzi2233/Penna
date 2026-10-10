@@ -1,0 +1,208 @@
+<p align="center">
+  <img src="assets/wordmark.png" height="80" alt="Penna">
+</p>
+
+<p align="center"><b>羽毛笔</b> · Windows 桌面端的文生图提示词工作台</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
+  <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
+  <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
+  <img src="https://img.shields.io/badge/version-0.1.0-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
+</p>
+
+---
+
+Penna 是面向文生图**正面提示词**的创作工具,覆盖撰写、修改、润色与翻译的完整流程。
+
+界面分为两栏:左侧为成稿,右侧为 Agent 对话。Agent 的每一处修改以待确认改动的形式呈现,**经用户确认后写入成稿**。
+
+<p align="center">
+  <img src="docs/promo.png" alt="Penna 功能一览">
+</p>
+
+## 目录
+
+- [功能](#功能)
+- [快速开始](#快速开始)
+- [数据与隐私](#数据与隐私)
+- [开发](#开发)
+- [仓库结构](#仓库结构)
+- [致谢](#致谢)
+- [许可](#许可)
+
+## 功能
+
+### 成稿与确认
+
+Agent 与润色的结果以待确认改动的形式提交。改动按行以红绿对比显示,可逐段采纳或驳回;待确认期间成稿为只读。成稿为空时,新内容直接填入。
+
+### 分段
+
+成稿按【主体】【光影】这样的行首标注分段,每段显示为一个独立的彩色框,并可附带一行中文对照。交付用的「最终提示词」会自动去掉标注和对照。
+
+- 每段可单独复制、润色、翻译、固定、删除,或带着这一段去和 Agent 讨论。
+- 段可以拖动换位,也可以脱离分段变回普通文字。
+- 「合并」把整页的分段还原成一段连续的文字。
+- Agent 只改了几段时,只对这几段提出改动,其余原样保留。
+
+### 固定区
+
+选中的文字或整段可以固定。固定区对润色和 Agent 都只读,可以拖动到成稿的任意位置。
+
+### 分页与系列
+
+一份工作台最多 10 页,每页是一条独立的提示词,页可以归入系列。
+
+- 同一系列共用一场对话,Agent 可参照系列内其他页的内容;各系列相互独立。
+- Agent 一条回复可以同时写好几页,换主题时自动另起一个系列。
+- 页可以改名、调整顺序、脱离系列,整个系列可以一次存入档案库。
+
+### Agent 对话
+
+- 回复流式输出,可随时停止或重新运行。
+- 生成期间继续发送的消息进入队列,依次自动发出,也可以插队立刻发送。
+- Agent 的提问可以带选项按钮,支持单选和多选。
+- 图片和文本文件可以通过按钮、拖放或 Ctrl+V 作为附件发送。
+- 输入 `@` 引用某个 Skill;输入框上方的快捷操作可以自定义。
+- 多场对话以标签页并列,关闭的对话保留在历史中。
+- 每个 Preset 有独立的系统提示、温度和 Top P。
+
+### 图像反推
+
+放入一张参考图,由模型反推出提示词。结果可以放到成稿,也会作为参考提供给之后的对话。
+
+### Danbooru 标签
+
+- 内置约 7.6 万个常用标签,附使用次数和中文含义,离线可查。
+- 可接入在线语义搜索,用中文描述即可找到对应标签。
+- Agent 写标签前自动查询,并在成稿给出后对照词库核对,存疑的标签单独列出。
+
+### 角色库
+
+- 内置约 6.9 万个 Danbooru 角色,可按英文名或中文、日文译名搜索。
+- 每个角色的特征词分为「外貌」和「服装与其他」两组,可单独取用外貌特征。
+- 可以保存自己的角色:名称、提示词和一张图。
+- Agent 在对话中可以查询角色库,也可以把角色存进去。
+
+### 润色与翻译
+
+- 润色可以针对整页、某一段或选中的一截文字,可单独指定模型。
+- 翻译支持 Google、百度和阿里机翻,按设定的顺序调用,自动重试并切换引擎。
+- 整段翻译写成该段的中文对照;选中文字的翻译显示在翻译卡片中。
+
+### Skills
+
+Skill 是一份写法说明(`SKILL.md`),决定 Agent 按什么方式写提示词。
+
+- 内置 11 个,默认全部启用,可逐个开关。
+- 支持导入 `.md` 或 `.zip`,也可以在设置中直接填写。
+- 可以在对话中让 Agent 写一个新的 Skill,写完自动加入。
+
+### 模型
+
+- 支持 OpenAI 兼容接口和 Google 接口(含 Vertex AI)。
+- 一个接口可以配置多个模型,所有模型按顺序组成后备链,自动切换。
+- Agent 和润色可以分别指定首选模型。
+
+### 档案、历史与回滚
+
+- **档案库**:手动保存的成稿,带名称和分类。
+- **历史提示词**:采纳改动、复制、清空时自动记录,最多 100 条,可以放回成稿。
+- **操作记录**:记录页面、固定、采纳驳回等结构性操作,可以回滚到任意一步之前。
+
+### MCP
+
+可以添加 HTTP 或 stdio 方式的 MCP 服务,测试连接并列出其工具。
+
+## 快速开始
+
+环境要求:Windows 10 / 11,[Flutter](https://flutter.dev)(Dart 3.13 及以上)。
+
+```bash
+flutter pub get
+flutter run -d windows
+```
+
+首次启动后,在「设置」中填入模型接口的 Base URL 与 API Key 即可使用。
+
+## 数据与隐私
+
+所有数据保存在本机「文档\Penna」。
+
+| 类别 | 文件 | 内容 |
+| --- | --- | --- |
+| 设置 | `config.json` | 模型、翻译、外观等配置 |
+| 机密 | `keys.dat` | 全部 API Key,经 Windows DPAPI 加密,仅本机当前用户可解 |
+| 工作台 | `workspace.json` | 成稿、对话、历史提示词 |
+| 档案 | `archive.json` | 档案库 |
+| 角色 | `characters.json`、`characters\` | 自存的角色及图片 |
+| 反推 | `reverse.json`、`reverse.img` | 参考图及反推结果 |
+| 扩展 | `skills\` | 导入的 Skill |
+
+## 开发
+
+```bash
+dart analyze lib test            # 静态检查
+flutter test                     # 全部测试
+dart format lib test             # 格式化
+pwsh tool/build_release.ps1      # 打包正式版
+```
+
+> 以上命令适用于含中文的项目路径。
+
+重新生成内置数据(仅在原始表或分类规则变动时需要):
+
+```bash
+python tool/make_tag_dict.py <CSV 所在文件夹>            # 标签词库
+python tool/make_character_dict.py dataset --review     # 角色库
+```
+
+## 仓库结构
+
+```
+lib/
+  ui/              界面
+  core/harness/    模型调用、成稿格式、Skills、标签、角色库、MCP(纯 Dart)
+  data/            配置、存盘、翻译、加密
+test/              测试
+assets/            随程序分发:字标、头像、内置标签词库与角色库
+font/              随程序分发的字体
+docs/              宣传图
+tool/              打包脚本、数据与图标生成脚本
+windows/           Windows 平台工程
+```
+
+依赖方向自上而下:`ui` → `core/harness` → `data`。
+
+## 致谢
+
+Penna 的每一部分都建立在开源社区的成果之上。
+
+### 数据
+
+| 来源 | 用途 | 许可 |
+| --- | --- | --- |
+| [Danbooru](https://danbooru.donmai.us) 及其标注者 | 全部标签与角色数据的源头 | — |
+| [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | 内置角色库中每个角色的外貌与服装特征词 | Apache-2.0 |
+| [DanbooruSearch](https://sakizuki-danboorusearch.hf.space) | 在线语义搜索标签的 MCP 服务 | — |
+
+### 字体
+
+| 字体 | 作者 | 许可 |
+| --- | --- | --- |
+| [Maple Mono](https://github.com/subframe7536/maple-font) | subframe7536 | SIL OFL 1.1 |
+| [975 圆体](https://github.com/lxgw/975Yuan) | 落霞孤鹜 | SIL OFL 1.1 |
+
+如有遗漏,或署名、许可信息有误,欢迎提 issue 指正。
+
+## 许可
+
+Penna 的源代码以 [MIT](LICENSE) 许可发布。
+
+随程序分发的第三方内容保留各自的许可:
+
+- `assets/danbooru_characters.tsv.gz`:由 [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki)(Apache-2.0)合并、筛选而成,特征词重新分成了「外貌」与「服装与其他」两组。
+- `font/MapleMono-Regular.ttf`:SIL OFL 1.1,见 [font/MapleMono-LICENSE.txt](font/MapleMono-LICENSE.txt)。
+- `font/LXGW975YuanSC-500W.ttf`:SIL OFL 1.1,见 [font/LXGW975Yuan-LICENSE.txt](font/LXGW975Yuan-LICENSE.txt)。

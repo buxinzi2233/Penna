@@ -1,0 +1,602 @@
+import 'package:flutter/foundation.dart';
+
+import 'mcp_server.dart';
+
+export 'mcp_server.dart';
+
+/// 一个可勾选的选项(Skill 或工具)。
+@immutable
+class Option {
+  const Option(this.id, this.label, this.hint);
+
+  final String id;
+  final String label;
+  final String hint;
+}
+
+const builtinSkills = [
+  Option('writer', '写提示词', '从一个想法写出完整的正面提示词'),
+  Option('local-edit', '局部修改', '只改指定的地方,其余原样不动'),
+  Option('reverse-polish', '整理反推', '把反推出的 Tag 或描述整理成能出图的提示词'),
+  Option('theme-expand', '同题变体', '同一个主题再出 3~5 条不同的写法'),
+  Option('paraphrase', '意译', '换一种语言重写提示词,保留结构,不逐字翻'),
+  Option('skill-creator', '写 Skill', '聊着写出一个新 Skill,自动加入 Skills'),
+  Option('danbooru-tags', '转标签', '把提示词改写成 Danbooru 标签,用到的标签都先查词库'),
+  Option('image-remix', '照图写', '用户给了图,要照着它写、或照着它改几处'),
+  Option('grilling', '画面规划', '用户只给了大概想法时,写词前先一问一答把画面定下来'),
+  Option('storyboard', '分镜', '把故事或情节拆成一组镜头,每个镜头一条能单独出图的提示词'),
+  Option('character-lib', '角色库', '用户提到某个具体角色时先查它的触发词和特征;要存角色时也用'),
+];
+
+/// 聊天框上方的快捷操作:点一下把 [prompt] 填进输入框。
+typedef QuickAction = ({String label, String prompt});
+
+const defaultQuickActions = <QuickAction>[
+  (label: '转成自然语言', prompt: '将提示词转换成自然语言'),
+  (label: '转成 Tag', prompt: '将提示词转换成 Tag'),
+];
+
+const builtinTools = [
+  Option('ask_user', 'ask_user', '结构化澄清'),
+  Option('context_memory', 'context_memory', '会话笔记 / 释放旧回复'),
+  Option('load_skill', 'load_skill', '按需加载 Skill'),
+  Option('reverse_image', 'reverse_image', '触发 Tag 或自然语言反推'),
+  Option('translate_mt', 'translate_mt', '机翻(多引擎)'),
+  Option('translate_llm', 'translate_llm', 'LLM 意译'),
+  Option('search_tags', 'search_tags', 'Danbooru 类 Tag 检索'),
+  Option('related_tags', 'related_tags', '相关 Tag'),
+  Option('prompt_library', 'prompt_library', '词库增删改查'),
+  Option('view_reference', 'view_reference', '查看参考图与批注(只读)'),
+];
+
+@immutable
+class MtField {
+  const MtField(this.id, this.label, {this.secret = false});
+
+  final String id;
+  final String label;
+  final bool secret;
+}
+
+@immutable
+class MtEngine {
+  const MtEngine(this.id, this.label, this.fields);
+
+  final String id;
+  final String label;
+  final List<MtField> fields;
+
+  String keyOf(MtField field) => 'mt.$id.${field.id}';
+}
+
+/// 全部机翻引擎;没有字段的是免费、无需凭据的。
+const mtEngines = [
+  MtEngine('google_free', 'Google 网页接口', []),
+  MtEngine('mymemory', 'MyMemory', []),
+  MtEngine('google', 'Google Cloud', [MtField('key', 'API Key', secret: true)]),
+  MtEngine('ali', '阿里翻译', [
+    MtField('id', 'AccessKey ID'),
+    MtField('secret', 'AccessKey Secret', secret: true),
+  ]),
+  MtEngine('baidu', '百度翻译', [
+    MtField('appid', 'APP ID'),
+    MtField('secret', '密钥', secret: true),
+  ]),
+];
+
+const defaultMtOrder = ['google_free', 'mymemory', 'google', 'ali', 'baidu'];
+const defaultMtEnabled = {'google_free', 'mymemory'};
+const minMtAttempts = 1;
+const maxMtAttempts = 10;
+const minMtTimeoutSeconds = 3;
+const maxMtTimeoutSeconds = 120;
+const defaultMtAttempts = 3;
+const defaultMtTimeoutSeconds = 25;
+
+/// 把存下来的顺序整理成"每个已知引擎恰好出现一次":丢掉不认识的,补上漏掉的。
+List<String> normalizeMtOrder(Iterable<String> saved) {
+  final known = {for (final e in mtEngines) e.id};
+  final kept = <String>{...saved.where(known.contains)};
+  return List.unmodifiable([
+    ...kept,
+    ...defaultMtOrder.where((id) => !kept.contains(id)),
+  ]);
+}
+
+String llmSecretKey(String llmId) => 'llm.$llmId.key';
+
+const protocolOpenAi = 'openai';
+const protocolGoogle = 'google';
+
+const defaultBaseUrls = {
+  protocolOpenAi: 'https://api.openai.com/v1',
+  protocolGoogle: 'https://generativelanguage.googleapis.com/v1beta',
+};
+
+/// 一个模型接口(OpenAI 或 Google 协议)。Key 不在这里,见 [AppConfig.secrets]。
+@immutable
+class LlmProfile {
+  const LlmProfile({
+    required this.id,
+    required this.name,
+    required this.baseUrl,
+    required this.model,
+    this.protocol = protocolOpenAi,
+    this.enabled = true,
+  });
+
+  factory LlmProfile.fromJson(Map<String, dynamic> j) => LlmProfile(
+    id: j['id'] as String,
+    name: j['name'] as String,
+    baseUrl: j['baseUrl'] as String,
+    model: j['model'] as String,
+    protocol: j['protocol'] == protocolGoogle ? protocolGoogle : protocolOpenAi,
+    enabled: j['enabled'] as bool? ?? true,
+  );
+
+  final String id;
+  final String name;
+  final String baseUrl;
+
+  /// 模型名称。一个接口可以填好几个,用逗号隔开,按先后顺序使用(见 [models])。
+  final String model;
+  final String protocol;
+
+  /// 这个接口要用的模型,按先后顺序;前一个失败了换下一个。
+  List<String> get models => [
+    for (final m in model.split(RegExp(r'[,,\n]')))
+      if (m.trim().isNotEmpty) m.trim(),
+  ];
+
+  /// 关掉的模型不参与任何用途。
+  final bool enabled;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'baseUrl': baseUrl,
+    'model': model,
+    'protocol': protocol,
+    'enabled': enabled,
+  };
+
+  LlmProfile copyWith({
+    String? name,
+    String? baseUrl,
+    String? model,
+    String? protocol,
+    bool? enabled,
+  }) => LlmProfile(
+    id: id,
+    name: name ?? this.name,
+    baseUrl: baseUrl ?? this.baseUrl,
+    model: model ?? this.model,
+    protocol: protocol ?? this.protocol,
+    enabled: enabled ?? this.enabled,
+  );
+}
+
+/// Preset = 系统提示 + 工具白名单。Skills 对所有 Preset 生效,见 [AppConfig.disabledSkills]。
+@immutable
+class AgentPreset {
+  const AgentPreset({
+    required this.id,
+    required this.name,
+    required this.systemPrompt,
+    required this.tools,
+    this.temperature = 0.7,
+    this.topP = 1,
+  });
+
+  factory AgentPreset.fromJson(Map<String, dynamic> j) => AgentPreset(
+    id: j['id'] as String,
+    name: j['name'] as String,
+    systemPrompt: j['systemPrompt'] as String,
+    tools: {...(j['tools'] as List).cast<String>()},
+    temperature: ((j['temperature'] as num?) ?? 0.7).clamp(0, 2).toDouble(),
+    topP: ((j['topP'] as num?) ?? 1).clamp(0.1, 1).toDouble(),
+  );
+
+  final String id;
+  final String name;
+  final String systemPrompt;
+  final Set<String> tools;
+  final double temperature;
+
+  /// 只在累计概率排在前这么多的词里选;1 是不限制(不发给模型)。
+  final double topP;
+
+  /// 界面上显示的名字;名字被清空时给个占位,免得出现点不到的空白项。
+  String get displayName => name.trim().isEmpty ? '未命名' : name;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'systemPrompt': systemPrompt,
+    'tools': tools.toList(),
+    'temperature': temperature,
+    'topP': topP,
+  };
+
+  AgentPreset copyWith({
+    String? id,
+    String? name,
+    String? systemPrompt,
+    Set<String>? tools,
+    double? temperature,
+    double? topP,
+  }) => AgentPreset(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    systemPrompt: systemPrompt ?? this.systemPrompt,
+    tools: tools ?? this.tools,
+    temperature: temperature ?? this.temperature,
+    topP: topP ?? this.topP,
+  );
+}
+
+const _positiveOnly = '你只处理文生图的【正面】提示词,不写负面提示词,也不负责出图。回答用中文,提示词本身用英文。';
+
+const factoryPresets = [
+  AgentPreset(
+    id: 'collab',
+    name: '协同写词',
+    systemPrompt:
+        '你是 Penna 的提示词协作者。先弄清用户想要的画面,再给出完整的英文自然语言正面提示词;'
+        '用户要求修改时只做最小必要改动,并说明改了哪里。$_positiveOnly',
+    tools: {
+      'ask_user',
+      'context_memory',
+      'load_skill',
+      'reverse_image',
+      'translate_mt',
+      'translate_llm',
+      'search_tags',
+      'related_tags',
+      'prompt_library',
+      'view_reference',
+    },
+  ),
+  AgentPreset(
+    id: 'reverse',
+    name: '反推润色',
+    systemPrompt:
+        '你负责把图片反推得到的 Tag 或自然语言描述,整理成干净、可直接出图的英文正面提示词:'
+        '去重、合并同义、按主体→外观→场景→光影→镜头排序。$_positiveOnly',
+    tools: {
+      'ask_user',
+      'context_memory',
+      'load_skill',
+      'reverse_image',
+      'search_tags',
+      'related_tags',
+      'view_reference',
+    },
+    temperature: 0.4,
+  ),
+  AgentPreset(
+    id: 'translate',
+    name: '意译合稿',
+    systemPrompt:
+        '你负责提示词的意译:保留原文的结构和信息量,用地道的英文表达画面,而不是逐字翻译;'
+        '同时给出中文对照,方便用户核对。$_positiveOnly',
+    tools: {'ask_user', 'load_skill', 'translate_mt', 'translate_llm'},
+    temperature: 0.3,
+  ),
+  AgentPreset(
+    id: 'free',
+    name: '自由改稿',
+    systemPrompt:
+        '你是提示词改稿助手。按用户的要求大胆改写、扩写或给出多个变体,每个变体单独成段并用一句话说明差异。$_positiveOnly',
+    // 不带 local-edit:它要求"只做最小改动",和这个 Preset 的"大胆改写"相反。
+    tools: {'ask_user', 'context_memory', 'load_skill', 'prompt_library'},
+    temperature: 0.9,
+  ),
+];
+
+/// 全部用户设置。[secrets] 单独加密保存,不进 [toJson]。
+@immutable
+class AppConfig {
+  const AppConfig({
+    this.llms = const [],
+    this.activeLlmId,
+    this.polishLlmId,
+    this.mtOrder = defaultMtOrder,
+    this.mtEnabled = defaultMtEnabled,
+    this.mtAttempts = defaultMtAttempts,
+    this.mtTimeoutSeconds = defaultMtTimeoutSeconds,
+    this.fields = const {},
+    this.paraphrase = true,
+    this.presets = factoryPresets,
+    this.activePresetId = 'collab',
+    this.fontLatin = '',
+    this.fontCjk = '',
+    this.agentAvatar = '',
+    this.userAvatar = '',
+    this.disabledSkills = const {},
+    this.tagSearchOnline = true,
+    this.quickActions = defaultQuickActions,
+    this.mcpServers = const [],
+    this.secrets = const {},
+  });
+
+  factory AppConfig.fromJson(Object? json) {
+    final m = json as Map<String, dynamic>;
+    final presets = [
+      for (final p in m['presets'] as List? ?? const [])
+        AgentPreset.fromJson(p as Map<String, dynamic>),
+    ];
+    return AppConfig(
+      llms: [
+        for (final l in m['llms'] as List? ?? const [])
+          LlmProfile.fromJson(l as Map<String, dynamic>),
+      ],
+      activeLlmId: m['activeLlmId'] as String?,
+      polishLlmId: m['polishLlmId'] as String?,
+      mtOrder: normalizeMtOrder((m['mtOrder'] as List? ?? const []).cast()),
+      // 旧版配置没有 mtOrder:那时的开关还没接功能,直接换成新默认(免费引擎)。
+      mtEnabled: m['mtOrder'] == null
+          ? defaultMtEnabled
+          : {...(m['mtEnabled'] as List? ?? const []).cast<String>()},
+      mtAttempts: ((m['mtAttempts'] as num?) ?? defaultMtAttempts)
+          .clamp(minMtAttempts, maxMtAttempts)
+          .toInt(),
+      mtTimeoutSeconds:
+          ((m['mtTimeoutSeconds'] as num?) ?? defaultMtTimeoutSeconds)
+              .clamp(minMtTimeoutSeconds, maxMtTimeoutSeconds)
+              .toInt(),
+      fields: {...(m['fields'] as Map? ?? const {}).cast<String, String>()},
+      paraphrase: m['paraphrase'] as bool? ?? true,
+      presets: presets.isEmpty ? factoryPresets : presets,
+      activePresetId: m['activePresetId'] as String? ?? 'collab',
+      fontLatin: m['fontLatin'] as String? ?? '',
+      fontCjk: m['fontCjk'] as String? ?? '',
+      agentAvatar: m['agentAvatar'] as String? ?? '',
+      userAvatar: m['userAvatar'] as String? ?? '',
+      tagSearchOnline: m['tagSearchOnline'] as bool? ?? true,
+      // 旧配置里没有这一项才给默认的;用户删空了就是空的。
+      quickActions: m['quickActions'] == null
+          ? defaultQuickActions
+          : List.unmodifiable([
+              for (final a in (m['quickActions'] as List).cast<Map>())
+                (
+                  label: a['label'] as String? ?? '',
+                  prompt: a['prompt'] as String? ?? '',
+                ),
+            ]),
+      disabledSkills: {
+        ...(m['disabledSkills'] as List? ?? const []).cast<String>(),
+      },
+      mcpServers: [
+        for (final s in m['mcpServers'] as List? ?? const [])
+          McpServer.fromJson(s as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  final List<LlmProfile> llms;
+
+  /// [llms] 的先后就是使用顺序:排前面的先用,失败了换下一个。
+  /// 这两个是"指定":Agent 对话 / 润色优先用哪个模型;null 表示直接按顺序。
+  final String? activeLlmId;
+  final String? polishLlmId;
+
+  /// Agent 对话依次尝试的模型。
+  List<LlmProfile> get agentChain => _llmChain(activeLlmId);
+
+  /// 润色依次尝试的模型。
+  List<LlmProfile> get polishChain => _llmChain(polishLlmId);
+
+  List<LlmProfile> _llmChain(String? pinnedId) {
+    final usable = llms.where((l) => l.enabled);
+    return [
+      ...usable.where((l) => l.id == pinnedId),
+      ...usable.where((l) => l.id != pinnedId),
+    ];
+  }
+
+  /// 启用的机翻引擎 id。
+  final Set<String> mtEnabled;
+
+  /// 全部引擎的优先顺序(含未启用的)。
+  final List<String> mtOrder;
+
+  /// 每个引擎最多尝试几次、单次等多久,都不行就换下一个。
+  final int mtAttempts;
+  final int mtTimeoutSeconds;
+
+  /// 按优先顺序排好的已启用引擎。
+  List<String> get mtChain => [
+    for (final id in mtOrder)
+      if (mtEnabled.contains(id)) id,
+  ];
+
+  /// 非机密的引擎字段(如 APP ID),键见 [MtEngine.keyOf]。
+  final Map<String, String> fields;
+
+  /// 是否启用 LLM 意译。
+  final bool paraphrase;
+  final List<AgentPreset> presets;
+  final String activePresetId;
+
+  /// 用户指定的英文 / 中文字体名;空串表示用内置字体。
+  final String fontLatin;
+  final String fontCjk;
+
+  /// 对话里 Agent / 用户头像的图片路径;空串表示用默认头像。
+  final String agentAvatar;
+  final String userAvatar;
+
+  /// 被用户关掉的 Skill。不在这里面的都是开着的,对所有 Preset 生效;
+  /// 所以新导入、新写出来的 Skill 默认就能用。
+  final Set<String> disabledSkills;
+
+  /// 查 Danbooru 标签时先问在线的 DanbooruSearch;关掉就只查内置词库。
+  final bool tagSearchOnline;
+
+  /// 聊天框上方的快捷操作,先后就是显示顺序。
+  final List<QuickAction> quickActions;
+  final List<McpServer> mcpServers;
+  final Map<String, String> secrets;
+
+  Map<String, dynamic> toJson() => {
+    'llms': [for (final l in llms) l.toJson()],
+    'activeLlmId': activeLlmId,
+    'polishLlmId': polishLlmId,
+    'mtOrder': mtOrder,
+    'mtEnabled': mtEnabled.toList(),
+    'mtAttempts': mtAttempts,
+    'mtTimeoutSeconds': mtTimeoutSeconds,
+    'fields': fields,
+    'paraphrase': paraphrase,
+    'presets': [for (final p in presets) p.toJson()],
+    'activePresetId': activePresetId,
+    'fontLatin': fontLatin,
+    'fontCjk': fontCjk,
+    'agentAvatar': agentAvatar,
+    'userAvatar': userAvatar,
+    'disabledSkills': disabledSkills.toList(),
+    'tagSearchOnline': tagSearchOnline,
+    'quickActions': [
+      for (final a in quickActions) {'label': a.label, 'prompt': a.prompt},
+    ],
+    'mcpServers': [for (final s in mcpServers) s.toJson()],
+  };
+
+  /// 开关一个 Skill。
+  AppConfig setSkill(String id, {required bool on}) => copyWith(
+    disabledSkills: on
+        ? ({...disabledSkills}..remove(id))
+        : {...disabledSkills, id},
+  );
+
+  AgentPreset get activePreset => presets.firstWhere(
+    (p) => p.id == activePresetId,
+    orElse: () => presets.first,
+  );
+
+  String llmKey(String llmId) => secrets[llmSecretKey(llmId)] ?? '';
+
+  AppConfig copyWith({
+    List<LlmProfile>? llms,
+    String? Function()? activeLlmId,
+    String? Function()? polishLlmId,
+    Set<String>? mtEnabled,
+    List<String>? mtOrder,
+    int? mtAttempts,
+    int? mtTimeoutSeconds,
+    Map<String, String>? fields,
+    bool? paraphrase,
+    List<AgentPreset>? presets,
+    String? activePresetId,
+    String? fontLatin,
+    String? fontCjk,
+    String? agentAvatar,
+    String? userAvatar,
+    Set<String>? disabledSkills,
+    bool? tagSearchOnline,
+    List<QuickAction>? quickActions,
+    List<McpServer>? mcpServers,
+    Map<String, String>? secrets,
+  }) => AppConfig(
+    llms: llms ?? this.llms,
+    activeLlmId: activeLlmId == null ? this.activeLlmId : activeLlmId(),
+    polishLlmId: polishLlmId == null ? this.polishLlmId : polishLlmId(),
+    mtEnabled: mtEnabled ?? this.mtEnabled,
+    mtOrder: mtOrder ?? this.mtOrder,
+    mtAttempts: mtAttempts ?? this.mtAttempts,
+    mtTimeoutSeconds: mtTimeoutSeconds ?? this.mtTimeoutSeconds,
+    fields: fields ?? this.fields,
+    paraphrase: paraphrase ?? this.paraphrase,
+    presets: presets ?? this.presets,
+    activePresetId: activePresetId ?? this.activePresetId,
+    fontLatin: fontLatin ?? this.fontLatin,
+    fontCjk: fontCjk ?? this.fontCjk,
+    agentAvatar: agentAvatar ?? this.agentAvatar,
+    userAvatar: userAvatar ?? this.userAvatar,
+    disabledSkills: disabledSkills ?? this.disabledSkills,
+    tagSearchOnline: tagSearchOnline ?? this.tagSearchOnline,
+    quickActions: quickActions ?? this.quickActions,
+    mcpServers: mcpServers ?? this.mcpServers,
+    secrets: secrets ?? this.secrets,
+  );
+
+  AppConfig setSecret(String key, String value) =>
+      copyWith(secrets: {...secrets, key: value});
+
+  AppConfig setField(String key, String value) =>
+      copyWith(fields: {...fields, key: value});
+
+  /// 新增(排到最后)或替换一个模型。
+  AppConfig putLlm(LlmProfile llm) {
+    final exists = llms.any((l) => l.id == llm.id);
+    return copyWith(
+      llms: exists
+          ? [for (final l in llms) l.id == llm.id ? llm : l]
+          : [...llms, llm],
+    );
+  }
+
+  /// 把第 [from] 个模型挪到第 [to] 位。
+  AppConfig moveLlm(int from, int to) {
+    final next = [...llms];
+    next.insert(to, next.removeAt(from));
+    return copyWith(llms: next);
+  }
+
+  /// 删除模型及其 Key;指定了它的用途改回按顺序。
+  AppConfig removeLlm(String id) => copyWith(
+    llms: [
+      for (final l in llms)
+        if (l.id != id) l,
+    ],
+    activeLlmId: () => activeLlmId == id ? null : activeLlmId,
+    polishLlmId: () => polishLlmId == id ? null : polishLlmId,
+    secrets: {...secrets}..remove(llmSecretKey(id)),
+  );
+
+  AppConfig putPreset(AgentPreset preset) => copyWith(
+    presets: [for (final p in presets) p.id == preset.id ? preset : p],
+  );
+}
+
+bool isFactoryPreset(String id) => factoryPresets.any((p) => p.id == id);
+
+extension McpEditing on AppConfig {
+  /// 新增或替换一个 MCP 服务。
+  AppConfig putMcp(McpServer server) => copyWith(
+    mcpServers: mcpServers.any((s) => s.id == server.id)
+        ? [for (final s in mcpServers) s.id == server.id ? server : s]
+        : [...mcpServers, server],
+  );
+
+  /// 删除 MCP 服务及其令牌、环境变量。
+  AppConfig removeMcp(String id) => copyWith(
+    mcpServers: [
+      for (final s in mcpServers)
+        if (s.id != id) s,
+    ],
+    secrets: {...secrets}
+      ..remove(mcpTokenKey(id))
+      ..remove(mcpEnvKey(id)),
+  );
+}
+
+extension PresetEditing on AppConfig {
+  /// 新增一个 Preset 并设为当前。
+  AppConfig addPreset(AgentPreset preset) =>
+      copyWith(presets: [...presets, preset], activePresetId: preset.id);
+
+  /// 删除 Preset;至少保留一个,删的是当前的就改用第一个。
+  AppConfig removePreset(String id) {
+    final rest = [
+      for (final p in presets)
+        if (p.id != id) p,
+    ];
+    if (rest.isEmpty) return this;
+    return copyWith(
+      presets: rest,
+      activePresetId: activePresetId == id ? rest.first.id : activePresetId,
+    );
+  }
+}
