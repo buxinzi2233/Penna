@@ -186,7 +186,7 @@ void main() {
       await service.load();
 
       expect(service.lastError, contains('读取设置失败'));
-      expect(service.config.presets, hasLength(4));
+      expect(service.config.presets, hasLength(factoryPresets.length));
       final names = service.file.parent.listSync().map((f) => f.path);
       expect(names.where((p) => p.contains('config.json.bad-')), hasLength(1));
       expect(service.file.existsSync(), isFalse);

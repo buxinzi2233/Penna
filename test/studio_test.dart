@@ -212,8 +212,8 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('新建 Preset(复制当前)'));
     await tester.pump();
-    expect(config.config.presets, hasLength(5));
-    expect(config.config.activePreset.name, '协同写词 副本');
+    expect(config.config.presets, hasLength(factoryPresets.length + 1));
+    expect(config.config.activePreset.name, '动漫风格 副本');
 
     await tester.tap(find.text('Skills'));
     await tester.pump();
