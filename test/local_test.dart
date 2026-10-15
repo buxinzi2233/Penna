@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/attachment.dart';
 import 'package:penna/core/harness/local/download.dart';
 import 'package:penna/core/harness/local/llama_server.dart';
+import 'package:penna/core/harness/local/model_scan.dart';
 import 'package:penna/core/harness/local/wd_tagger.dart';
 import 'package:penna/core/harness/providers/llm_http.dart';
 import 'package:penna/ui/features/local/local_model.dart';
@@ -333,6 +334,132 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('模型文件夹', () {
+    /// 在 [root] 下放好一堆文件(路径用 / 分隔),内容随便。
+    void files(Directory root, List<String> paths) {
+      for (final p in paths) {
+        File('${root.path}/$p')
+          ..createSync(recursive: true)
+          ..writeAsStringSync('x');
+      }
+    }
+
+    late Directory root;
+    setUp(() {
+      root = Directory('${tmp.path}/models')..createSync();
+      files(root, [
+        // BooruDatasetTagManagerPlus 的放法
+        'bdtm/Models/SmilingWolf/wd-vit-tagger-v3/model.onnx',
+        'bdtm/Models/SmilingWolf/wd-vit-tagger-v3/selected_tags.csv',
+        // HuggingFace 缓存
+        'hf/hub/models--SmilingWolf--wd-swinv2-tagger-v3/snapshots/'
+            '0123456789abcdef0123/model.onnx',
+        'hf/hub/models--SmilingWolf--wd-swinv2-tagger-v3/snapshots/'
+            '0123456789abcdef0123/selected_tags.csv',
+        // 不在清单里的 WD 模型
+        'other/wd-v1-4-moat-tagger-v2/model.onnx',
+        'other/wd-v1-4-moat-tagger-v2/selected_tags.csv',
+        // 只有模型、没有标签表的不算
+        'half/model.onnx',
+        // NLapt 的放法
+        'nlapt/toriigate-0.5/ToriiGate-0.5-Q4_K_M.gguf',
+        'nlapt/toriigate-0.5/ToriiGate-0.5-fp16.mmproj.gguf',
+        // 别的 GGUF,配同文件夹的视觉组件
+        'llm/qwen/qwen-vl.gguf',
+        'llm/qwen/mmproj-qwen.gguf',
+        'llm/text-only.gguf',
+        'bin/llama-server.exe',
+        // 跳过的文件夹
+        'node_modules/x/model.gguf',
+      ]);
+    });
+
+    test('一层层往下找;认得清单里的模型,跳过 node_modules', () {
+      final f = scanModelFolders([root.path]);
+
+      expect(f.taggers, hasLength(3));
+      expect(f.taggers.map(catalogTaggerFor).toSet(), {
+        'SmilingWolf/wd-vit-tagger-v3',
+        'SmilingWolf/wd-swinv2-tagger-v3',
+        null,
+      });
+      expect(f.ggufs.map(fileName).toSet(), {
+        'ToriiGate-0.5-Q4_K_M.gguf',
+        'qwen-vl.gguf',
+        'text-only.gguf',
+      });
+      expect(f.mmprojs, hasLength(2));
+      expect(f.servers, hasLength(1));
+      expect(f.truncated, isFalse);
+      expect(
+        folderTitle(
+          '${root.path}/hf/hub/models--SmilingWolf--wd-swinv2-tagger-v3/'
+          'snapshots/0123456789abcdef0123',
+        ),
+        'wd-swinv2-tagger-v3',
+      );
+      // 条目太多时停下,说一声。
+      expect(scanModelFolders([root.path], maxEntries: 3).truncated, isTrue);
+    });
+
+    test('找到的直接能用:打标模型、看图模型、llama-server,不在清单里的也列出来', () async {
+      final model = LocalModel(
+        dir: tmp,
+        streamChat: (_) => const Stream.empty(),
+      );
+      expect(model.taggerPaths(taggerModels.last), isNull);
+
+      model.addFolder(root.path);
+      while (model.scanning) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+
+      // ViT v3 在 BDTM 的文件夹里找到了,不用下。
+      final vit = taggerModels.firstWhere(
+        (m) => m.repo == 'SmilingWolf/wd-vit-tagger-v3',
+      );
+      expect(model.taggerPaths(vit)!.model, endsWith('model.onnx'));
+      // 不在清单里的那个也能选,阈值用默认值。
+      final moat = model.taggers.firstWhere(
+        (m) => m.name == 'wd-v1-4-moat-tagger-v2',
+      );
+      expect(moat.general, 0.35);
+      expect(model.taggerPaths(moat), isNotNull);
+
+      final torii = captionModels.firstWhere((m) => m.id == 'toriigate-0.5');
+      expect(model.useCaption(torii), isTrue);
+      expect(model.modelPath, endsWith('ToriiGate-0.5-Q4_K_M.gguf'));
+      expect(model.mmprojPath, endsWith('ToriiGate-0.5-fp16.mmproj.gguf'));
+
+      expect(
+        {
+          for (final g in model.foundGgufs)
+            fileName(g.model): fileName(g.mmproj),
+        },
+        {'qwen-vl.gguf': 'mmproj-qwen.gguf', 'text-only.gguf': ''},
+      );
+      expect(model.serverExe, endsWith('llama-server.exe'));
+
+      // 文件夹存盘后还在,重开时自动再扫一遍。
+      final again = LocalModel(
+        dir: tmp,
+        streamChat: (_) => const Stream.empty(),
+      );
+      await again.load();
+      expect(again.modelFolders, [root.path]);
+      while (again.scanning) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(again.found.taggers, hasLength(3));
+
+      model.removeFolder(root.path);
+      while (model.scanning) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(model.taggerPaths(vit), isNull);
     });
   });
 

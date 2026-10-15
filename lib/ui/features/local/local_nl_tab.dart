@@ -55,6 +55,7 @@ class _NlTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _FoldersBlock(model: model),
         _runtime(context),
         _models(context),
         _params(),
@@ -120,10 +121,32 @@ class _NlTab extends StatelessWidget {
               note: m.note,
               files: model.captionFiles(m),
               onDownload: () => model.downloadCaption(m),
-              selected: model.modelPath == model.captionFiles(m).first.path,
-              onSelect: () => model.ready(model.captionFiles(m))
-                  ? model.useCaption(m)
+              foundAt: model.ready(model.captionFiles(m))
+                  ? null
+                  : model.captionPaths(m)?.model,
+              selected: model.modelPath == model.captionPaths(m)?.model,
+              onSelect: () => model.useCaption(m)
+                  ? null
                   : showToast(context, '先下载这个模型', warn: true),
+            ),
+          // 文件夹里找到的别的 GGUF:点一下就用它(同文件夹里的视觉组件一起配上)。
+          for (final g in model.foundGgufs)
+            _DownloadRow(
+              model: model,
+              keyName: g.model,
+              name: fileName(g.model),
+              note: g.mmproj.isEmpty
+                  ? '本机 · 仅文本'
+                  : '本机 · 视觉组件 ${fileName(g.mmproj)}',
+              files: const [],
+              done: true,
+              onDownload: () async => null,
+              foundAt: g.model,
+              selected: model.modelPath == g.model,
+              onSelect: () => model.update(() {
+                model.modelPath = g.model;
+                model.mmprojPath = g.mmproj;
+              }),
             ),
           const SizedBox(height: 6),
           _PathPicker(

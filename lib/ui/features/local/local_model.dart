@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/harness/attachment.dart';
 import '../../../core/harness/local/download.dart';
 import '../../../core/harness/local/llama_server.dart';
+import '../../../core/harness/local/model_scan.dart';
 import '../../../core/harness/local/wd_tagger.dart';
 import '../../../core/harness/providers/llm_http.dart';
 import '../../../data/services/onnx_model.dart';
@@ -59,6 +60,9 @@ class LocalModel extends ChangeNotifier {
   int gpuLayers = -1;
   String captionPrompt = defaultCaptionPrompt;
 
+  /// 用户加的模型文件夹:连同子文件夹一起找已有的模型,找到的直接用,不用再下。
+  List<String> modelFolders = const [];
+
   // —— 只在内存里的 ——
   Attachment? _image;
   final _downloads = <String, Progress>{};
@@ -86,6 +90,13 @@ class LocalModel extends ChangeNotifier {
   String get caption => _caption;
   bool get serverRunning => server.running;
 
+  FoundModels _found = noModels;
+  bool _scanning = false;
+
+  /// 上次在模型文件夹里扫到的东西。
+  FoundModels get found => _found;
+  bool get scanning => _scanning;
+
   /// 正在下载的东西(按 [download] 时给的名字)和进度。
   Progress? progressOf(String key) => _downloads[key];
   bool get downloading => _downloads.isNotEmpty;
@@ -93,9 +104,63 @@ class LocalModel extends ChangeNotifier {
   String get _sep => Platform.pathSeparator;
   String get _home => dir?.path ?? '';
 
+  /// 文件夹里找到、但不在清单里的打标模型,id 用这个开头接文件夹路径。
+  static const _localTagger = 'local:';
+
+  /// 能选的打标模型:清单里的,加上文件夹里找到的别的 WD 类模型(阈值用常见的默认值)。
+  List<TaggerModel> get taggers => [
+    ...taggerModels,
+    for (final d in _found.taggers)
+      if (catalogTaggerFor(d) == null)
+        (
+          repo: '$_localTagger$d',
+          name: folderTitle(d),
+          note: '本机',
+          general: 0.35,
+          character: 0.85,
+        ),
+  ];
+
   TaggerModel get tagger =>
-      taggerModels.where((m) => m.repo == taggerRepo).firstOrNull ??
+      taggers.where((m) => m.repo == taggerRepo).firstOrNull ??
       taggerModels.first;
+
+  /// 打标模型在文件夹里找到的位置;自己下载过的不算。
+  String? foundTagger(TaggerModel m) => m.repo.startsWith(_localTagger)
+      ? m.repo.substring(_localTagger.length)
+      : _found.taggers.where((d) => catalogTaggerFor(d) == m.repo).firstOrNull;
+
+  /// 要用的模型和标签表:自己下载的优先,其次是文件夹里找到的。都没有时为 null。
+  ({String model, String labels})? taggerPaths(TaggerModel m) {
+    if (!m.repo.startsWith(_localTagger)) {
+      final files = taggerFiles(m);
+      if (ready(files)) return (model: files[0].path, labels: files[1].path);
+    }
+    final dir = foundTagger(m);
+    return dir == null
+        ? null
+        : (
+            model: '$dir$_sep$taggerModelFile',
+            labels: '$dir$_sep$taggerLabelsFile',
+          );
+  }
+
+  /// 看图模型要用的文件:自己下载的优先,其次是文件夹里找到的同名文件。
+  ({String model, String mmproj})? captionPaths(CaptionModel m) {
+    final files = captionFiles(m);
+    if (ready(files)) return (model: files[0].path, mmproj: files[1].path);
+    return findCaption(m, _found);
+  }
+
+  /// 文件夹里找到的、不在清单里的 GGUF 模型,配好同一个文件夹里的视觉组件。
+  List<({String model, String mmproj})> get foundGgufs {
+    final known = {for (final m in captionModels) m.file};
+    return [
+      for (final g in _found.ggufs)
+        if (!known.contains(fileName(g)))
+          (model: g, mmproj: mmprojFor(g, _found.mmprojs)),
+    ];
+  }
 
   // —— 文件位置 ——
 
@@ -142,12 +207,46 @@ class LocalModel extends ChangeNotifier {
   bool ready(List<RemoteFile> files) =>
       dir != null && files.every(isDownloaded);
 
-  /// 要用的 llama-server:自己选的优先,其次是下载好的运行时。
+  /// 要用的 llama-server:自己选的优先,其次是下载好的运行时,再次是文件夹里找到的。
   String? get serverExe => exePath.isNotEmpty
       ? exePath
-      : dir == null
-      ? null
-      : findServerExe(_runtimeDir)?.path;
+      : (dir == null ? null : findServerExe(_runtimeDir)?.path) ??
+            _found.servers.firstOrNull;
+
+  // —— 模型文件夹 ——
+
+  void addFolder(String path) {
+    if (modelFolders.contains(path)) return;
+    update(() => modelFolders = List.unmodifiable([...modelFolders, path]));
+    rescan();
+  }
+
+  void removeFolder(String path) {
+    update(
+      () => modelFolders = List.unmodifiable(
+        modelFolders.where((f) => f != path),
+      ),
+    );
+    rescan();
+  }
+
+  /// 重新扫一遍模型文件夹。在别的 isolate 里扫,文件多也不卡界面。
+  Future<void> rescan() async {
+    final roots = modelFolders;
+    _scanning = true;
+    notifyListeners();
+    FoundModels result = noModels;
+    try {
+      result = await Isolate.run(() => scanModelFolders(roots));
+    } on Object catch (e) {
+      debugPrint('扫描模型文件夹失败:${e.runtimeType}');
+    }
+    // 扫的时候文件夹又变了:以后面那次为准。
+    if (!identical(roots, modelFolders)) return;
+    _found = result;
+    _scanning = false;
+    notifyListeners();
+  }
 
   // —— 改设置 ——
 
@@ -300,12 +399,15 @@ class LocalModel extends ChangeNotifier {
     return problem;
   }
 
-  void useCaption(CaptionModel m) {
-    final files = captionFiles(m);
+  /// 用这个看图模型;下载的、文件夹里找到的都行。没有时返回 false。
+  bool useCaption(CaptionModel m) {
+    final paths = captionPaths(m);
+    if (paths == null) return false;
     update(() {
-      modelPath = files[0].path;
-      mmprojPath = files[1].path;
+      modelPath = paths.model;
+      mmprojPath = paths.mmproj;
     });
+    return true;
   }
 
   // —— Tag ——
@@ -315,8 +417,8 @@ class LocalModel extends ChangeNotifier {
     final image = _image;
     if (image == null) return '先放一张图';
     if (_tagging) return '正在推理';
-    final files = taggerFiles(tagger);
-    if (!ready(files)) return '先下载模型';
+    final paths = taggerPaths(tagger);
+    if (paths == null) return '先下载模型';
     _tagging = true;
     final round = _round;
     notifyListeners();
@@ -324,8 +426,8 @@ class LocalModel extends ChangeNotifier {
     try {
       if (_taggerFor != tagger.repo) {
         _dropTagger();
-        _labels = parseSelectedTags(await File(files[1].path).readAsString());
-        _tagger = await _loadOnnx(files[0].path);
+        _labels = parseSelectedTags(await File(paths.labels).readAsString());
+        _tagger = await _loadOnnx(paths.model);
         _taggerFor = tagger.repo;
       }
       final model = _tagger!;
@@ -468,6 +570,7 @@ class LocalModel extends ChangeNotifier {
     'context': context,
     'gpuLayers': gpuLayers,
     'captionPrompt': captionPrompt,
+    'modelFolders': modelFolders,
   };
 
   void _save() {
@@ -497,6 +600,11 @@ class LocalModel extends ChangeNotifier {
       context = j['context'] as int? ?? context;
       gpuLayers = j['gpuLayers'] as int? ?? gpuLayers;
       captionPrompt = j['captionPrompt'] as String? ?? captionPrompt;
+      modelFolders = List.unmodifiable([
+        for (final f in j['modelFolders'] as List? ?? const []) f as String,
+      ]);
+      // 不等它扫完:文件夹大的话要好一会儿,不拦着程序启动。
+      if (modelFolders.isNotEmpty) rescan();
       notifyListeners();
     } on Object {
       // 读不了就用默认设置,不拦着程序启动。

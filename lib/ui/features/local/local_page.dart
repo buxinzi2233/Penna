@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/harness/local/download.dart';
 import '../../../core/harness/local/llama_server.dart';
+import '../../../core/harness/local/model_scan.dart';
 import '../../../core/harness/local/wd_tagger.dart';
 import '../../../data/models/app_config.dart';
 import '../../../data/services/config_service.dart';
@@ -200,9 +201,13 @@ class _DownloadRow extends StatelessWidget {
     this.selected = false,
     this.onSelect,
     this.done,
+    this.foundAt,
   });
 
   final LocalModel model;
+
+  /// 在模型文件夹里找到时是它所在的位置:直接能用,不显示下载,也不给删(那是别的程序的文件)。
+  final String? foundAt;
 
   /// 下好了没有;不给就看 [files] 在不在。
   final bool? done;
@@ -305,7 +310,9 @@ class _DownloadRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            if (progress != null)
+            if (progress == null && foundAt != null)
+              Tooltip(message: foundAt!, child: const _Badge('本机'))
+            else if (progress != null)
               PennaButton(
                 label: '停止',
                 icon: Icons.stop_circle_outlined,
@@ -331,6 +338,109 @@ class _DownloadRow extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 一个小标签,比如「本机」。
+class _Badge extends StatelessWidget {
+  const _Badge(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: PennaColors.diffAdd,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 11, color: PennaColors.diffAddText),
+      ),
+    );
+  }
+}
+
+/// 模型文件夹:加几个电脑上已有模型的文件夹,连同子文件夹一起找,找到的直接用。
+class _FoldersBlock extends StatelessWidget {
+  const _FoldersBlock({required this.model});
+
+  final LocalModel model;
+
+  Future<void> _add() async {
+    final path = await getDirectoryPath();
+    if (path != null) model.addFolder(path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = model.found;
+    final counts = [
+      if (f.taggers.isNotEmpty) '${f.taggers.length} 个打标模型',
+      if (f.ggufs.isNotEmpty) '${f.ggufs.length} 个 GGUF 模型',
+      if (f.servers.isNotEmpty) 'llama-server',
+    ];
+    return _Block(
+      title: '模型文件夹',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (model.modelFolders.isNotEmpty)
+            IconButton(
+              tooltip: '重新扫描',
+              iconSize: 16,
+              visualDensity: VisualDensity.compact,
+              color: PennaColors.slate500,
+              icon: const Icon(Icons.refresh),
+              onPressed: model.scanning ? null : model.rescan,
+            ),
+          PennaButton(
+            label: '添加文件夹',
+            icon: Icons.create_new_folder_outlined,
+            borderColor: PennaColors.border,
+            onPressed: _add,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final folder in model.modelFolders)
+            Row(
+              children: [
+                const Icon(
+                  Icons.folder_outlined,
+                  size: 15,
+                  color: PennaColors.slate500,
+                ),
+                const SizedBox(width: 6),
+                Expanded(child: _PathText(folder)),
+                IconButton(
+                  tooltip: '移除',
+                  iconSize: 14,
+                  visualDensity: VisualDensity.compact,
+                  color: PennaColors.slate400,
+                  icon: const Icon(Icons.close),
+                  onPressed: () => model.removeFolder(folder),
+                ),
+              ],
+            ),
+          Text(
+            model.scanning
+                ? '扫描中…'
+                : model.modelFolders.isEmpty
+                ? '添加已有模型的文件夹,子文件夹一起查找'
+                : counts.isEmpty
+                ? '没有找到可用的模型'
+                : '找到 ${counts.join('、')}'
+                      '${f.truncated ? '(文件太多,只查了一部分)' : ''}',
+            style: const TextStyle(fontSize: 11.5, color: PennaColors.slate500),
+          ),
+        ],
       ),
     );
   }

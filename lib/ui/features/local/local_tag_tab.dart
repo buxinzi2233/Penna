@@ -8,31 +8,39 @@ class _TagTab extends StatelessWidget {
   final LocalModel model;
   final ValueChanged<String> onToDraft;
 
+  /// 一个打标模型:自己下载过的可以删;文件夹里找到的标「本机」,直接用。
+  Widget _taggerRow(TaggerModel m, {required bool selected}) {
+    final files = model.taggerFiles(m);
+    final own = model.ready(files);
+    return _DownloadRow(
+      model: model,
+      keyName: m.repo,
+      name: m.name,
+      note: m.note,
+      files: files,
+      onDownload: () => model.download(m.repo, files),
+      foundAt: own ? null : model.foundTagger(m),
+      selected: selected,
+      onSelect: () => model.pickTagger(m.repo),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = model.tagger;
-    final ready = model.ready(model.taggerFiles(current));
+    final ready = model.taggerPaths(current) != null;
     final tags = model.tags;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _FoldersBlock(model: model),
         _Block(
           title: '模型',
           trailing: _SourcePicker(model: model),
           child: Column(
             children: [
-              for (final m in taggerModels)
-                _DownloadRow(
-                  model: model,
-                  keyName: m.repo,
-                  name: m.name,
-                  note: m.note,
-                  files: model.taggerFiles(m),
-                  onDownload: () =>
-                      model.download(m.repo, model.taggerFiles(m)),
-                  selected: m.repo == current.repo,
-                  onSelect: () => model.pickTagger(m.repo),
-                ),
+              for (final m in model.taggers)
+                _taggerRow(m, selected: m.repo == current.repo),
             ],
           ),
         ),

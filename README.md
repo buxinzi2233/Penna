@@ -81,6 +81,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 - **Tag**:使用 WD14 系列 ONNX 打标模型生成 Danbooru 标签,角色与通用标签各有阈值,调整后即时重新筛选。
 - **自然语言**:使用 llama.cpp 运行 GGUF 看图模型(Gemma 4、ToriiGate、JoyCaption 等)撰写画面描述;运行中的服务可以加入 API 管理,供 Agent 与润色使用。
 - 模型与运行时可从 HuggingFace 或国内镜像下载,支持断点续传与完整性校验;也可以选用本机已有的 GGUF 文件和 llama-server。
+- 可以添加模型文件夹:连同子文件夹一起查找已有的模型(兼容 BooruDatasetTagManagerPlus、NLapt 与 HuggingFace 缓存的目录结构),找到的模型直接使用。
 - 结果可以复制或放到成稿。
 
 ### Danbooru 标签
