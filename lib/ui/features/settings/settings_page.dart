@@ -5,9 +5,11 @@ import '../../core/smooth_scroll.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../../data/services/skill_store.dart';
+import '../local/local_model.dart';
 import 'settings_agent_sections.dart';
 import 'settings_extension_sections.dart';
 import 'settings_llm_section.dart';
+import 'settings_local_section.dart';
 import 'settings_translate_section.dart';
 
 typedef _Tab = ({IconData icon, String label});
@@ -20,15 +22,22 @@ const List<_Tab> _tabs = [
   (icon: Icons.tune, label: '参数与工具'),
   (icon: Icons.electrical_services, label: 'MCP'),
   (icon: Icons.bolt_outlined, label: '快捷操作'),
+  (icon: Icons.memory_outlined, label: '本地反推'),
   (icon: Icons.text_fields, label: '外观'),
 ];
 
 /// 设置页:左边分区导航,右边对应的表单。改动即时保存。
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.service, required this.skills});
+  const SettingsPage({
+    super.key,
+    required this.service,
+    required this.skills,
+    required this.local,
+  });
 
   final ConfigService service;
   final SkillStore skills;
+  final LocalModel local;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -96,6 +105,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     4 => AbilitySection(service: service),
                     5 => McpSection(service: service),
                     6 => QuickActionSection(service: service),
+                    7 => LocalSection(service: service, local: widget.local),
                     _ => AppearanceSection(service: service),
                   },
                 ),

@@ -11,7 +11,7 @@ import 'package:penna/core/harness/local/download.dart';
 import 'package:penna/core/harness/local/florence.dart';
 import 'package:penna/core/harness/local/llama_server.dart';
 import 'package:penna/core/harness/local/model_scan.dart';
-import 'package:penna/core/harness/local/wd_tagger.dart';
+import 'package:penna/core/harness/local/tagger.dart';
 import 'package:penna/core/harness/providers/llm_http.dart';
 import 'package:penna/ui/features/local/local_model.dart';
 
@@ -362,8 +362,11 @@ void main() {
         'hf/hub/models--SmilingWolf--wd-swinv2-tagger-v3/snapshots/'
             '0123456789abcdef0123/selected_tags.csv',
         // 不在清单里的 WD 模型
-        'other/wd-v1-4-moat-tagger-v2/model.onnx',
-        'other/wd-v1-4-moat-tagger-v2/selected_tags.csv',
+        'other/my-tagger/model.onnx',
+        'other/my-tagger/selected_tags.csv',
+        // CL v1 放在仓库的子文件夹里
+        'hf/Nonene/cl_tagger/cl_tagger_1_02/model.onnx',
+        'hf/Nonene/cl_tagger/cl_tagger_1_02/tag_mapping.json',
         // 只有模型、没有标签表的不算
         'half/model.onnx',
         // NLapt 的放法
@@ -382,10 +385,11 @@ void main() {
     test('一层层往下找;认得清单里的模型,跳过 node_modules', () {
       final f = scanModelFolders([root.path]);
 
-      expect(f.taggers, hasLength(3));
+      expect(f.taggers, hasLength(4));
       expect(f.taggers.map(catalogTaggerFor).toSet(), {
         'SmilingWolf/wd-vit-tagger-v3',
         'SmilingWolf/wd-swinv2-tagger-v3',
+        'cl:Nonene/cl_tagger:1_02',
         null,
       });
       expect(f.ggufs.map(fileName).toSet(), {
@@ -412,7 +416,7 @@ void main() {
         dir: tmp,
         streamChat: (_) => const Stream.empty(),
       );
-      expect(model.taggerPaths(taggerModels.last), isNull);
+      expect(model.taggerPaths(taggerModels.first), isNull);
 
       model.addFolder(root.path);
       while (model.scanning) {
@@ -421,15 +425,19 @@ void main() {
 
       // ViT v3 在 BDTM 的文件夹里找到了,不用下。
       final vit = taggerModels.firstWhere(
-        (m) => m.repo == 'SmilingWolf/wd-vit-tagger-v3',
+        (m) => m.id == 'SmilingWolf/wd-vit-tagger-v3',
       );
       expect(model.taggerPaths(vit)!.model, endsWith('model.onnx'));
       // 不在清单里的那个也能选,阈值用默认值。
-      final moat = model.taggers.firstWhere(
-        (m) => m.name == 'wd-v1-4-moat-tagger-v2',
+      final mine = model.taggers.firstWhere((m) => m.name == '[本机] my-tagger');
+      expect(
+        (mine.general, mine.series, mine.kind),
+        (0.35, '本机', TaggerKind.wd),
       );
-      expect(moat.general, 0.35);
-      expect(model.taggerPaths(moat), isNotNull);
+      expect(model.taggerPaths(mine), isNotNull);
+      // CL 的标签表是 tag_mapping.json。
+      final cl = taggerModels.firstWhere((m) => m.kind == TaggerKind.clV1);
+      expect(model.taggerPaths(cl)!.labels, endsWith('tag_mapping.json'));
 
       final torii = captionModels.firstWhere((m) => m.id == 'toriigate-0.5');
       expect(model.useCaption(torii), isTrue);
@@ -455,13 +463,137 @@ void main() {
       while (again.scanning) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
-      expect(again.found.taggers, hasLength(3));
+      expect(again.found.taggers, hasLength(4));
 
       model.removeFolder(root.path);
       while (model.scanning) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
       expect(model.taggerPaths(vit), isNull);
+    });
+  });
+
+  group('各种打标模型', () {
+    test('标签表:PixAI 的 csv 和 tags.json、CL 的两种 json、OppaiOracle 的 csv', () {
+      expect(
+        parseLabels(
+          TaggerKind.pixai09,
+          'id,tag_id,name,category\n0,5,smile,0\n1,6,miku,4',
+        ),
+        [(name: 'smile', category: 0), (name: 'miku', category: 4)],
+      );
+      expect(
+        parseLabels(
+          TaggerKind.pixai10,
+          jsonEncode({
+            'categories': [
+              {
+                'name': 'character',
+                'offset': 1,
+                'count': 1,
+                'tags': ['miku'],
+              },
+              {
+                'name': 'general',
+                'offset': 0,
+                'count': 1,
+                'tags': ['smile'],
+              },
+            ],
+          }),
+        ),
+        [
+          (name: 'smile', category: tagGeneral),
+          (name: 'miku', category: tagCharacter),
+        ],
+      );
+      expect(
+        parseLabels(
+          TaggerKind.clV1,
+          jsonEncode({
+            '1': {'tag': 'miku', 'category': 'Character'},
+            '0': {'tag': 'smile', 'category': 'General'},
+          }),
+        ),
+        [
+          (name: 'smile', category: tagGeneral),
+          (name: 'miku', category: tagCharacter),
+        ],
+      );
+      expect(
+        parseLabels(
+          TaggerKind.clV2,
+          jsonEncode({
+            'idx_to_tag': {'0': 'smile', '1': 'miku', '2': 'oc'},
+            'tag_to_category': {
+              'smile': 'General',
+              'miku': 1,
+              'oc': 'Copyright',
+            },
+          }),
+        ),
+        [
+          (name: 'smile', category: tagGeneral),
+          (name: 'miku', category: tagCharacter),
+          (name: 'oc', category: tagCopyright),
+        ],
+      );
+      final oo = parseLabels(
+        TaggerKind.oppai,
+        'tag_id,name\n0,<PAD>\n1,smile\n2,rating:safe',
+      );
+      expect([for (final l in oo) l.category], [-1, tagGeneral, -1]);
+    });
+
+    test('只留通用和角色;logits 过 sigmoid;skip 里的不要', () {
+      const labels = [
+        (name: 'smile', category: tagGeneral),
+        (name: 'oc', category: tagCopyright),
+        (name: 'gray_background', category: tagGeneral),
+      ];
+      final r = decodeTags(
+        [3, 3, 3],
+        labels,
+        general: 0.5,
+        character: 0.5,
+        logits: true,
+        skip: {'gray_background'},
+      );
+      expect(r.general.map((t) => t.tag), ['smile']);
+      expect(r.general.single.prob, closeTo(0.9526, 1e-3));
+    });
+
+    test('预处理:PixAI v1.0 黑底、OppaiOracle 灰底加掩码、CL v1 用 BGR', () {
+      // 1×1 的红点贴到 3×3 的画布正中。
+      final red = Uint8List.fromList([255, 0, 0, 255]);
+      double norm(int v) => (v / 255 - 0.5) / 0.5;
+
+      final pixai = prepareTaggerInput(TaggerKind.pixai10, red, 1, 1, size: 3);
+      expect(pixai.shape, [1, 3, 3, 3]);
+      expect(pixai.pixels[0], norm(0)); // 角上是黑色
+      expect(pixai.pixels[4], norm(255)); // 正中 R 通道是红
+
+      final oo = prepareTaggerInput(TaggerKind.oppai, red, 1, 1, size: 3);
+      expect(oo.pixels[0], closeTo(norm(114), 1e-6));
+      expect(oo.mask, [true, true, true, true, false, true, true, true, true]);
+
+      final cl = prepareTaggerInput(TaggerKind.clV1, red, 1, 1, size: 3);
+      // BGR:第 0 个通道是蓝色,红点那里是 0。
+      expect(cl.pixels[4], norm(0));
+      expect(cl.pixels[2 * 9 + 4], norm(255));
+
+      expect(taggerImageSize(TaggerKind.pixai10, 200, 100, 1008), (
+        width: 1008,
+        height: 504,
+      ));
+      expect(taggerImageSize(TaggerKind.oppai, 200, 100, 448), (
+        width: 200,
+        height: 100,
+      ));
+      expect(taggerImageSize(TaggerKind.clV2, 200, 100, 384), (
+        width: 384,
+        height: 384,
+      ));
     });
   });
 
@@ -538,20 +670,43 @@ void main() {
       expect(again.quantOf(gemma).label, 'Q8_0');
     });
 
-    test('拖动排序存盘后还在;新出现的接在后面', () async {
+    test('按系列分组;整组拖、组里拖都存盘后还在', () async {
       final model = fresh();
-      final first = model.orderedTaggers.first.repo;
-      model.moveTagger(0, 2);
-      expect(model.orderedTaggers[2].repo, first);
-      final last = model.captionRows.last.id;
-      model.moveCaption(model.captionRows.length - 1, 0);
-      expect(model.captionRows.first.id, last);
+      expect(
+        [for (final g in model.taggerGroups) g.series],
+        ['WD14', 'PixAI', 'CL', 'OppaiOracle'],
+      );
+      expect(
+        [for (final g in model.captionGroups) g.series],
+        [
+          'Gemma 4',
+          'Gemma 4 · Heretic',
+          'ToriiGate',
+          'JoyCaption',
+          'Florence-2',
+        ],
+      );
+      // 把 OppaiOracle 整组挪到最前;WD14 组里把第一个挪到第三个。
+      model.moveTagger(null, 3, 0);
+      final first = model.taggerGroups[1].items.first.id;
+      model.moveTagger(1, 0, 2);
+      // NL:Florence-2 组挪到最前。
+      model.moveCaption(null, 4, 0);
 
       final again = fresh();
       await again.load();
-      expect(again.orderedTaggers[2].repo, first);
-      expect(again.captionRows.first.id, last);
-      expect(again.captionRows, hasLength(captionModels.length));
+      expect(again.taggerGroups.first.series, 'OppaiOracle');
+      expect(again.taggerGroups[1].items[2].id, first);
+      expect(again.captionGroups.first.series, 'Florence-2');
+      expect(
+        again.captionGroups.expand((g) => g.items),
+        hasLength(captionModels.length),
+      );
+    });
+
+    test('要申请访问的模型没填 Token 时不下载', () async {
+      final gated = taggerModels.firstWhere((m) => m.gated);
+      expect(await fresh().downloadTagger(gated), contains('Token'));
     });
 
     test('文件夹里有别的量化档、NLapt 放的 Florence-2:都直接能用', () async {
@@ -596,7 +751,7 @@ void main() {
         dir: tmp,
         streamChat: (_) => const Stream.empty(),
       );
-      model.pickTagger(taggerModels[2].repo);
+      model.pickTagger(taggerModels[2].id);
       expect(model.general, taggerModels[2].general);
       model.setThresholds(character: 0.7);
       model.update(() => model.port = 9100);
@@ -606,7 +761,7 @@ void main() {
         streamChat: (_) => const Stream.empty(),
       );
       await again.load();
-      expect(again.taggerRepo, taggerModels[2].repo);
+      expect(again.taggerRepo, taggerModels[2].id);
       expect(again.character, 0.7);
       expect(again.port, 9100);
     });

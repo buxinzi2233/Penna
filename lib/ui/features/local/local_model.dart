@@ -12,12 +12,13 @@ import '../../../core/harness/local/download.dart';
 import '../../../core/harness/local/florence.dart';
 import '../../../core/harness/local/llama_server.dart';
 import '../../../core/harness/local/model_scan.dart';
-import '../../../core/harness/local/wd_tagger.dart';
+import '../../../core/harness/local/tagger.dart';
 import '../../../core/harness/providers/llm_http.dart';
 import '../../../data/services/florence_engine.dart';
 import '../../../data/services/onnx_model.dart';
 
 part 'local_caption.dart';
+part 'local_tagger.dart';
 
 /// 看图写自然语言时默认的要求。
 const defaultCaptionPrompt =
@@ -30,7 +31,7 @@ typedef Progress = ({int received, int? total});
 
 typedef StreamChatFn = Stream<String> Function(LlmRequest request);
 
-/// 本地推理页的状态:Tag 反推(ONNX 打标模型)和 NL 反推(看图模型,见 [LocalCaption])。
+/// 本地反推页的状态:Tag 反推(打标模型,见 [LocalTagger])和 NL 反推(看图模型,见 [LocalCaption])。
 /// 设置存在「文档\Penna\local.json」,模型和运行时在「文档\Penna\models」「runtime」下。
 class LocalModel extends ChangeNotifier {
   /// [dir] 为 null 时只在内存里(测试用),也不能下载。
@@ -39,7 +40,9 @@ class LocalModel extends ChangeNotifier {
     required this.streamChat,
     LlamaServer? server,
     Future<OnnxModel> Function(String path)? loadOnnx,
+    String Function()? hfToken,
   }) : server = server ?? LlamaServer(),
+       hfToken = hfToken ?? (() => ''),
        _loadOnnx = loadOnnx ?? OnnxModel.load {
     // 服务自己退出了(崩了、被别的程序关了),界面跟着变回未启动。
     this.server.onExit = notifyListeners;
@@ -50,11 +53,16 @@ class LocalModel extends ChangeNotifier {
   final LlamaServer server;
   final Future<OnnxModel> Function(String path) _loadOnnx;
 
+  /// HuggingFace 的 Token(存在设置的机密里);下要申请访问的模型时用。
+  final String Function() hfToken;
+
   // —— 存盘的设置 ——
   String source = 'mirror';
-  String taggerRepo = taggerModels.first.repo;
-  double general = taggerModels.first.general;
-  double character = taggerModels.first.character;
+
+  /// 选中的打标模型的 id(WD14 的就是仓库名,和以前存的对得上)。
+  String taggerRepo = _defaultTagger.id;
+  double general = _defaultTagger.general;
+  double character = _defaultTagger.character;
 
   /// 自己选的 llama-server.exe;空串用下载的运行时。
   String exePath = '';
@@ -68,7 +76,7 @@ class LocalModel extends ChangeNotifier {
   /// 用户加的模型文件夹:连同子文件夹一起找已有的模型,找到的直接用,不用再下。
   List<String> modelFolders = const [];
 
-  /// 两个模型列表用户拖好的顺序(id 的先后);没列的排在后面。
+  /// 两个模型列表用户拖好的顺序(系列和模型的 id 的先后);没列的排在后面。
   List<String> taggerOrder = const [];
   List<String> captionOrder = const [];
 
@@ -96,6 +104,9 @@ class LocalModel extends ChangeNotifier {
 
   /// 上次推理每个标签的把握;调阈值时拿它重新筛,不用再跑模型。
   List<double>? _scores;
+
+  /// 上次打标的那张图有透明的地方。
+  bool _transparent = false;
   bool _starting = false;
   bool _captioning = false;
   String _caption = '';
@@ -123,71 +134,6 @@ class LocalModel extends ChangeNotifier {
 
   String get _sep => Platform.pathSeparator;
   String get _home => dir?.path ?? '';
-
-  /// 文件夹里找到、但不在清单里的打标模型,id 用这个开头接文件夹路径。
-  static const _localTagger = 'local:';
-
-  /// 能选的打标模型:清单里的,加上文件夹里找到的别的 WD 类模型(阈值用常见的默认值)。
-  List<TaggerModel> get taggers => [
-    ...taggerModels,
-    for (final d in _found.taggers)
-      if (catalogTaggerFor(d) == null)
-        (
-          repo: '$_localTagger$d',
-          name: folderTitle(d),
-          note: '本机',
-          general: 0.35,
-          character: 0.85,
-        ),
-  ];
-
-  /// 打标模型列表,按用户拖好的顺序。
-  List<TaggerModel> get orderedTaggers =>
-      _ordered(taggers, (m) => m.repo, taggerOrder);
-
-  void moveTagger(int from, int to) {
-    final ids = [for (final m in orderedTaggers) m.repo];
-    ids.insert(to, ids.removeAt(from));
-    update(() => taggerOrder = List.unmodifiable(ids));
-  }
-
-  TaggerModel get tagger =>
-      taggers.where((m) => m.repo == taggerRepo).firstOrNull ??
-      taggerModels.first;
-
-  /// 打标模型在文件夹里找到的位置;自己下载过的不算。
-  String? foundTagger(TaggerModel m) => m.repo.startsWith(_localTagger)
-      ? m.repo.substring(_localTagger.length)
-      : _found.taggers.where((d) => catalogTaggerFor(d) == m.repo).firstOrNull;
-
-  /// 要用的模型和标签表:自己下载的优先,其次是文件夹里找到的。都没有时为 null。
-  ({String model, String labels})? taggerPaths(TaggerModel m) {
-    if (!m.repo.startsWith(_localTagger)) {
-      final files = taggerFiles(m);
-      if (ready(files)) return (model: files[0].path, labels: files[1].path);
-    }
-    final dir = foundTagger(m);
-    return dir == null
-        ? null
-        : (
-            model: '$dir$_sep$taggerModelFile',
-            labels: '$dir$_sep$taggerLabelsFile',
-          );
-  }
-
-  // —— 文件位置 ——
-
-  List<RemoteFile> taggerFiles(TaggerModel m) => [
-    for (final name in [taggerModelFile, taggerLabelsFile])
-      (
-        url: hfFileUrl(source, m.repo, name),
-        path:
-            '$_home${_sep}models${_sep}tagger$_sep'
-            '${m.repo.replaceAll('/', '__')}$_sep$name',
-        size: null,
-        sha256: null,
-      ),
-  ];
 
   RemoteFile get _runtimeZip => (
     url: llamaRuntimeUrl,
@@ -254,35 +200,6 @@ class LocalModel extends ChangeNotifier {
     _save();
   }
 
-  /// 换打标模型:阈值换成它的推荐值,已加载的模型放掉。
-  void pickTagger(String repo) {
-    // 推理途中不换:正在用的模型会被关掉。
-    if (repo == taggerRepo || _tagging) return;
-    _round++;
-    update(() {
-      taggerRepo = repo;
-      general = tagger.general;
-      character = tagger.character;
-      _tags = null;
-      _scores = null;
-    });
-    _dropTagger();
-  }
-
-  /// 调阈值:上次推理的结果按新阈值重新筛。
-  void setThresholds({double? general, double? character}) => update(() {
-    this.general = general ?? this.general;
-    this.character = character ?? this.character;
-    _refilter();
-  });
-
-  void _refilter() {
-    final scores = _scores;
-    _tags = scores == null
-        ? null
-        : decodeTags(scores, _labels, general: general, character: character);
-  }
-
   void setImage(Attachment? image) {
     _round++;
     _image = image;
@@ -295,7 +212,11 @@ class LocalModel extends ChangeNotifier {
   // —— 下载 ——
 
   /// 依次下载 [files],进度记在 [key] 下。失败时返回给用户看的原因。
-  Future<String?> download(String key, List<RemoteFile> files) async {
+  Future<String?> download(
+    String key,
+    List<RemoteFile> files, {
+    Map<String, String> headers = const {},
+  }) async {
     if (dir == null) return '没有存放的地方';
     if (_downloads.containsKey(key)) return '正在下载';
     final cancel = _cancels[key] = DownloadCancel();
@@ -312,6 +233,7 @@ class LocalModel extends ChangeNotifier {
         await downloadFile(
           f,
           cancel: cancel,
+          headers: headers,
           onProgress: (got, all) {
             _downloads[key] = (
               received: before + got,
@@ -392,67 +314,6 @@ class LocalModel extends ChangeNotifier {
     return serverExe == null ? '运行时里没找到 llama-server.exe' : null;
   }
 
-  // —— Tag ——
-
-  /// 用选中的打标模型给当前的图打标。失败时返回给用户看的原因。
-  Future<String?> runTagger() async {
-    final image = _image;
-    if (image == null) return '先放一张图';
-    if (_tagging) return '正在推理';
-    final paths = taggerPaths(tagger);
-    if (paths == null) return '先下载模型';
-    _tagging = true;
-    final round = _round;
-    notifyListeners();
-    String? problem;
-    try {
-      if (_taggerFor != tagger.repo) {
-        _dropTagger();
-        _labels = parseSelectedTags(await File(paths.labels).readAsString());
-        _tagger = await _loadOnnx(paths.model);
-        _taggerFor = tagger.repo;
-      }
-      final model = _tagger!;
-      final layout = inputLayout(model.inputShape);
-      final pixels = await decodeImage(image.bytes!, layout.size);
-      final input = letterboxBgr(
-        pixels.rgba,
-        pixels.width,
-        pixels.height,
-        size: layout.size,
-        nchw: layout.nchw,
-      );
-      final scores = await model.run(
-        input,
-        layout.nchw
-            ? [1, 3, layout.size, layout.size]
-            : [1, layout.size, layout.size, 3],
-      );
-      // 推理途中换了图:这次的结果不是眼前这张图的。
-      if (round == _round) {
-        _scores = scores;
-        _refilter();
-      }
-    } on OnnxException catch (e) {
-      problem = e.message;
-      _dropTagger();
-    } on FileSystemException catch (e) {
-      problem = '读不了模型文件:${e.osError?.message ?? e.message}';
-    } on Object catch (e) {
-      problem = '推理失败(${e.runtimeType})';
-    }
-    _tagging = false;
-    notifyListeners();
-    return round == _round ? problem : null;
-  }
-
-  void _dropTagger() {
-    final old = _tagger;
-    _tagger = null;
-    _taggerFor = null;
-    old?.close().catchError((Object _) {});
-  }
-
   // —— 存盘 ——
 
   File? get _file => dir == null ? null : File('$_home${_sep}local.json');
@@ -484,7 +345,7 @@ class LocalModel extends ChangeNotifier {
       file.parent.createSync(recursive: true);
       file.writeAsStringSync(jsonEncode(toJson()));
     } on FileSystemException catch (e) {
-      debugPrint('本地推理的设置没存上:${e.message}');
+      debugPrint('本地反推的设置没存上:${e.message}');
     }
   }
 
@@ -537,18 +398,14 @@ class LocalModel extends ChangeNotifier {
   }
 }
 
-/// 读出图片的像素,缩到长边不超过 [size](不放大);[stretch] 为真时直接拉成 [size]×[size]。
-/// 透明度是没乘进颜色的。
+/// 读出图片的像素,缩成 [size] 按原图长宽算出的大小。透明度是没乘进颜色的。
 Future<({Uint8List rgba, int width, int height})> decodeImage(
   Uint8List bytes,
-  int size, {
-  bool stretch = false,
-}) async {
+  ({int width, int height}) Function(int width, int height) size,
+) async {
   final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
   final descriptor = await ui.ImageDescriptor.encoded(buffer);
-  final fit = stretch
-      ? (width: size, height: size)
-      : fitInside(descriptor.width, descriptor.height, size);
+  final fit = size(descriptor.width, descriptor.height);
   final codec = await descriptor.instantiateCodec(
     targetWidth: fit.width,
     targetHeight: fit.height,
@@ -578,3 +435,8 @@ Future<void> _extractInto(String zip, String temp, String target) async {
   if (old.existsSync()) old.deleteSync(recursive: true);
   dir.renameSync(target);
 }
+
+/// 新装时默认选的打标模型。
+final _defaultTagger = taggerModels.firstWhere(
+  (m) => m.id == 'SmilingWolf/wd-eva02-large-tagger-v3',
+);

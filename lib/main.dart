@@ -10,6 +10,7 @@ import 'core/harness/characters/character_dict.dart';
 import 'core/harness/providers/llm_router.dart';
 import 'core/harness/tags/tag_dictionary.dart';
 import 'core/harness/tags/tag_search.dart';
+import 'data/models/app_config.dart';
 import 'data/services/archive_store.dart';
 import 'data/services/character_store.dart';
 import 'data/services/config_service.dart';
@@ -77,9 +78,13 @@ Future<void> main() async {
   await archive.load();
   final reverse = ReverseModel(vm, dir: home);
   await reverse.load();
-  final local = LocalModel(dir: home, streamChat: streamChat);
+  final local = LocalModel(
+    dir: home,
+    streamChat: streamChat,
+    hfToken: () => config.config.secrets[hfTokenSecret] ?? '',
+  );
   await local.load();
-  // 关窗前先停掉本地推理起的 llama-server:Windows 不会跟着把它关掉。
+  // 关窗前先停掉本地反推起的 llama-server:Windows 不会跟着把它关掉。
   await windowManager.setPreventClose(true);
   runApp(
     PennaApp(

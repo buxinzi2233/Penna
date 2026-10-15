@@ -1,7 +1,7 @@
 part of 'local_page.dart';
 
-// 「NL 反推」:选一个看图模型写描述。GGUF 要下载 llama.cpp 运行时、在本机起服务;
-// Florence-2 在程序里直接跑,只要选指令。
+// 「NL 反推」:按系列挑一个看图模型写描述。GGUF 要在本机起 llama-server
+// (运行时和参数在「设置 → 本地反推」);Florence-2 在程序里直接跑,只要选指令。
 
 /// 加进「API 管理」的那个本地模型用这个 id,再点一次是更新它的地址。
 const _localLlmId = 'local-llama';
@@ -16,15 +16,6 @@ class _NlTab extends StatelessWidget {
   final LocalModel model;
   final ConfigService config;
   final ValueChanged<String> onToDraft;
-
-  Future<void> _pickExe() async {
-    final picked = await openFile(
-      acceptedTypeGroups: [
-        const XTypeGroup(label: 'llama-server', extensions: ['exe']),
-      ],
-    );
-    if (picked != null) model.update(() => model.exePath = picked.path);
-  }
 
   Future<String?> _pickGguf() async => (await openFile(
     acceptedTypeGroups: [
@@ -56,57 +47,11 @@ class _NlTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FoldersBlock(model: model),
         _models(context),
-        // Florence-2 不用 llama-server:运行时、参数、服务都用不上。
-        if (!model.florenceMode) ...[
-          _runtime(context),
-          _params(),
-          _service(context),
-        ],
+        // Florence-2 在程序里直接跑,不用起 llama-server。
+        if (!model.florenceMode) _service(context),
         _caption(context),
       ],
-    );
-  }
-
-  Widget _runtime(BuildContext context) {
-    final exe = model.serverExe;
-    return _Block(
-      title: '运行时',
-      trailing: PennaButton(
-        label: '选择 llama-server.exe',
-        icon: Icons.folder_open,
-        borderColor: PennaColors.border,
-        onPressed: _pickExe,
-      ),
-      child: exe != null
-          ? Row(
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  size: 15,
-                  color: PennaColors.accent,
-                ),
-                const SizedBox(width: 6),
-                Expanded(child: _PathText(exe)),
-                if (model.exePath.isNotEmpty)
-                  PennaButton(
-                    label: '不用这个',
-                    icon: Icons.close,
-                    background: PennaColors.slate100,
-                    onPressed: () => model.update(() => model.exePath = ''),
-                  ),
-              ],
-            )
-          : _DownloadRow(
-              model: model,
-              keyName: 'runtime',
-              name: 'llama.cpp $llamaCppTag',
-              note: 'Vulkan 版,N 卡 / A 卡 / 核显通用 · ${_size(llamaRuntimeSize)}',
-              files: const [],
-              done: false,
-              onDownload: model.downloadRuntime,
-            ),
     );
   }
 
@@ -123,7 +68,7 @@ class _NlTab extends StatelessWidget {
       model: model,
       keyName: m.id,
       name: m.name,
-      note: '${m.series} · ${m.params} · ${_size(total)} · ${m.note}',
+      note: '${m.params} · ${_size(total)} · ${m.note}',
       files: model.captionFiles(m),
       onDownload: () => model.downloadCaption(m),
       onRemove: () => model.removeCaption(m),
@@ -167,21 +112,27 @@ class _NlTab extends StatelessWidget {
   );
 
   Widget _models(BuildContext context) {
-    final rows = model.captionRows;
+    final picked = model.pickedCaption;
     return _Block(
       title: '模型',
-      trailing: _SourcePicker(model: model),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ModelList(
-            ids: [for (final r in rows) r.id],
-            rows: [
-              for (final r in rows)
-                if (r.model case final m?)
-                  _catalogRow(context, m)
-                else
-                  _ggufRow(r.gguf!),
+          _GroupedModelList(
+            current: picked?.series ?? '本机',
+            groups: [
+              for (final g in model.captionGroups)
+                (
+                  series: g.series,
+                  ids: [for (final r in g.items) r.id],
+                  rows: [
+                    for (final r in g.items)
+                      if (r.model case final m?)
+                        _catalogRow(context, m)
+                      else
+                        _ggufRow(r.gguf!),
+                  ],
+                ),
             ],
             onMove: model.moveCaption,
           ),
@@ -205,48 +156,6 @@ class _NlTab extends StatelessWidget {
               onClear: () => model.useGguf(model.modelPath, ''),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _params() {
-    // 不在范围里的数不收,框里改回合法的数才生效。
-    Widget field(
-      String label,
-      int value,
-      ({int min, int max}) range,
-      ValueChanged<int> set,
-    ) => Expanded(
-      child: PennaField(
-        label: label,
-        value: '$value',
-        onChanged: (v) {
-          final n = int.tryParse(v.trim());
-          if (n != null && n >= range.min && n <= range.max) {
-            model.update(() => set(n));
-          }
-        },
-      ),
-    );
-    return _Block(
-      title: '参数',
-      child: Row(
-        children: [
-          field('端口', model.port, (
-            min: 1024,
-            max: 65535,
-          ), (n) => model.port = n),
-          const SizedBox(width: 10),
-          field('上下文长度', model.context, (
-            min: 512,
-            max: 262144,
-          ), (n) => model.context = n),
-          const SizedBox(width: 10),
-          field('GPU 层数(-1 全部)', model.gpuLayers, (
-            min: -1,
-            max: 999,
-          ), (n) => model.gpuLayers = n),
         ],
       ),
     );
@@ -314,8 +223,8 @@ class _NlTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Florence-2 只认几个固定的指令;GGUF 模型照写的要求来。
-          if (florence != null)
+          // Florence-2 只认几个固定的指令;GGUF 模型照「设置 → 本地反推」里写的要求来。
+          if (florence != null) ...[
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -327,15 +236,9 @@ class _NlTab extends StatelessWidget {
                     onTap: () => model.update(() => model.florenceTask = task),
                   ),
               ],
-            )
-          else
-            PennaField(
-              label: '要求',
-              value: model.captionPrompt,
-              maxLines: 3,
-              onChanged: (v) => model.update(() => model.captionPrompt = v),
             ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
+          ],
           if (model.caption.isNotEmpty) ...[
             PennaCard(
               color: PennaColors.slate50,

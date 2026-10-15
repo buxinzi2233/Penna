@@ -1,6 +1,6 @@
 part of 'local_page.dart';
 
-// 「Tag 反推」:选一个 WD14 打标模型,下载后给左边的图打标。
+// 「Tag 反推」:按系列挑一个打标模型(WD14、PixAI、CL、OppaiOracle),下载后给左边的图打标。
 
 class _TagTab extends StatelessWidget {
   const _TagTab({required this.model, required this.onToDraft});
@@ -11,17 +11,20 @@ class _TagTab extends StatelessWidget {
   /// 一个打标模型:自己下载过的可以删;文件夹里找到的标「本机」,直接用。
   Widget _taggerRow(TaggerModel m, {required bool selected}) {
     final files = model.taggerFiles(m);
-    final own = model.ready(files);
+    final own = files.isNotEmpty && model.ready(files);
     return _DownloadRow(
       model: model,
-      keyName: m.repo,
+      keyName: m.id,
       name: m.name,
-      note: m.note,
+      note: [
+        if (m.size > 0) '约 ${_size(m.size)}',
+        if (m.note.isNotEmpty) m.note,
+      ].join(' · '),
       files: files,
-      onDownload: () => model.download(m.repo, files),
+      onDownload: () => model.downloadTagger(m),
       foundAt: own ? null : model.foundTagger(m),
       selected: selected,
-      onSelect: () => model.pickTagger(m.repo),
+      onSelect: () => model.pickTagger(m.id),
     );
   }
 
@@ -33,15 +36,20 @@ class _TagTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FoldersBlock(model: model),
         _Block(
           title: '模型',
-          trailing: _SourcePicker(model: model),
-          child: _ModelList(
-            ids: [for (final m in model.orderedTaggers) m.repo],
-            rows: [
-              for (final m in model.orderedTaggers)
-                _taggerRow(m, selected: m.repo == current.repo),
+          child: _GroupedModelList(
+            current: current.series,
+            groups: [
+              for (final g in model.taggerGroups)
+                (
+                  series: g.series,
+                  ids: [for (final m in g.items) m.id],
+                  rows: [
+                    for (final m in g.items)
+                      _taggerRow(m, selected: m.id == current.id),
+                  ],
+                ),
             ],
             onMove: model.moveTagger,
           ),
@@ -55,11 +63,13 @@ class _TagTab extends StatelessWidget {
                 value: model.general,
                 onChanged: (v) => model.setThresholds(general: v),
               ),
-              _Threshold(
-                label: '角色',
-                value: model.character,
-                onChanged: (v) => model.setThresholds(character: v),
-              ),
+              // OppaiOracle 只有一个阈值。
+              if (current.kind != TaggerKind.oppai)
+                _Threshold(
+                  label: '角色',
+                  value: model.character,
+                  onChanged: (v) => model.setThresholds(character: v),
+                ),
             ],
           ),
         ),

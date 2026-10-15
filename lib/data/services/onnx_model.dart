@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 
@@ -12,25 +10,52 @@ class OnnxException implements Exception {
   String toString() => message;
 }
 
-/// 一个加载好的 ONNX 模型:取第一个输入、第一个输出(打标模型都是这样)。
+/// 输出名按这个先后挑(打标模型常见的几种叫法),都没有就用第一个输出。
+const _outputNames = [
+  'probabilities',
+  'output',
+  'predictions',
+  'prediction',
+  'probs',
+  'logits',
+];
+
+/// 一个加载好的打标模型。输入可以有好几个(OppaiOracle 另要一张填充掩码)。
 // ponytail: 插件在 Windows 的平台线程上同步跑模型,大模型加载和推理时窗口会停顿一两秒;
 // 要完全不卡得换成能在 isolate 里跑的 FFI 版 onnxruntime。也只用 CPU,要用显卡得换 DirectML 版运行库。
 class OnnxModel {
-  OnnxModel._(this._session, this.inputName, this.inputShape);
+  OnnxModel._(this._session, this.inputs, this._output);
 
   final OrtSession _session;
-  final String inputName;
 
-  /// 输入的形状;动态的维度是 -1。
-  final List<int> inputShape;
+  /// 各个输入的名字和形状(动态的维度是 -1),按模型里的先后。
+  final List<({String name, List<int> shape})> inputs;
+  final String _output;
 
   static Future<OnnxModel> load(String path) async {
     try {
       final session = await OnnxRuntime().createSession(path);
-      final input = (await session.getInputInfo()).first;
-      return OnnxModel._(session, input['name'] as String, [
-        for (final d in input['shape'] as List) (d as num).toInt(),
-      ]);
+      final outputs = [
+        for (final o in await session.getOutputInfo()) o['name'] as String,
+      ];
+      return OnnxModel._(
+        session,
+        [
+          for (final i in await session.getInputInfo())
+            (
+              name: i['name'] as String,
+              shape: [for (final d in i['shape'] as List) (d as num).toInt()],
+            ),
+        ],
+        _outputNames
+                .map(
+                  (want) =>
+                      outputs.where((o) => o.toLowerCase() == want).firstOrNull,
+                )
+                .nonNulls
+                .firstOrNull ??
+            outputs.first,
+      );
     } on PlatformException catch (e) {
       throw OnnxException('模型加载失败:${_brief(e.message)}');
     } on MissingPluginException {
@@ -38,23 +63,29 @@ class OnnxModel {
     }
   }
 
-  /// 跑一次,返回第一个输出摊平后的数。
-  Future<List<double>> run(Float32List data, List<int> shape) async {
-    final input = await OrtValue.fromList(data, shape);
+  /// 跑一次,返回选中的那个输出摊平后的数。[feeds] 是输入名 → (数据, 形状)。
+  Future<List<double>> run(
+    Map<String, ({Object data, List<int> shape})> feeds,
+  ) async {
+    final made = <OrtValue>[];
     try {
-      final outputs = await _session.run({inputName: input});
-      try {
-        final values = await outputs.values.first.asFlattenedList();
-        return [for (final v in values) (v as num).toDouble()];
-      } finally {
-        for (final v in outputs.values) {
-          await v.dispose();
-        }
+      final inputs = <String, OrtValue>{};
+      for (final e in feeds.entries) {
+        final v = await OrtValue.fromList(e.value.data, e.value.shape);
+        made.add(v);
+        inputs[e.key] = v;
       }
+      final outputs = await _session.run(inputs);
+      made.addAll(outputs.values);
+      final values = await (outputs[_output] ?? outputs.values.first)
+          .asFlattenedList();
+      return [for (final v in values) (v as num).toDouble()];
     } on PlatformException catch (e) {
       throw OnnxException('推理失败:${_brief(e.message)}');
     } finally {
-      await input.dispose();
+      for (final v in made) {
+        await v.dispose();
+      }
     }
   }
 

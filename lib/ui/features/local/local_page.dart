@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 import '../../../core/harness/local/caption_catalog.dart';
 import '../../../core/harness/local/download.dart';
 import '../../../core/harness/local/florence.dart';
-import '../../../core/harness/local/llama_server.dart';
 import '../../../core/harness/local/model_scan.dart';
-import '../../../core/harness/local/wd_tagger.dart';
+import '../../../core/harness/local/tagger.dart';
 import '../../../data/models/app_config.dart';
 import '../../../data/services/config_service.dart';
 import '../../core/image_drop.dart';
@@ -20,7 +19,7 @@ import 'local_model.dart';
 part 'local_nl_tab.dart';
 part 'local_tag_tab.dart';
 
-/// 本地推理:左边放一张图,右边用本机的模型给它反推。
+/// 本地反推:左边放一张图,右边用本机的模型给它反推。
 /// 「Tag 反推」用 ONNX 打标模型出 Danbooru 标签,「NL 反推」用看图模型写描述。
 class LocalPage extends StatefulWidget {
   const LocalPage({
@@ -65,7 +64,7 @@ class _LocalPageState extends State<LocalPage> {
             Row(
               children: [
                 const Text(
-                  '本地推理',
+                  '本地反推',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 16),
@@ -126,7 +125,7 @@ class _LocalPageState extends State<LocalPage> {
     final problem = widget.vm.restorePrompt((
       time: DateTime.now(),
       text: text,
-    ), title: '本地推理');
+    ), title: '本地反推');
     if (problem != null) return showToast(context, problem, warn: true);
     widget.onOpenStudio();
   }
@@ -160,33 +159,6 @@ class _Block extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// 下载来源:官方或国内镜像。
-class _SourcePicker extends StatelessWidget {
-  const _SourcePicker({required this.model});
-
-  final LocalModel model;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final (id, label) in const [
-          ('mirror', '镜像'),
-          ('huggingface', 'HuggingFace'),
-        ]) ...[
-          const SizedBox(width: 6),
-          PennaChip(
-            label: label,
-            selected: model.source == id,
-            onTap: () => model.update(() => model.source = id),
-          ),
-        ],
-      ],
     );
   }
 }
@@ -363,20 +335,112 @@ class _DownloadRow extends StatelessWidget {
   }
 }
 
-/// 模型列表:最多这么高,再多就在框里滚动;按住左边的把手上下拖动排序。
-const _listMaxHeight = 330.0;
+/// 模型列表最多这么高,再多就在框里滚动。
+const _listMaxHeight = 360.0;
 
-class _ModelList extends StatelessWidget {
-  const _ModelList({
-    required this.ids,
-    required this.rows,
+/// 列表里的一组:系列名,和组里各行的 id(拖动时靠它认行)与行本身。
+typedef _Group = ({String series, List<String> ids, List<Widget> rows});
+
+/// 按系列分组的模型列表:点系列名展开、收起;按住左边的把手上下拖动,
+/// 系列那一行拖的是整组,模型那一行只在组里挪。
+class _GroupedModelList extends StatefulWidget {
+  const _GroupedModelList({
+    required this.groups,
     required this.onMove,
+    required this.current,
   });
 
-  /// 每一行的 id,拖动时靠它认行。
-  final List<String> ids;
-  final List<Widget> rows;
-  final void Function(int from, int to) onMove;
+  final List<_Group> groups;
+  final void Function(int? group, int from, int to) onMove;
+
+  /// 选中的模型所在的系列:一开始展开它,系列名标成蓝色。
+  final String current;
+
+  @override
+  State<_GroupedModelList> createState() => _GroupedModelListState();
+}
+
+class _GroupedModelListState extends State<_GroupedModelList> {
+  late final _open = {widget.current};
+
+  Widget _handle(int index, {double top = 0}) => ReorderableDragStartListener(
+    index: index,
+    child: MouseRegion(
+      cursor: SystemMouseCursors.grab,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(0, top, 4, 0),
+        child: const Icon(
+          Icons.drag_indicator,
+          size: 16,
+          color: PennaColors.slate400,
+        ),
+      ),
+    ),
+  );
+
+  Widget _header(int index, _Group g) {
+    final open = _open.contains(g.series);
+    final current = g.series == widget.current;
+    return InkWell(
+      onTap: () =>
+          setState(() => open ? _open.remove(g.series) : _open.add(g.series)),
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            _handle(index),
+            AnimatedRotation(
+              turns: open ? 0.25 : 0,
+              duration: const Duration(milliseconds: 160),
+              child: const Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: PennaColors.slate500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              g.series,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: current ? PennaColors.primary : PennaColors.text,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${g.rows.length}',
+              style: const TextStyle(fontSize: 11, color: PennaColors.slate400),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _rows(int index, _Group g) => ReorderableListView(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    buildDefaultDragHandles: false,
+    onReorderItem: (from, to) => widget.onMove(index, from, to),
+    proxyDecorator: (child, _, _) =>
+        Material(color: Colors.transparent, child: child),
+    children: [
+      for (final (i, row) in g.rows.indexed)
+        Padding(
+          key: ValueKey(g.ids[i]),
+          padding: const EdgeInsets.only(left: 22),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _handle(i, top: 14),
+              Expanded(child: row),
+            ],
+          ),
+        ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -385,30 +449,17 @@ class _ModelList extends StatelessWidget {
       child: ReorderableListView(
         shrinkWrap: true,
         buildDefaultDragHandles: false,
-        onReorderItem: onMove,
+        onReorderItem: (from, to) => widget.onMove(null, from, to),
         proxyDecorator: (child, _, _) =>
             Material(color: Colors.transparent, child: child),
         children: [
-          for (final (i, row) in rows.indexed)
-            Row(
-              key: ValueKey(ids[i]),
-              crossAxisAlignment: CrossAxisAlignment.start,
+          for (final (i, g) in widget.groups.indexed)
+            Column(
+              key: ValueKey('series:${g.series}'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ReorderableDragStartListener(
-                  index: i,
-                  child: const MouseRegion(
-                    cursor: SystemMouseCursors.grab,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(0, 14, 4, 0),
-                      child: Icon(
-                        Icons.drag_indicator,
-                        size: 16,
-                        color: PennaColors.slate400,
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(child: row),
+                _header(i, g),
+                if (_open.contains(g.series)) _rows(i, g),
               ],
             ),
         ],
@@ -434,87 +485,6 @@ class _Badge extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(fontSize: 11, color: PennaColors.diffAddText),
-      ),
-    );
-  }
-}
-
-/// 模型文件夹:加几个电脑上已有模型的文件夹,连同子文件夹一起找,找到的直接用。
-class _FoldersBlock extends StatelessWidget {
-  const _FoldersBlock({required this.model});
-
-  final LocalModel model;
-
-  Future<void> _add() async {
-    final path = await getDirectoryPath();
-    if (path != null) model.addFolder(path);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final f = model.found;
-    final counts = [
-      if (f.taggers.isNotEmpty) '${f.taggers.length} 个打标模型',
-      if (f.ggufs.isNotEmpty) '${f.ggufs.length} 个 GGUF 模型',
-      if (f.servers.isNotEmpty) 'llama-server',
-    ];
-    return _Block(
-      title: '模型文件夹',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (model.modelFolders.isNotEmpty)
-            IconButton(
-              tooltip: '重新扫描',
-              iconSize: 16,
-              visualDensity: VisualDensity.compact,
-              color: PennaColors.slate500,
-              icon: const Icon(Icons.refresh),
-              onPressed: model.scanning ? null : model.rescan,
-            ),
-          PennaButton(
-            label: '添加文件夹',
-            icon: Icons.create_new_folder_outlined,
-            borderColor: PennaColors.border,
-            onPressed: _add,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final folder in model.modelFolders)
-            Row(
-              children: [
-                const Icon(
-                  Icons.folder_outlined,
-                  size: 15,
-                  color: PennaColors.slate500,
-                ),
-                const SizedBox(width: 6),
-                Expanded(child: _PathText(folder)),
-                IconButton(
-                  tooltip: '移除',
-                  iconSize: 14,
-                  visualDensity: VisualDensity.compact,
-                  color: PennaColors.slate400,
-                  icon: const Icon(Icons.close),
-                  onPressed: () => model.removeFolder(folder),
-                ),
-              ],
-            ),
-          Text(
-            model.scanning
-                ? '扫描中…'
-                : model.modelFolders.isEmpty
-                ? '添加已有模型的文件夹,子文件夹一起查找'
-                : counts.isEmpty
-                ? '没有找到可用的模型'
-                : '找到 ${counts.join('、')}'
-                      '${f.truncated ? '(文件太多,只查了一部分)' : ''}',
-            style: const TextStyle(fontSize: 11.5, color: PennaColors.slate500),
-          ),
-        ],
       ),
     );
   }

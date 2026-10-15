@@ -202,7 +202,7 @@ class _LlmCardState extends State<_LlmCard> {
   @override
   void didUpdateWidget(_LlmCard old) {
     super.didUpdateWidget(old);
-    // 设置在别处变了(刚保存完、本地推理更新了地址):没改过的那几项跟着走,改过的留着草稿。
+    // 设置在别处变了(刚保存完、本地反推更新了地址):没改过的那几项跟着走,改过的留着草稿。
     final was = old.llm, now = widget.llm;
     final key = service.config.llmKey(now.id);
     if (_same(was, now) && key == _savedKey) return;

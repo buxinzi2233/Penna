@@ -45,6 +45,7 @@ Future<void> downloadFile(
   RemoteFile f, {
   DownloadProgress? onProgress,
   DownloadCancel? cancel,
+  Map<String, String> headers = const {},
 }) async {
   if (isDownloaded(f)) return;
   final part = File('${f.path}.part');
@@ -58,7 +59,7 @@ Future<void> downloadFile(
   unawaited(cancel?.whenCancelled.then((_) => client.close(force: true)));
   try {
     if (f.size == null || have < f.size!) {
-      have = await _fetch(client, f, part, have, onProgress, cancel);
+      have = await _fetch(client, f, part, have, onProgress, cancel, headers);
     }
   } on Object catch (e) {
     if (cancel?.cancelled ?? false) throw const DownloadException('已停止下载');
@@ -94,8 +95,10 @@ Future<int> _fetch(
   int have,
   DownloadProgress? onProgress,
   DownloadCancel? cancel,
+  Map<String, String> headers,
 ) async {
   final request = await client.getUrl(Uri.parse(f.url));
+  headers.forEach(request.headers.set);
   if (have > 0) request.headers.set(HttpHeaders.rangeHeader, 'bytes=$have-');
   final response = await request.close();
   final status = response.statusCode;

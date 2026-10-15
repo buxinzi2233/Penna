@@ -1,8 +1,9 @@
 part of 'local_model.dart';
 
-/// 「NL 反推」列表里的一行:清单里的看图模型,或模型文件夹里找到的 GGUF。
+/// 「NL 反推」列表里的一行:清单里的看图模型,或模型文件夹里找到的 GGUF(系列「本机」)。
 typedef CaptionRow = ({
   String id,
+  String series,
   CaptionModel? model,
   ({String model, String mmproj})? gguf,
 });
@@ -23,21 +24,23 @@ extension LocalCaption on LocalModel {
     ];
   }
 
-  /// 列表里的各行,按用户拖好的顺序。
-  List<CaptionRow> get captionRows => _ordered<CaptionRow>(
+  /// 列表里的各行按系列分好组,按用户拖好的顺序。
+  List<ModelGroup<CaptionRow>> get captionGroups => _grouped<CaptionRow>(
     [
-      for (final m in captionModels) (id: m.id, model: m, gguf: null),
-      for (final g in foundGgufs) (id: 'gguf:${g.model}', model: null, gguf: g),
+      for (final m in captionModels)
+        (id: m.id, series: m.series, model: m, gguf: null),
+      for (final g in foundGgufs)
+        (id: 'gguf:${g.model}', series: '本机', model: null, gguf: g),
     ],
     (r) => r.id,
+    (r) => r.series,
     captionOrder,
   );
 
-  void moveCaption(int from, int to) {
-    final ids = [for (final r in captionRows) r.id];
-    ids.insert(to, ids.removeAt(from));
-    update(() => captionOrder = List.unmodifiable(ids));
-  }
+  /// 拖动排序:[group] 为 null 时挪的是整组。
+  void moveCaption(int? group, int from, int to) => update(
+    () => captionOrder = _moved(captionGroups, (r) => r.id, group, from, to),
+  );
 
   /// 这个模型要用哪个量化档:用户选过的,否则推荐的那档。
   Quant quantOf(CaptionModel m) =>
@@ -242,8 +245,7 @@ extension LocalCaption on LocalModel {
       }
       final pixels = await decodeImage(
         image.bytes!,
-        florenceImageSize,
-        stretch: true,
+        (_, _) => (width: florenceImageSize, height: florenceImageSize),
       );
       final text = await _florence!.caption(
         florencePixels(pixels.rgba, florenceImageSize),

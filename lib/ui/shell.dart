@@ -24,7 +24,7 @@ const _studio = 0,
     _charactersPage = 3,
     _localPage = 4;
 
-/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「角色库」「本地推理」「设置」之间切换。
+/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「角色库」「本地反推」「设置」之间切换。
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -44,7 +44,7 @@ class AppShell extends StatefulWidget {
   final ArchiveStore? archive;
   final ReverseModel? reverse;
 
-  /// 本地推理;不给就用一个只在内存里、不能下载的(测试用)。
+  /// 本地反推;不给就用一个只在内存里、不能下载的(测试用)。
   final LocalModel? local;
 
   @override
@@ -118,6 +118,7 @@ class _AppShellState extends State<AppShell> {
                           child: SettingsPage(
                             service: widget.config,
                             skills: widget.skills,
+                            local: _local,
                           ),
                         ),
                         const Positioned(
@@ -237,7 +238,7 @@ class _NavRail extends StatelessWidget {
           const SizedBox(height: 6),
           _RailButton(
             icon: Icons.memory_outlined,
-            tooltip: '本地推理',
+            tooltip: '本地反推',
             selected: page == _localPage,
             onTap: () => onSelect(_localPage),
           ),

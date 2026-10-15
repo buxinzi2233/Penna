@@ -74,15 +74,15 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 放入一张参考图,由模型反推出提示词。结果可以放到成稿,也会作为参考提供给之后的对话。
 
-### 本地推理
+### 本地反推
 
 在本机运行模型反推图片,分为两类:
 
-- **Tag 反推**:使用 WD14 系列 ONNX 打标模型生成 Danbooru 标签,角色与通用标签各有阈值,调整后即时重新筛选。
+- **Tag 反推**:内置 20 个 ONNX 打标模型,分为 WD14、PixAI、CL 与 OppaiOracle 四个系列,生成 Danbooru 标签;角色与通用标签各有阈值,调整后即时重新筛选。
 - **NL 反推**:内置 15 个看图模型,覆盖 Gemma 4(E2B 至 31B)、Gemma 4 Heretic、ToriiGate、JoyCaption 与 Florence-2,每个模型可选量化档。GGUF 模型由 llama.cpp 运行,运行中的服务可以加入 API 管理,供 Agent 与润色使用;Florence-2 在程序内直接运行,按指令输出标签、各级描述或构图分析。
-- 两类模型列表均可滚动浏览,并可拖动调整顺序。
-- 模型与运行时可从 HuggingFace 或国内镜像下载,支持断点续传与完整性校验;也可以选用本机已有的 GGUF 文件和 llama-server。
-- 可以添加模型文件夹:连同子文件夹一起查找已有的模型(兼容 BooruDatasetTagManagerPlus、NLapt 与 HuggingFace 缓存的目录结构),找到的模型直接使用。
+- 两类模型均按系列折叠显示,系列与模型都可以拖动调整顺序。
+- 模型与运行时可从 HuggingFace 或国内镜像下载,支持断点续传与完整性校验;需要申请访问的模型使用设置中的 HuggingFace Token 下载。
+- 在「设置 → 本地反推」中可以添加模型文件夹:连同子文件夹一起查找已有的模型(兼容 BooruDatasetTagManagerPlus、NLapt 与 HuggingFace 缓存的目录结构),找到的模型直接使用;llama.cpp 运行时、运行参数与看图要求也在这里设置。
 - 结果可以复制或放到成稿。
 
 ### Danbooru 标签
@@ -152,7 +152,7 @@ flutter run -d windows
 | 档案 | `archive.json` | 档案库 |
 | 角色 | `characters.json`、`characters\` | 自存的角色及图片 |
 | 反推 | `reverse.json`、`reverse.img` | 参考图及反推结果 |
-| 本地推理 | `local.json`、`models\`、`runtime\` | 本地推理设置、下载的模型与 llama.cpp 运行时 |
+| 本地反推 | `local.json`、`models\`、`runtime\` | 本地反推设置、下载的模型与 llama.cpp 运行时 |
 | 扩展 | `skills\` | 导入的 Skill |
 
 ## 开发
@@ -178,7 +178,7 @@ python tool/make_character_dict.py dataset --review     # 角色库
 ```
 lib/
   ui/              界面
-  core/harness/    模型调用、成稿格式、Skills、标签、角色库、MCP、本地推理(纯 Dart)
+  core/harness/    模型调用、成稿格式、Skills、标签、角色库、MCP、本地反推(纯 Dart)
   data/            配置、存盘、翻译、加密
 test/              测试
 assets/            随程序分发:字标、头像、内置标签词库与角色库
@@ -210,9 +210,10 @@ Penna 的每一部分都建立在开源社区的成果之上。
 | [flutter_onnxruntime](https://github.com/masicai/flutter_onnxruntime) | ONNX Runtime 的 Flutter 插件 | MIT |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | 本地运行 GGUF 看图模型(使用时下载) | MIT |
 | [SmilingWolf WD14 Tagger](https://huggingface.co/SmilingWolf) | 本地打标模型(使用时下载) | Apache-2.0 |
+| [PixAI Tagger](https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx)、[CL Tagger](https://huggingface.co/Nonene/cl_tagger)、[OppaiOracle](https://huggingface.co/Grio43/OppaiOracle) | 本地打标模型(使用时下载) | 见各模型页 |
 | [Gemma 4](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF)、[ToriiGate](https://huggingface.co/DraconicDragon/ToriiGate-0.5-GGUF)、[JoyCaption](https://huggingface.co/concedo/llama-joycaption-beta-one-hf-llava-mmproj-gguf)、[Florence-2](https://huggingface.co/onnx-community/Florence-2-base-ft) | 本地看图模型(使用时下载) | 见各模型页 |
 
-本地推理的做法参考了作者的另外两个项目 [NLapt](https://github.com/storyAura/NLapt) 与 [BooruDatasetTagManagerPlus](https://github.com/storyAura/BooruDatasetTagManagerPlus)。
+本地反推的做法参考了作者的另外两个项目 [NLapt](https://github.com/storyAura/NLapt) 与 [BooruDatasetTagManagerPlus](https://github.com/storyAura/BooruDatasetTagManagerPlus)。
 
 ### 字体
 

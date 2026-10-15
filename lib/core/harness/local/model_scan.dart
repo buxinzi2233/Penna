@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'caption_catalog.dart';
 import 'florence.dart';
-import 'wd_tagger.dart';
+import 'tagger.dart';
 
 // 在用户指定的文件夹(连同子文件夹)里找已经有的模型,免得同一个模型反复下载。
 // 认得 BooruDatasetTagManagerPlus(Models\SmilingWolf\wd-...\)、
@@ -10,7 +10,7 @@ import 'wd_tagger.dart';
 
 /// 扫到的东西,都是完整路径。
 typedef FoundModels = ({
-  /// 同时放着 model.onnx 和 selected_tags.csv 的文件夹(WD14 打标模型)。
+  /// 放着 model.onnx 和一种标签表的文件夹(打标模型,见 [taggerLabelFiles])。
   List<String> taggers,
 
   /// 模型本体 .gguf(名字里带 mmproj 的算视觉组件,不在这里)。
@@ -97,7 +97,8 @@ FoundModels scanModelFolders(
         }
       }
     }
-    if (files.contains(taggerModelFile) && files.contains(taggerLabelsFile)) {
+    if (files.contains(taggerModelFile) &&
+        taggerLabelFiles.keys.any(files.contains)) {
       taggers.add(dir.path);
     }
     if (florenceOnnx.every(files.contains) &&
@@ -121,8 +122,33 @@ FoundModels scanModelFolders(
 
 /// 这个文件夹是不是清单里的那个打标模型:路径里有一层的名字以模型名结尾
 /// (wd-vit-tagger-v3、SmilingWolf__wd-vit-tagger-v3、models--SmilingWolf--wd-vit-tagger-v3)。
-String? catalogTaggerFor(String dir) =>
-    taggerModels.where((m) => inRepoFolder(dir, m.repo)).firstOrNull?.repo;
+String? catalogTaggerFor(String dir) {
+  for (final m in taggerModels) {
+    // 文件在仓库的子文件夹里的(cl_tagger_1_02/、V1_onnx/):最后一层要是它,上一层对上仓库。
+    final at = m.files.first.lastIndexOf('/');
+    if (at < 0) {
+      if (inRepoFolder(dir, m.repo)) return m.id;
+      continue;
+    }
+    final sub = m.files.first.substring(0, at).toLowerCase();
+    final cut = dir.lastIndexOf(RegExp(r'[\\/]'));
+    if (cut > 0 &&
+        fileName(dir).toLowerCase() == sub &&
+        inRepoFolder(dir.substring(0, cut), m.repo)) {
+      return m.id;
+    }
+  }
+  return null;
+}
+
+/// 打标模型的标签表文件名 → 它是哪一种(清单外的模型靠它认种类)。
+/// selected_tags.csv 三种模型都用,默认按 WD 的读法。
+const taggerLabelFiles = {
+  taggerLabelsFile: TaggerKind.wd,
+  'tags.json': TaggerKind.pixai10,
+  'tag_mapping.json': TaggerKind.clV1,
+  'model_vocabulary.json': TaggerKind.clV2,
+};
 
 /// [dir] 的路径里有一层是 [repo] 的模型名(或 [id]),允许前面带「作者__」「models--作者--」。
 bool inRepoFolder(String dir, String repo, [String? id]) {

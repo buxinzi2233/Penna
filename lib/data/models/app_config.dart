@@ -105,6 +105,9 @@ List<String> normalizeMtOrder(Iterable<String> saved) {
 
 String llmSecretKey(String llmId) => 'llm.$llmId.key';
 
+/// HuggingFace 的 Token:下要申请访问的本地模型时用。
+const hfTokenSecret = 'hf.token';
+
 const protocolOpenAi = 'openai';
 const protocolGoogle = 'google';
 
