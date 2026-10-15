@@ -28,7 +28,7 @@ const builtinSkills = [
   Option('character-lib', '角色库', '用户提到某个具体角色时先查它的触发词和特征;要存角色时也用'),
 ];
 
-/// 聊天框上方的快捷操作:点一下把 [prompt] 填进输入框。
+/// 聊天框上方的快捷操作:点一下把 [prompt] 接在输入框末尾。
 typedef QuickAction = ({String label, String prompt});
 
 const defaultQuickActions = <QuickAction>[

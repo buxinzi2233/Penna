@@ -248,7 +248,7 @@ class _QuickActionSectionState extends State<QuickActionSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('快捷操作', '点一下填进聊天框'),
+        const SectionHeading('快捷操作', '点一下接在聊天框末尾'),
         for (final (i, action) in actions.indexed) ...[
           PennaCard(
             padding: const EdgeInsets.all(14),

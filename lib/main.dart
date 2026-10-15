@@ -15,6 +15,7 @@ import 'data/services/character_store.dart';
 import 'data/services/config_service.dart';
 import 'data/services/skill_store.dart';
 import 'ui/core/theme.dart';
+import 'ui/features/local/local_model.dart';
 import 'ui/features/studio/reverse_model.dart';
 import 'ui/features/studio/studio_view_model.dart';
 import 'ui/shell.dart';
@@ -76,6 +77,10 @@ Future<void> main() async {
   await archive.load();
   final reverse = ReverseModel(vm, dir: home);
   await reverse.load();
+  final local = LocalModel(dir: home, streamChat: streamChat);
+  await local.load();
+  // 关窗前先停掉本地推理起的 llama-server:Windows 不会跟着把它关掉。
+  await windowManager.setPreventClose(true);
   runApp(
     PennaApp(
       config: config,
@@ -83,6 +88,7 @@ Future<void> main() async {
       vm: vm,
       archive: archive,
       reverse: reverse,
+      local: local,
     ),
   );
 }
@@ -109,9 +115,11 @@ class PennaApp extends StatefulWidget {
     required this.vm,
     required this.archive,
     required this.reverse,
+    required this.local,
   });
 
   final ArchiveStore archive;
+  final LocalModel local;
   final ReverseModel reverse;
   final StudioViewModel vm;
   final ConfigService config;
@@ -121,8 +129,23 @@ class PennaApp extends StatefulWidget {
   State<PennaApp> createState() => _PennaAppState();
 }
 
-class _PennaAppState extends State<PennaApp> {
+class _PennaAppState extends State<PennaApp> with WindowListener {
   StudioViewModel get _vm => widget.vm;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+  }
+
+  @override
+  Future<void> onWindowClose() async {
+    try {
+      await widget.local.stopServer();
+    } finally {
+      await windowManager.destroy();
+    }
+  }
 
   // 主题只在字体设置变了的时候重建,不跟着每次设置改动重算。
   (String, String)? _fonts;
@@ -138,6 +161,7 @@ class _PennaAppState extends State<PennaApp> {
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _vm.dispose();
     super.dispose();
   }
@@ -176,6 +200,7 @@ class _PennaAppState extends State<PennaApp> {
             skills: widget.skills,
             archive: widget.archive,
             reverse: widget.reverse,
+            local: widget.local,
           ),
         );
       },

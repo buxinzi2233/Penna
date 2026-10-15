@@ -33,6 +33,8 @@ const _sectionTints = <_Tint>[
   (bg: Color(0xFFFDF4FF), border: Color(0xFFF5D0FE), text: Color(0xFFA21CAF)),
 ];
 
+const _labelHint = '例如 主体、服装、光影';
+
 /// 没有标注的那段用的中性色。
 const _Tint _plainTint = (
   bg: PennaColors.slate50,
@@ -112,7 +114,12 @@ class BodyCard extends StatelessWidget {
 
   /// 一栏可编辑文字:里面有分段标注就一段一个彩色框,没有就是一个普通输入栏。
   /// [tintFrom] 是这栏第一段该用第几个颜色。
-  List<Widget> _column(Part p, int partCount, int tintFrom) {
+  List<Widget> _column(
+    BuildContext context,
+    Part p,
+    int partCount,
+    int tintFrom,
+  ) {
     _BodyEditor editor(
       String text,
       int at,
@@ -132,7 +139,8 @@ class BodyCard extends StatelessWidget {
           ? null
           : (p.offset + at + range.$1, p.offset + at + range.$2),
       onDropPin: (from, to) => vm.movePin(from, p.offset + at + to),
-      // 选中一截文字后右键菜单里多出来的几项;「脱离」只有分段框里才有。
+      // 选中一截文字后右键菜单里多出来的几项;「脱离」只有分段框里才有,
+      // 「建立分段」只有普通文字里才有。
       selectionMenu: [
         ('固定选中的', Icons.push_pin_outlined, vm.pinSelection),
         if (onPolish != null)
@@ -147,6 +155,12 @@ class BodyCard extends StatelessWidget {
         if (onTranslateSelection != null)
           ('翻译选中的', Icons.translate, onTranslateSelection!),
         if (detach) ('脱离选中的', Icons.call_split, vm.detachSelection),
+        if (!detach)
+          (
+            '建立分段',
+            Icons.dashboard_customize_outlined,
+            () => _sectionSelection(context),
+          ),
       ],
     );
     final spans = sectionSpans(p.text);
@@ -193,6 +207,22 @@ class BodyCard extends StatelessWidget {
                       : _sectionTints[(tintFrom + i) % _sectionTints.length],
                   zh: s.zh,
                   openAll: zhOpen,
+                  onRename: () async {
+                    final name = await askName(
+                      context,
+                      '分段的名字',
+                      s.label,
+                      hint: _labelHint,
+                    );
+                    if (name == null || !context.mounted) return;
+                    if (!vm.renameSection(p.index, i, name)) {
+                      showToast(
+                        context,
+                        sectionLabel(name).isEmpty ? '名字不能为空' : '已经有叫这个名字的段了',
+                        warn: true,
+                      );
+                    }
+                  },
                   copyText: p.text.substring(s.textStart, s.textEnd),
                   onCopied: onCopied,
                   quoted: vm.quote == p.text.substring(s.start, s.end),
@@ -235,6 +265,21 @@ class BodyCard extends StatelessWidget {
         ),
       ],
     ];
+  }
+
+  /// 把选中的普通文字建成一段:先问名字。问的时候输入框会失焦,选区先记下来。
+  Future<void> _sectionSelection(BuildContext context) async {
+    final selection = vm.bodySelection;
+    final name = await askName(context, '新分段的名字', '', hint: _labelHint);
+    if (name == null || !context.mounted) return;
+    vm.bodySelection = selection;
+    if (sectionLabel(name).isEmpty) {
+      showToast(context, '名字不能为空', warn: true);
+    } else if (vm.sectionNameTaken(name)) {
+      showToast(context, '已经有叫这个名字的段了', warn: true);
+    } else if (!vm.sectionSelection(name)) {
+      showToast(context, '只能把普通文字建成分段', warn: true);
+    }
   }
 
   /// 固定区。整段固定下来的还是原来那个分段框,只是罩上一层琥珀色、不能编辑;
@@ -429,7 +474,7 @@ class BodyCard extends StatelessWidget {
             ..add(_pin(p.text, p.index, p.offset, tint));
           if (p.text.startsWith('【')) tint++;
         } else {
-          columns.addAll(_column(p, parts.length, tint));
+          columns.addAll(_column(context, p, parts.length, tint));
           tint += sectionSpans(p.text).length;
         }
       }

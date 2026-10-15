@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
@@ -16,54 +17,8 @@ const _seriesTints = <_Tint>[
   (bg: Color(0xFFFAF5FF), border: Color(0xFFE9D5FF), text: Color(0xFF7E22CE)),
 ];
 
-/// 问用户要一个名字。点「确定」返回文字(可以是空串),取消返回 null。
-Future<String?> _askName(BuildContext context, String title, String initial) {
-  var text = initial;
-  return showDialog<String>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title, style: const TextStyle(fontSize: 16)),
-      content: SizedBox(
-        width: 320,
-        child: PennaField(
-          label: '名字',
-          hint: '留空就用默认的',
-          value: initial,
-          onChanged: (v) => text = v,
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, text),
-          child: const Text('确定'),
-        ),
-      ],
-    ),
-  );
-}
-
-/// 在鼠标的位置弹一个小菜单,返回选中的那一项。
-Future<String?> _menu(BuildContext context, Offset at, List<String> items) {
-  return showMenu<String>(
-    context: context,
-    position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
-    items: [
-      for (final item in items)
-        PopupMenuItem(
-          value: item,
-          height: 34,
-          child: Text(item, style: const TextStyle(fontSize: 13)),
-        ),
-    ],
-  );
-}
-
 /// 成稿正文上方的页签:每个系列一个彩色框,框里先是系列的名字,再是它的各页
-/// (页码每个系列都从 1 数)。右键改名或删除,按住页签可以在系列里拖着调顺序。
+/// (页码每个系列都从 1 数)。双击改名,右键更多操作,按住页签可以在系列里拖着调顺序。
 class PageStrip extends StatelessWidget {
   const PageStrip({super.key, required this.vm});
 
@@ -74,7 +29,7 @@ class PageStrip extends StatelessWidget {
   }
 
   Future<void> _pageMenu(BuildContext context, Offset at, int i) async {
-    final picked = await _menu(context, at, const [
+    final picked = await popMenu(context, at, const [
       '改名',
       '脱离系列',
       '建立系列',
@@ -86,15 +41,7 @@ class PageStrip extends StatelessWidget {
     if (picked == '脱离系列') return _do(context, vm.detachPage(i));
     if (picked == '建立系列') return _do(context, vm.addPage(newSeries: true));
     if (picked == '删除整个系列') return _removeSeries(context, page.series);
-    if (picked == '改名') {
-      final name = await _askName(
-        context,
-        '第 ${vm.pageNumber(i)} 页的名字',
-        page.name,
-      );
-      if (name != null) vm.renamePage(i, name);
-      return;
-    }
+    if (picked == '改名') return _renamePage(context, i);
     final empty =
         page.pending == null && page.blocks.every((b) => b.text.trim().isEmpty);
     if (!empty &&
@@ -109,14 +56,24 @@ class PageStrip extends StatelessWidget {
   }
 
   Future<void> _seriesMenu(BuildContext context, Offset at, int series) async {
-    final picked = await _menu(context, at, const ['改名', '删除整个系列']);
+    final picked = await popMenu(context, at, const ['改名', '删除整个系列']);
     if (!context.mounted || picked == null) return;
-    if (picked == '改名') {
-      final next = await _askName(context, '系列的名字', vm.seriesName(series));
-      if (next != null) vm.renameSeries(series, next);
-      return;
-    }
+    if (picked == '改名') return _renameSeries(context, series);
     await _removeSeries(context, series);
+  }
+
+  Future<void> _renamePage(BuildContext context, int i) async {
+    final name = await askName(
+      context,
+      '第 ${vm.pageNumber(i)} 页的名字',
+      vm.pages[i].name,
+    );
+    if (name != null) vm.renamePage(i, name);
+  }
+
+  Future<void> _renameSeries(BuildContext context, int series) async {
+    final next = await askName(context, '系列的名字', vm.seriesName(series));
+    if (next != null) vm.renameSeries(series, next);
   }
 
   /// 删掉整个系列,先问一句。
@@ -146,13 +103,28 @@ class PageStrip extends StatelessWidget {
       children: [
         const Padding(
           padding: EdgeInsets.only(top: 7, right: 10),
-          child: Text(
-            '成稿正文',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: PennaColors.slate500,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '成稿正文',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: PennaColors.slate500,
+                ),
+              ),
+              SizedBox(width: 3),
+              Tooltip(
+                message: _bodyTips,
+                waitDuration: Duration.zero,
+                child: Icon(
+                  Icons.help_outline,
+                  size: 13,
+                  color: PennaColors.slate400,
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -173,6 +145,8 @@ class PageStrip extends StatelessWidget {
                       tint: _seriesTints[g % _seriesTints.length],
                       onMenu: (at) =>
                           _seriesMenu(context, at, pages[group.first].series),
+                      onRename: () =>
+                          _renameSeries(context, pages[group.first].series),
                     ),
                     for (final i in group)
                       _PageChip(
@@ -187,6 +161,7 @@ class PageStrip extends StatelessWidget {
                             from != i && pages[from].series == pages[i].series,
                         onTap: () => _do(context, vm.openPage(i)),
                         onMenu: (at) => _pageMenu(context, at, i),
+                        onRename: () => _renamePage(context, i),
                         onDrop: (from) => _do(context, vm.movePage(from, i)),
                       ),
                     _IconChip(
@@ -256,25 +231,28 @@ class _SeriesFrame extends StatelessWidget {
   }
 }
 
-/// 框里最前面的系列名;右键改名或删掉整个系列。
+/// 框里最前面的系列名;双击改名,右键改名或删掉整个系列。
 class _SeriesLabel extends StatelessWidget {
   const _SeriesLabel({
     required this.name,
     required this.tint,
     required this.onMenu,
+    required this.onRename,
   });
 
   final String name;
   final _Tint tint;
   final ValueChanged<Offset> onMenu;
+  final VoidCallback onRename;
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: '右键改名或删除',
-      waitDuration: const Duration(milliseconds: 600),
+      message: _gestureTip,
+      waitDuration: _tipWait,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onDoubleTap: onRename,
         onSecondaryTapDown: (d) => onMenu(d.globalPosition),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 5),
@@ -296,7 +274,7 @@ class _SeriesLabel extends StatelessWidget {
   }
 }
 
-/// 一页的页签:点一下换页,右键改名或删除,按住拖到同系列的另一页上调顺序。
+/// 一页的页签:点一下换页,双击改名,右键更多操作,按住拖到同系列的另一页上调顺序。
 /// [waiting] 表示这页有待确认的改动,右上角亮一个小点。
 class _PageChip extends StatelessWidget {
   const _PageChip({
@@ -309,6 +287,7 @@ class _PageChip extends StatelessWidget {
     required this.accepts,
     required this.onTap,
     required this.onMenu,
+    required this.onRename,
     required this.onDrop,
   });
 
@@ -324,6 +303,7 @@ class _PageChip extends StatelessWidget {
   final bool Function(int from) accepts;
   final VoidCallback onTap;
   final ValueChanged<Offset> onMenu;
+  final VoidCallback onRename;
   final ValueChanged<int> onDrop;
 
   Widget _face({required bool hovered}) {
@@ -377,11 +357,13 @@ class _PageChip extends StatelessWidget {
             '第 $number 页',
             if (name.isNotEmpty) name,
             if (waiting) '有待确认的改动',
+            _gestureTip,
           ].join(' · '),
-          waitDuration: const Duration(milliseconds: 600),
-          child: GestureDetector(
+          waitDuration: _tipWait,
+          child: _QuickTap(
             onTap: onTap,
-            onSecondaryTapDown: (d) => onMenu(d.globalPosition),
+            onDoubleTap: onRename,
+            onMenu: onMenu,
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: Stack(
@@ -405,6 +387,53 @@ class _PageChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 「成稿正文」旁边的问号:这一块藏着的操作。
+const _bodyTips =
+    '页签、系列名:双击改名 · 右键更多 · 按住拖动换顺序\n'
+    '分段:右键标注改名 · 拖左上角把手换位置\n'
+    '选中文字后右键:固定、润色、翻译、建立分段';
+
+/// 页签和系列名上能做什么;悬停一会儿就显示。
+const _gestureTip = '双击改名 · 右键更多';
+const _tipWait = Duration(milliseconds: 350);
+
+/// 单击马上生效,紧接着再点一下算双击。
+/// GestureDetector 的 onDoubleTap 会让单击等一会儿才生效,换页会觉得卡。
+class _QuickTap extends StatefulWidget {
+  const _QuickTap({
+    required this.onTap,
+    required this.onDoubleTap,
+    required this.onMenu,
+    required this.child,
+  });
+
+  final VoidCallback onTap;
+  final VoidCallback onDoubleTap;
+  final ValueChanged<Offset> onMenu;
+  final Widget child;
+
+  @override
+  State<_QuickTap> createState() => _QuickTapState();
+}
+
+class _QuickTapState extends State<_QuickTap> {
+  var _last = DateTime(0);
+
+  void _tap() {
+    final now = DateTime.now();
+    final second = now.difference(_last) < kDoubleTapTimeout;
+    _last = second ? DateTime(0) : now;
+    second ? widget.onDoubleTap() : widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: _tap,
+    onSecondaryTapDown: (d) => widget.onMenu(d.globalPosition),
+    child: widget.child,
+  );
 }
 
 /// 页签条上的小图标按钮;[onTap] 为 null 时是灰的。

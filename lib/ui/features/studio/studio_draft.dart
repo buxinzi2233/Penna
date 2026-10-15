@@ -201,6 +201,95 @@ extension StudioDraft on StudioViewModel {
     return false;
   }
 
+  /// 当前页能改的各段(固定的不算):标注和提示词。同名的只算第一个。
+  List<({String label, String text})> get sectionsHere {
+    final seen = <String>{};
+    return [
+      for (final p in parts.where((p) => !p.pinned))
+        for (final s in sectionSpans(p.text))
+          if (s.label.isNotEmpty && seen.add(s.label))
+            (label: s.label, text: p.text.substring(s.textStart, s.textEnd)),
+    ];
+  }
+
+  /// 这一页(连固定的段)已经有叫 [label] 的段了。
+  /// 同名的段会让按标注并入的改动只认第一个,所以起名时不让重名。
+  bool sectionNameTaken(String label) {
+    final name = sectionLabel(label);
+    return parts.any((p) => sectionSpans(p.text).any((s) => s.label == name));
+  }
+
+  /// 把从第 [index] 块开始的那一栏里第 [span] 段的标注改成 [label]。
+  /// 名字是空的、和别的段重名、或这段已经不在了时返回 false。
+  bool renameSection(int index, int span, String label) {
+    final name = sectionLabel(label);
+    if (_pending != null || name.isEmpty) return false;
+    final part = parts.where((p) => p.index == index && !p.pinned).firstOrNull;
+    if (part == null) return false;
+    final spans = sectionSpans(part.text);
+    if (span < 0 || span >= spans.length) return false;
+    final s = spans[span];
+    if (s.label.isEmpty) return false;
+    if (s.label == name) return true;
+    if (sectionNameTaken(name)) return false;
+    _log('「${s.label}」改名为「$name」($_here)');
+    setText(index, part.text.replaceRange(s.start, s.textStart, '【$name】'));
+    return true;
+  }
+
+  /// 把选中的普通文字(不在任何分段里的)建成一段,标注是 [label]。
+  /// 选区前后剩下的文字留在原处,仍是普通文字。做不了时返回 false。
+  bool sectionSelection(String label) {
+    final sel = bodySelection;
+    final name = sectionLabel(label);
+    if (_pending != null || sel == null || name.isEmpty) return false;
+    if (sectionNameTaken(name)) return false;
+    for (final p in parts.where((p) => !p.pinned)) {
+      final a = sel.$1 - p.offset;
+      final b = sel.$2 - p.offset;
+      if (a < 0 || b > p.text.length) continue;
+      final spans = sectionSpans(p.text);
+      // 一个标注都没有的栏整栏都是普通文字。
+      final free = spans.isEmpty
+          ? (start: 0, textStart: 0, textEnd: p.text.length, end: p.text.length)
+          : spans
+                .where(
+                  (s) => s.label.isEmpty && a >= s.textStart && b <= s.textEnd,
+                )
+                .map(
+                  (s) => (
+                    start: s.start,
+                    textStart: s.textStart,
+                    textEnd: s.textEnd,
+                    end: s.end,
+                  ),
+                )
+                .firstOrNull;
+      if (free == null) continue;
+      final picked = p.text.substring(a, b).trim();
+      if (picked.isEmpty) return false;
+      final before = p.text.substring(free.textStart, a).trim();
+      final after = p.text.substring(b, free.textEnd).trim();
+      _log('选中的文字建成「$name」($_here)');
+      bodySelection = null;
+      setText(
+        p.index,
+        p.text.replaceRange(
+          free.start,
+          free.end,
+          [
+            // 这一栏最开头的文字本来就不算哪一段,不用记号。
+            if (before.isNotEmpty) '${free.start == 0 ? '' : freeMark}$before',
+            '【$name】$picked',
+            if (after.isNotEmpty) '$freeMark$after',
+          ].join('\n'),
+        ),
+      );
+      return true;
+    }
+    return false;
+  }
+
   /// 去掉这一页的分段:标注和中文对照都拿掉,各段连成普通的文字(一段一行)。
   /// 拿掉之前先记进历史提示词,后悔了能从那里放回来。固定的段不动。
   /// 没有可去的分段时返回 false。

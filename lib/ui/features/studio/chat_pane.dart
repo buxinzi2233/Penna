@@ -422,6 +422,10 @@ class _ChatPaneState extends State<ChatPane> {
             : null,
         // 只有最新那条回复的选项能点;点了就当成用户的回答发出去。
         onOption: !widget.vm.isStreaming && last ? _answer : null,
+        draftSections: [
+          for (final s in widget.vm.sectionsHere)
+            (label: s.label, detail: s.text.trim()),
+        ],
       ),
     );
   }

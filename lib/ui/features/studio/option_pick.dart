@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 
-/// 多选的选项:勾上几个(或点「全选」),再点「确定」一起当成回答发出去。
+/// 多选里的一项:[label] 是发出去的字,[detail] 是排在它后面的一行预览(可以是空串)。
+typedef PickItem = ({String label, String detail});
+
+/// 多选的选项:竖着一行一项,勾上几个(或点「全选」),再点「确定」一起当成回答发出去。
+/// 挑成稿里的段时,每行后面是那段提示词的开头。
 /// [onSubmit] 为 null 时只是摆着看(不是最新那条回复,或正在生成)。
 class MultiPick extends StatefulWidget {
-  const MultiPick({super.key, required this.options, required this.onSubmit});
+  const MultiPick({super.key, required this.items, required this.onSubmit});
 
-  final List<String> options;
+  final List<PickItem> items;
   final ValueChanged<String>? onSubmit;
 
   @override
@@ -18,16 +22,76 @@ class MultiPick extends StatefulWidget {
 class _PickState extends State<MultiPick> {
   var _picked = const <String>{};
 
-  void _toggle(String option) => setState(
-    () => _picked = _picked.contains(option)
-        ? _picked.difference({option})
-        : {..._picked, option},
+  @override
+  void didUpdateWidget(MultiPick old) {
+    super.didUpdateWidget(old);
+    // 成稿的段变了:已经不在的勾掉。
+    _picked = _picked.intersection({for (final i in widget.items) i.label});
+  }
+
+  void _toggle(String label) => setState(
+    () => _picked = _picked.contains(label)
+        ? _picked.difference({label})
+        : {..._picked, label},
   );
+
+  Widget _row(PickItem item) {
+    final on = _picked.contains(item.label);
+    return InkWell(
+      onTap: () => _toggle(item.label),
+      borderRadius: BorderRadius.circular(6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: on ? PennaColors.primaryBg : PennaColors.card,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: on ? PennaColors.primaryBorder : PennaColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              on ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 16,
+              color: on ? PennaColors.primary : PennaColors.slate400,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              item.label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: on ? PennaColors.primary : PennaColors.text,
+              ),
+            ),
+            if (item.detail.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item.detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: monoStyle.copyWith(
+                    fontSize: 11,
+                    color: PennaColors.slate500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final items = widget.items;
+    if (items.isEmpty) return const SizedBox.shrink();
     final live = widget.onSubmit != null;
-    final all = _picked.length == widget.options.length;
+    final all = _picked.length == items.length;
     return IgnorePointer(
       ignoring: !live,
       child: Opacity(
@@ -39,18 +103,10 @@ class _PickState extends State<MultiPick> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final option in widget.options)
-                    PennaChip(
-                      label: option,
-                      selected: _picked.contains(option),
-                      onTap: () => _toggle(option),
-                    ),
-                ],
-              ),
+              for (final (i, item) in items.indexed) ...[
+                if (i > 0) const SizedBox(height: 4),
+                _row(item),
+              ],
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -59,13 +115,15 @@ class _PickState extends State<MultiPick> {
                     icon: all ? Icons.deselect : Icons.select_all,
                     borderColor: PennaColors.border,
                     onPressed: () => setState(
-                      () => _picked = all ? const {} : {...widget.options},
+                      () => _picked = all
+                          ? const {}
+                          : {for (final item in items) item.label},
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '已选 ${_picked.length} / ${widget.options.length}',
+                      '已选 ${_picked.length} / ${items.length}',
                       style: const TextStyle(
                         fontSize: 11,
                         color: PennaColors.slate500,
@@ -83,7 +141,8 @@ class _PickState extends State<MultiPick> {
                         : () => widget.onSubmit?.call(
                             all
                                 ? '全部'
-                                : widget.options
+                                : items
+                                      .map((item) => item.label)
                                       .where(_picked.contains)
                                       .join('、'),
                           ),

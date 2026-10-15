@@ -534,7 +534,7 @@ void main() {
       expect(asked, ['m1', 'm2']);
     });
 
-    testWidgets('拉取后点一行,就勾选并填进模型名称', (tester) async {
+    testWidgets('拉取后点一行,就勾选并填进模型名称;点保存才写进设置', (tester) async {
       late HttpServer server;
       await tester.runAsync(() async {
         server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -579,7 +579,8 @@ void main() {
       await tester.tap(find.text('gpt-b'));
       await tester.pump();
 
-      expect(config.config.llms.single.model, 'gpt-b');
+      expect(config.config.llms.single.model, '');
+      expect(find.text('未保存'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'gpt-b'), findsOneWidget);
       expect(find.byIcon(Icons.check_box), findsOneWidget);
 
@@ -588,10 +589,47 @@ void main() {
       await tester.tap(find.text('gpt-a'));
       await tester.pump();
 
-      expect(config.config.llms.single.model, 'gpt-b, gpt-a');
-      expect(config.config.llms.single.models, ['gpt-b', 'gpt-a']);
       expect(find.text('1 · gpt-b'), findsOneWidget);
       expect(find.text('2 · gpt-a'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('保存'));
+      // 写盘在假时钟里等不到;内存里的设置是立即更新的。
+      await tester.tap(find.text('保存'));
+      await tester.pump();
+
+      expect(config.config.llms.single.model, 'gpt-b, gpt-a');
+      expect(config.config.llms.single.models, ['gpt-b', 'gpt-a']);
+      expect(find.text('未保存'), findsNothing);
+    });
+
+    testWidgets('放弃:改过的名称回到已保存的值', (tester) async {
+      final config = tempConfig();
+      config.update(
+        const AppConfig().putLlm(
+          const LlmProfile(id: 'a', name: 'A', baseUrl: '', model: ''),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ListenableBuilder(
+                listenable: config,
+                builder: (_, _) => LlmSection(service: config),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(find.widgetWithText(TextField, 'A'), 'B');
+      await tester.pump();
+      expect(config.config.llms.single.name, 'A');
+
+      await tester.tap(find.text('放弃'));
+      await tester.pump();
+      expect(find.widgetWithText(TextField, 'A'), findsOneWidget);
+      expect(find.text('未保存'), findsNothing);
     });
   });
 }

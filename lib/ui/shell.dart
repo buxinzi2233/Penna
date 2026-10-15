@@ -8,6 +8,8 @@ import 'core/theme.dart';
 import 'core/widgets.dart';
 import 'features/archive/archive_page.dart';
 import 'features/characters/characters_page.dart';
+import 'features/local/local_model.dart';
+import 'features/local/local_page.dart';
 import 'features/settings/settings_page.dart';
 import 'features/studio/reverse_model.dart';
 import 'features/studio/studio_page.dart';
@@ -16,9 +18,13 @@ import 'features/studio/studio_view_model.dart';
 /// 显示在右下角的版本号;要和 pubspec.yaml 的 version 一致(version_test.dart 会查)。
 const appVersion = '0.1.0';
 
-const _studio = 0, _archivePage = 1, _settings = 2, _charactersPage = 3;
+const _studio = 0,
+    _archivePage = 1,
+    _settings = 2,
+    _charactersPage = 3,
+    _localPage = 4;
 
-/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「设置」之间切换。
+/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「角色库」「本地推理」「设置」之间切换。
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -27,6 +33,7 @@ class AppShell extends StatefulWidget {
     required this.skills,
     this.archive,
     this.reverse,
+    this.local,
   });
 
   final StudioViewModel vm;
@@ -36,6 +43,9 @@ class AppShell extends StatefulWidget {
   /// 档案库和图像反推;不给就各用一个只在内存里的(测试用)。
   final ArchiveStore? archive;
   final ReverseModel? reverse;
+
+  /// 本地推理;不给就用一个只在内存里、不能下载的(测试用)。
+  final LocalModel? local;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -47,6 +57,8 @@ class _AppShellState extends State<AppShell> {
   late final _reverse = widget.reverse ?? ReverseModel(widget.vm);
   // 角色库跟着工作台走:Agent 存进去的和这一页上看到的是同一份。
   late final _characters = widget.vm.characters ?? CharacterStore();
+  late final _local =
+      widget.local ?? LocalModel(streamChat: widget.vm.streamChat);
 
   void _go(int page) => setState(() => _page = page);
 
@@ -90,6 +102,15 @@ class _AppShellState extends State<AppShell> {
                           child: CharactersPage(
                             store: _characters,
                             dict: widget.vm.characterDict,
+                          ),
+                        ),
+                        _Page(
+                          active: _page == _localPage,
+                          child: LocalPage(
+                            model: _local,
+                            config: widget.config,
+                            vm: widget.vm,
+                            onOpenStudio: () => _go(_studio),
                           ),
                         ),
                         _Page(
@@ -212,6 +233,13 @@ class _NavRail extends StatelessWidget {
             tooltip: '角色库',
             selected: page == _charactersPage,
             onTap: () => onSelect(_charactersPage),
+          ),
+          const SizedBox(height: 6),
+          _RailButton(
+            icon: Icons.memory_outlined,
+            tooltip: '本地推理',
+            selected: page == _localPage,
+            onTap: () => onSelect(_localPage),
           ),
           const Spacer(),
           _RailButton(

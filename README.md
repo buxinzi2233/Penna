@@ -43,7 +43,8 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 成稿按【主体】【光影】这样的行首标注分段,每段显示为一个独立的彩色框,并可附带一行中文对照。交付用的「最终提示词」会自动去掉标注和对照。
 
 - 每段可单独复制、润色、翻译、固定、删除,或带着这一段去和 Agent 讨论。
-- 段可以拖动换位,也可以脱离分段变回普通文字。
+- 段可以拖动换位,也可以脱离分段变回普通文字;选中普通文字可以建成新的一段。
+- 右键段的标注可以修改段名。
 - 「合并」把整页的分段还原成一段连续的文字。
 - Agent 只改了几段时,只对这几段提出改动,其余原样保留。
 
@@ -57,21 +58,30 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 - 同一系列共用一场对话,Agent 可参照系列内其他页的内容;各系列相互独立。
 - Agent 一条回复可以同时写好几页,换主题时自动另起一个系列。
-- 页可以改名、调整顺序、脱离系列,整个系列可以一次存入档案库。
+- 双击页签或系列名即可改名;页可以调整顺序、脱离系列,整个系列可以一次存入档案库。
 
 ### Agent 对话
 
 - 回复流式输出,可随时停止或重新运行。
 - 生成期间继续发送的消息进入队列,依次自动发出,也可以插队立刻发送。
-- Agent 的提问可以带选项按钮,支持单选和多选。
+- Agent 的提问可以带选项按钮,支持单选和多选;选择成稿中的段落时,直接列出当前页的各段。
 - 图片和文本文件可以通过按钮、拖放或 Ctrl+V 作为附件发送。
-- 输入 `@` 引用某个 Skill;输入框上方的快捷操作可以自定义。
+- 输入 `@` 引用某个 Skill;输入框上方的快捷操作接在已输入的内容之后,可以自定义。
 - 多场对话以标签页并列,关闭的对话保留在历史中。
 - 每个 Preset 有独立的系统提示、温度和 Top P。
 
 ### 图像反推
 
 放入一张参考图,由模型反推出提示词。结果可以放到成稿,也会作为参考提供给之后的对话。
+
+### 本地推理
+
+在本机运行模型反推图片,分为两类:
+
+- **Tag**:使用 WD14 系列 ONNX 打标模型生成 Danbooru 标签,角色与通用标签各有阈值,调整后即时重新筛选。
+- **自然语言**:使用 llama.cpp 运行 GGUF 看图模型(Gemma 4、ToriiGate、JoyCaption 等)撰写画面描述;运行中的服务可以加入 API 管理,供 Agent 与润色使用。
+- 模型与运行时可从 HuggingFace 或国内镜像下载,支持断点续传与完整性校验;也可以选用本机已有的 GGUF 文件和 llama-server。
+- 结果可以复制或放到成稿。
 
 ### Danbooru 标签
 
@@ -100,16 +110,17 @@ Skill 是一份写法说明(`SKILL.md`),决定 Agent 按什么方式写提示词
 - 支持导入 `.md` 或 `.zip`,也可以在设置中直接填写。
 - 可以在对话中让 Agent 写一个新的 Skill,写完自动加入。
 
-### 模型
+### API 管理
 
 - 支持 OpenAI 兼容接口和 Google 接口(含 Vertex AI)。
+- 接口的名称、地址、模型与 Key 修改后点「保存」生效。
 - 一个接口可以配置多个模型,所有模型按顺序组成后备链,自动切换。
 - Agent 和润色可以分别指定首选模型。
 
 ### 档案、历史与回滚
 
 - **档案库**:手动保存的成稿,带名称和分类。
-- **历史提示词**:采纳改动、复制、清空时自动记录,最多 100 条,可以放回成稿。
+- **历史提示词**:采纳改动、复制、清空时自动记录,最多 100 条,可以展开全文或放回成稿。
 - **操作记录**:记录页面、固定、采纳驳回等结构性操作,可以回滚到任意一步之前。
 
 ### MCP
@@ -139,6 +150,7 @@ flutter run -d windows
 | 档案 | `archive.json` | 档案库 |
 | 角色 | `characters.json`、`characters\` | 自存的角色及图片 |
 | 反推 | `reverse.json`、`reverse.img` | 参考图及反推结果 |
+| 本地推理 | `local.json`、`models\`、`runtime\` | 本地推理设置、下载的模型与 llama.cpp 运行时 |
 | 扩展 | `skills\` | 导入的 Skill |
 
 ## 开发
@@ -164,7 +176,7 @@ python tool/make_character_dict.py dataset --review     # 角色库
 ```
 lib/
   ui/              界面
-  core/harness/    模型调用、成稿格式、Skills、标签、角色库、MCP(纯 Dart)
+  core/harness/    模型调用、成稿格式、Skills、标签、角色库、MCP、本地推理(纯 Dart)
   data/            配置、存盘、翻译、加密
 test/              测试
 assets/            随程序分发:字标、头像、内置标签词库与角色库
@@ -188,6 +200,18 @@ Penna 的每一部分都建立在开源社区的成果之上。
 | [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | 内置角色库中每个角色的外貌与服装特征词 | Apache-2.0 |
 | [DanbooruSearch](https://sakizuki-danboorusearch.hf.space) | 在线语义搜索标签的 MCP 服务 | — |
 
+### 软件与模型
+
+| 项目 | 用途 | 许可 |
+| --- | --- | --- |
+| [ONNX Runtime](https://github.com/microsoft/onnxruntime) | 本地运行打标模型 | MIT |
+| [flutter_onnxruntime](https://github.com/masicai/flutter_onnxruntime) | ONNX Runtime 的 Flutter 插件 | MIT |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | 本地运行 GGUF 看图模型(使用时下载) | MIT |
+| [SmilingWolf WD14 Tagger](https://huggingface.co/SmilingWolf) | 本地打标模型(使用时下载) | Apache-2.0 |
+| [Gemma 4](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF)、[ToriiGate](https://huggingface.co/DraconicDragon/ToriiGate-0.5-GGUF)、[JoyCaption](https://huggingface.co/concedo/llama-joycaption-beta-one-hf-llava-mmproj-gguf) | 本地看图模型(使用时下载) | 见各模型页 |
+
+本地推理的做法参考了作者的另外两个项目 [NLapt](https://github.com/storyAura/NLapt) 与 [BooruDatasetTagManagerPlus](https://github.com/storyAura/BooruDatasetTagManagerPlus)。
+
 ### 字体
 
 | 字体 | 作者 | 许可 |
@@ -206,3 +230,4 @@ Penna 的源代码以 [MIT](LICENSE) 许可发布。
 - `assets/danbooru_characters.tsv.gz`:由 [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki)(Apache-2.0)合并、筛选而成,特征词重新分成了「外貌」与「服装与其他」两组。
 - `font/MapleMono-Regular.ttf`:SIL OFL 1.1,见 [font/MapleMono-LICENSE.txt](font/MapleMono-LICENSE.txt)。
 - `font/LXGW975YuanSC-500W.ttf`:SIL OFL 1.1,见 [font/LXGW975Yuan-LICENSE.txt](font/LXGW975Yuan-LICENSE.txt)。
+- `onnxruntime.dll`:[ONNX Runtime](https://github.com/microsoft/onnxruntime),MIT。

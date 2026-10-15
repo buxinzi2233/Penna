@@ -1,0 +1,443 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:penna/core/harness/attachment.dart';
+import 'package:penna/core/harness/local/download.dart';
+import 'package:penna/core/harness/local/llama_server.dart';
+import 'package:penna/core/harness/local/wd_tagger.dart';
+import 'package:penna/core/harness/providers/llm_http.dart';
+import 'package:penna/ui/features/local/local_model.dart';
+
+/// 假的 llama-server 进程:不真的起程序,[exit] 之后算退出。
+class _FakeProcess implements Process {
+  final _exit = Completer<int>();
+  final _err = StreamController<List<int>>();
+  bool killed = false;
+
+  void exit(int code, [String stderr = '']) {
+    _err.add(utf8.encode(stderr));
+    _err.close();
+    _exit.complete(code);
+  }
+
+  @override
+  Future<int> get exitCode => _exit.future;
+  @override
+  Stream<List<int>> get stdout => const Stream.empty();
+  @override
+  Stream<List<int>> get stderr => _err.stream;
+  @override
+  IOSink get stdin => throw UnimplementedError();
+  @override
+  int get pid => 1;
+  @override
+  bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    killed = true;
+    if (!_exit.isCompleted) exit(-1);
+    return true;
+  }
+}
+
+/// 临时文件夹里放好假的 llama-server.exe 和模型,返回启动参数。
+ServerSpec _spec(Directory dir) {
+  for (final name in ['llama-server.exe', 'm.gguf']) {
+    File('${dir.path}/$name').writeAsStringSync('x');
+  }
+  return (
+    exe: '${dir.path}/llama-server.exe',
+    model: '${dir.path}/m.gguf',
+    mmproj: '',
+    port: 8091,
+    context: 4096,
+    gpuLayers: -1,
+  );
+}
+
+void main() {
+  late Directory tmp;
+  setUp(() => tmp = Directory.systemTemp.createTempSync('penna_local'));
+  tearDown(() => tmp.deleteSync(recursive: true));
+
+  group('打标模型', () {
+    test('标签表:v3 和老版本的写法都认,表头跳过', () {
+      expect(
+        parseSelectedTags(
+          'tag_id,name,category,count\n9999999,general,9,1\n1,long_hair,0,5\n'
+          '2,hatsune_miku,4,3\n',
+        ),
+        [
+          (name: 'general', category: 9),
+          (name: 'long_hair', category: 0),
+          (name: 'hatsune_miku', category: 4),
+        ],
+      );
+      expect(parseSelectedTags('name,category\nsmile,0\r\n'), [
+        (name: 'smile', category: 0),
+      ]);
+    });
+
+    test('输入的形状:通道在后或在前', () {
+      expect(inputLayout([1, 448, 448, 3]), (size: 448, nchw: false));
+      expect(inputLayout([-1, 448, 448, 3]), (size: 448, nchw: false));
+      expect(inputLayout([1, 3, 384, 384]), (size: 384, nchw: true));
+      expect(inputLayout([]), (size: 448, nchw: false));
+      expect(fitInside(1000, 500, 448), (width: 448, height: 224));
+      expect(fitInside(100, 50, 448), (width: 100, height: 50));
+    });
+
+    test('贴到白底正中,透明的算白色,输出 BGR', () {
+      // 1×2 的图:上面一个不透明的红点,下面一个全透明的点。
+      final rgba = Uint8List.fromList([255, 0, 0, 255, 0, 0, 0, 0]);
+      final out = letterboxBgr(rgba, 1, 2, size: 2);
+      // 宽 1 放在第 0 列(左右各空 0.5 取整),上面一行是红点。
+      expect(out.sublist(0, 3), [0, 0, 255]);
+      expect(out.sublist(3, 6), [255, 255, 255]);
+      expect(out.sublist(6, 9), [255, 255, 255]);
+
+      final planes = letterboxBgr(rgba, 1, 2, size: 2, nchw: true);
+      // 通道在前:B、G、R 各一整块,红点在每块的第 0 个。
+      expect([planes[0], planes[4], planes[8]], [0, 0, 255]);
+    });
+
+    test('按阈值筛:角色、通用分开,分级取把握最大的;没过 sigmoid 的先补上', () {
+      const labels = [
+        (name: 'general', category: tagRating),
+        (name: 'sensitive', category: tagRating),
+        (name: 'long_hair', category: tagGeneral),
+        (name: 'smile', category: tagGeneral),
+        (name: 'hatsune_miku', category: tagCharacter),
+      ];
+      final r = decodeTags(
+        [0.2, 0.7, 0.4, 0.9, 0.95],
+        labels,
+        general: 0.35,
+        character: 0.85,
+      );
+      expect(r.rating, 'sensitive');
+      expect(r.characters.map((t) => t.tag), ['hatsune_miku']);
+      expect(r.general.map((t) => t.tag), ['smile', 'long_hair']);
+      expect(tagPrompt(r), 'hatsune miku, smile, long hair');
+
+      final logits = decodeTags(
+        [-5, -5, 3, -3, -1],
+        labels,
+        general: 0.5,
+        character: 0.85,
+      );
+      expect(logits.general.map((t) => t.tag), ['long_hair']);
+      expect(logits.characters, isEmpty);
+    });
+
+    test('颜文字的下划线留着', () {
+      expect(tagText('^_^'), '^_^');
+      expect(tagText('looking_at_viewer'), 'looking at viewer');
+    });
+  });
+
+  group('llama-server', () {
+    test('参数:-1 层是全部放进显卡,有视觉组件才带 --mmproj', () {
+      final spec = (
+        exe: 'a.exe',
+        model: 'm.gguf',
+        mmproj: 'p.gguf',
+        port: 9000,
+        context: 2048,
+        gpuLayers: -1,
+      );
+      final args = serverArgs(spec);
+      expect(args.join(' '), contains('-ngl 999'));
+      expect(args.join(' '), contains('--port 9000'));
+      expect(args.sublist(args.length - 2), ['--mmproj', 'p.gguf']);
+      expect(
+        serverArgs((
+          exe: 'a.exe',
+          model: 'm.gguf',
+          mmproj: '',
+          port: 9000,
+          context: 2048,
+          gpuLayers: 20,
+        )),
+        isNot(contains('--mmproj')),
+      );
+    });
+
+    test('等到 /health 通了才算起来;停掉会结束进程', () async {
+      final process = _FakeProcess();
+      var polls = 0;
+      final server = LlamaServer(
+        start: (_, _) async => process,
+        health: (_) async => ++polls >= 3,
+      );
+
+      final url = await server.start(_spec(tmp), poll: Duration.zero);
+
+      expect(url, 'http://127.0.0.1:8091/v1');
+      expect(server.running, isTrue);
+      await server.stop();
+      expect(process.killed, isTrue);
+      expect(server.running, isFalse);
+    });
+
+    test('起来后马上退出:报出最后一行输出', () async {
+      final process = _FakeProcess();
+      final server = LlamaServer(
+        start: (_, _) async {
+          scheduleMicrotask(() => process.exit(1, 'loading\nout of memory\n'));
+          return process;
+        },
+        health: (_) async => false,
+      );
+
+      await expectLater(
+        server.start(_spec(tmp), poll: const Duration(milliseconds: 5)),
+        throwsA(
+          isA<LocalServerException>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('退出了'), contains('out of memory')),
+          ),
+        ),
+      );
+      expect(server.running, isFalse);
+    });
+
+    test('加载途中点停止:说「已停止」,不当成崩了', () async {
+      final server = LlamaServer(
+        start: (_, _) async => _FakeProcess(),
+        health: (_) async => false,
+      );
+
+      final starting = server.start(
+        _spec(tmp),
+        poll: const Duration(milliseconds: 5),
+      );
+      // 先挂上判断,不然它报错时还没人接。
+      final check = expectLater(
+        starting,
+        throwsA(
+          isA<LocalServerException>().having(
+            (e) => e.message,
+            'message',
+            '已停止',
+          ),
+        ),
+      );
+      // 等它真的起了进程、开始等 /health 再停。
+      while (!server.running) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await server.stop();
+      await check;
+    });
+
+    test('找不到文件时不启动', () async {
+      final server = LlamaServer(start: (_, _) => fail('不该启动'));
+      await expectLater(
+        server.start((
+          exe: '${tmp.path}/none.exe',
+          model: 'm',
+          mmproj: '',
+          port: 1,
+          context: 1,
+          gpuLayers: 0,
+        )),
+        throwsA(isA<LocalServerException>()),
+      );
+    });
+
+    test('在解开的运行时里找最浅的 llama-server.exe', () {
+      Directory('${tmp.path}/a/b').createSync(recursive: true);
+      File('${tmp.path}/a/b/llama-server.exe').writeAsStringSync('');
+      File('${tmp.path}/a/llama-server.exe').writeAsStringSync('');
+      expect(
+        findServerExe(tmp)!.path.replaceAll('\\', '/'),
+        endsWith('/a/llama-server.exe'),
+      );
+      expect(findServerExe(Directory('${tmp.path}/none')), isNull);
+    });
+  });
+
+  group('下载', () {
+    late HttpServer http;
+    final body = List.generate(1000, (i) => i % 251);
+    final ranges = <String?>[];
+
+    setUp(() async {
+      ranges.clear();
+      http = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      http.listen((request) async {
+        final range = request.headers.value(HttpHeaders.rangeHeader);
+        ranges.add(range);
+        if (request.uri.path == '/missing') {
+          request.response.statusCode = 404;
+        } else if (range != null) {
+          final from = int.parse(range.split('=')[1].split('-')[0]);
+          request.response.statusCode = HttpStatus.partialContent;
+          request.response.add(body.sublist(from));
+        } else {
+          request.response.add(body);
+        }
+        await request.response.close();
+      });
+    });
+    tearDown(() => http.close(force: true));
+
+    RemoteFile file({String path = '/f', String? sha}) => (
+      url: 'http://127.0.0.1:${http.port}$path',
+      path: '${tmp.path}/out.bin',
+      size: body.length,
+      sha256: sha,
+    );
+
+    test('从断开的地方接着下;校验通过才改成正式的名字', () async {
+      File('${tmp.path}/out.bin.part').writeAsBytesSync(body.sublist(0, 400));
+      final seen = <int>[];
+
+      await downloadFile(
+        file(sha: '${sha256.convert(body)}'),
+        onProgress: (got, _) => seen.add(got),
+      );
+
+      expect(ranges, ['bytes=400-']);
+      expect(File('${tmp.path}/out.bin').readAsBytesSync(), body);
+      expect(File('${tmp.path}/out.bin.part').existsSync(), isFalse);
+      expect(seen.last, 1000);
+      expect(isDownloaded(file()), isTrue);
+    });
+
+    test('校验不对就删掉;找不到文件说人话', () async {
+      await expectLater(
+        downloadFile(file(sha: '00')),
+        throwsA(
+          isA<DownloadException>().having(
+            (e) => e.message,
+            'message',
+            contains('校验'),
+          ),
+        ),
+      );
+      expect(File('${tmp.path}/out.bin.part').existsSync(), isFalse);
+      expect(File('${tmp.path}/out.bin').existsSync(), isFalse);
+
+      await expectLater(
+        downloadFile(file(path: '/missing')),
+        throwsA(
+          isA<DownloadException>().having(
+            (e) => e.message,
+            'message',
+            contains('404'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('本地推理页的状态', () {
+    test('换打标模型:阈值换成它的推荐值;设置存盘后还在', () async {
+      final model = LocalModel(
+        dir: tmp,
+        streamChat: (_) => const Stream.empty(),
+      );
+      model.pickTagger(taggerModels[2].repo);
+      expect(model.general, taggerModels[2].general);
+      model.setThresholds(character: 0.7);
+      model.update(() => model.port = 9100);
+
+      final again = LocalModel(
+        dir: tmp,
+        streamChat: (_) => const Stream.empty(),
+      );
+      await again.load();
+      expect(again.taggerRepo, taggerModels[2].repo);
+      expect(again.character, 0.7);
+      expect(again.port, 9100);
+    });
+
+    test('起了服务才能看图写描述,图带在请求里', () async {
+      LlmRequest? asked;
+      final model = LocalModel(
+        dir: tmp,
+        streamChat: (request) {
+          asked = request;
+          return Stream.fromIterable(['a girl ', 'in a field']);
+        },
+        server: LlamaServer(
+          start: (_, _) async => _FakeProcess(),
+          health: (_) async => true,
+        ),
+      );
+      final spec = _spec(tmp);
+      model.update(() {
+        model.exePath = spec.exe;
+        model.modelPath = spec.model;
+      });
+
+      model.setImage(
+        Attachment.image(
+          name: 'a.png',
+          mime: 'image/png',
+          bytes: Uint8List.fromList([1, 2, 3]),
+        ),
+      );
+      expect(await model.runCaption(), '先启动模型');
+      expect(await model.startServer(), isNull);
+      expect(model.serverRunning, isTrue);
+
+      expect(await model.runCaption(), isNull);
+      expect(model.caption, 'a girl in a field');
+      expect(asked!.baseUrl, 'http://127.0.0.1:8091/v1');
+      expect(asked!.images[0]!.single.bytes, [1, 2, 3]);
+
+      // 正在用的模型不能删。
+      expect(
+        await model.remove([
+          (url: '', path: spec.model, size: null, sha256: null),
+        ]),
+        contains('正在用'),
+      );
+
+      await model.stopServer();
+      expect(model.serverRunning, isFalse);
+    });
+
+    test('生成途中换了图:前一张图的字不会挂到新图上', () async {
+      final reply = StreamController<String>();
+      final model = LocalModel(
+        dir: tmp,
+        streamChat: (_) => reply.stream,
+        server: LlamaServer(
+          start: (_, _) async => _FakeProcess(),
+          health: (_) async => true,
+        ),
+      );
+      final spec = _spec(tmp);
+      model.update(() {
+        model.exePath = spec.exe;
+        model.modelPath = spec.model;
+      });
+      Attachment image(int b) => Attachment.image(
+        name: 'a.png',
+        mime: 'image/png',
+        bytes: Uint8List.fromList([b]),
+      );
+      model.setImage(image(1));
+      expect(await model.startServer(), isNull);
+
+      final running = model.runCaption();
+      reply.add('a cat ');
+      await pumpEventQueue();
+      model.setImage(image(2));
+      reply.add('on a sofa');
+      await reply.close();
+
+      expect(await running, isNull);
+      expect(model.caption, isEmpty);
+      expect(model.captioning, isFalse);
+      await model.stopServer();
+    });
+  });
+}

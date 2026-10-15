@@ -58,6 +58,12 @@ final _label = RegExp(r'^【([^】\n]{0,12})】[ \t]*', multiLine: true);
 /// 脱离了分段的文字那一行的开头:它自己占一处,但不画成分段框,也没有标注。
 const freeMark = '【】';
 
+/// 用户起的标注整理成 [_label] 认得的样子:去掉【】和换行,最多 12 个字。
+String sectionLabel(String name) {
+  final clean = name.replaceAll(RegExp(r'[【】\r\n]'), '').trim();
+  return clean.length > 12 ? clean.substring(0, 12).trim() : clean;
+}
+
 /// 去掉每行开头的分段标注和中文对照行:它们只给人看,不进交付的提示词。
 /// [atLineStart] 为 false 表示 [text] 是从一行中间开始的,开头那个【】不算标注。
 String stripSectionLabels(String text, {bool atLineStart = true}) => text
@@ -336,34 +342,48 @@ const _skillClose = '</new-skill>';
   );
 }
 
-/// 选项的开始标签:`<options>` 是挑一个,`<options multi>` 是可以勾好几个。
-final _optionsOpen = RegExp(r'<options(\s+multi)?\s*>');
-const _optionsHalf = '<options multi>';
+/// 选项的开始标签:`<options>` 是挑一个,`<options multi>` 是可以勾好几个,
+/// `<options sections>` 是从成稿的各段里勾:界面自己读出当前页的各段,标签里可以不写。
+final _optionsOpen = RegExp(r'<options(?:\s+(multi|sections))?\s*>');
+const _optionsHalves = ['<options multi>', '<options sections>'];
 const _optionsClose = '</options>';
+
+/// 回复里给用户点的选项。[sections] 为真时是挑成稿里的哪几段(也算多选)。
+typedef AskedOptions = ({
+  String prose,
+  List<String> options,
+  bool multi,
+  bool sections,
+});
 
 /// 把回复里给用户点的选项拆出来:一行一个,显示成按钮,点了就当成用户的回答发出去。
 /// [multi] 为真时是多选:勾上几个(或全选)再一起发。
 /// 没写完(还在生成、被停在半路)的不算,免得按钮一个个蹦出来又变。
-({String prose, List<String> options, bool multi}) splitOptions(String reply) {
+AskedOptions splitOptions(String reply) {
   final open = _optionsOpen.allMatches(reply).lastOrNull;
   if (open == null) {
     return (
-      prose: _withoutPartial(reply, _optionsHalf),
+      prose: _optionsHalves.fold(reply, _withoutPartial),
       options: const [],
       multi: false,
+      sections: false,
     );
   }
   final start = open.start;
   final from = open.end;
   final multi = open[1] != null;
+  final sections = open[1] == 'sections';
   final end = reply.indexOf(_optionsClose, from);
   final prose = [
     reply.substring(0, start).trim(),
     if (end >= 0) reply.substring(end + _optionsClose.length).trim(),
   ].where((s) => s.isNotEmpty).join('\n\n');
-  if (end < 0) return (prose: prose, options: const [], multi: multi);
+  if (end < 0) {
+    return (prose: prose, options: const [], multi: multi, sections: sections);
+  }
   return (
     multi: multi,
+    sections: sections,
     prose: prose,
     options: List.unmodifiable(
       reply

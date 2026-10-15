@@ -1,0 +1,380 @@
+import 'package:file_selector/file_selector.dart';
+import 'package:flutter/material.dart';
+
+import '../../../core/harness/local/download.dart';
+import '../../../core/harness/local/llama_server.dart';
+import '../../../core/harness/local/wd_tagger.dart';
+import '../../../data/models/app_config.dart';
+import '../../../data/services/config_service.dart';
+import '../../core/image_drop.dart';
+import '../../core/smooth_scroll.dart';
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
+import '../settings/settings_sections.dart';
+import '../studio/studio_view_model.dart';
+import 'local_model.dart';
+
+part 'local_nl_tab.dart';
+part 'local_tag_tab.dart';
+
+/// 本地推理:左边放一张图,右边用本机的模型给它反推。
+/// 「Tag」用 ONNX 打标模型出 Danbooru 标签,「自然语言」用 llama-server 跑的看图模型写描述。
+class LocalPage extends StatefulWidget {
+  const LocalPage({
+    super.key,
+    required this.model,
+    required this.config,
+    required this.vm,
+    required this.onOpenStudio,
+  });
+
+  final LocalModel model;
+  final ConfigService config;
+  final StudioViewModel vm;
+
+  /// 放到成稿后切去工作台。
+  final VoidCallback onOpenStudio;
+
+  @override
+  State<LocalPage> createState() => _LocalPageState();
+}
+
+class _LocalPageState extends State<LocalPage> {
+  int _tab = 0;
+  final _scroll = SmoothScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final model = widget.model;
+    return ListenableBuilder(
+      listenable: model,
+      builder: (context, _) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  '本地推理',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 16),
+                for (final (i, label) in const ['Tag', '自然语言'].indexed) ...[
+                  PennaChip(
+                    label: label,
+                    selected: _tab == i,
+                    onTap: () => setState(() => _tab = i),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: ImageDrop(
+                      image: model.image,
+                      onChanged: model.setImage,
+                      hint: '点击或拖入要反推的图片',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 3,
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      child: PopIn(
+                        key: ValueKey(_tab),
+                        child: _tab == 0
+                            ? _TagTab(
+                                model: model,
+                                onToDraft: (text) => _toDraft(context, text),
+                              )
+                            : _NlTab(
+                                model: model,
+                                config: widget.config,
+                                onToDraft: (text) => _toDraft(context, text),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 结果放进当前页的成稿:成稿空着直接填,有内容时是待确认的改动。
+  void _toDraft(BuildContext context, String text) {
+    final problem = widget.vm.restorePrompt((
+      time: DateTime.now(),
+      text: text,
+    ), title: '本地推理');
+    if (problem != null) return showToast(context, problem, warn: true);
+    widget.onOpenStudio();
+  }
+}
+
+/// 一块带标题的卡片。
+class _Block extends StatelessWidget {
+  const _Block({required this.title, this.trailing, required this.child});
+
+  final String title;
+  final Widget? trailing;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: PennaCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(title, style: titleStyle)),
+                ?trailing,
+              ],
+            ),
+            const SizedBox(height: 10),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 下载来源:官方或国内镜像。
+class _SourcePicker extends StatelessWidget {
+  const _SourcePicker({required this.model});
+
+  final LocalModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (id, label) in const [
+          ('mirror', '镜像'),
+          ('huggingface', 'HuggingFace'),
+        ]) ...[
+          const SizedBox(width: 6),
+          PennaChip(
+            label: label,
+            selected: model.source == id,
+            onTap: () => model.update(() => model.source = id),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 一行可下载的东西:名字、说明,右边是下载 / 进度 / 删除。
+class _DownloadRow extends StatelessWidget {
+  const _DownloadRow({
+    required this.model,
+    required this.keyName,
+    required this.name,
+    required this.note,
+    required this.files,
+    required this.onDownload,
+    this.selected = false,
+    this.onSelect,
+    this.done,
+  });
+
+  final LocalModel model;
+
+  /// 下好了没有;不给就看 [files] 在不在。
+  final bool? done;
+
+  /// 进度记在哪个名字下。
+  final String keyName;
+  final String name;
+  final String note;
+  final List<RemoteFile> files;
+  final Future<String?> Function() onDownload;
+  final bool selected;
+
+  /// 点这一行选中它;为 null 时这一行不能选。
+  final VoidCallback? onSelect;
+
+  Future<void> _download(BuildContext context) async {
+    final problem = await onDownload();
+    if (problem != null && context.mounted) {
+      showToast(context, problem, warn: true);
+    }
+  }
+
+  Future<void> _remove(BuildContext context) async {
+    if (!await confirmDelete(context, '删除「$name」?', '下载好的文件会从本机删掉。')) {
+      return;
+    }
+    final problem = await model.remove(files);
+    if (problem != null && context.mounted) {
+      showToast(context, problem, warn: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = model.progressOf(keyName);
+    final ready = done ?? model.ready(files);
+    return InkWell(
+      onTap: onSelect,
+      borderRadius: BorderRadius.circular(6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: selected ? PennaColors.primaryBg : PennaColors.card,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: selected ? PennaColors.primaryBorder : PennaColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            if (onSelect != null) ...[
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                size: 16,
+                color: selected ? PennaColors.primary : PennaColors.slate400,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    note,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: PennaColors.slate500,
+                    ),
+                  ),
+                  if (progress != null) ...[
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: progress.total == null
+                          ? null
+                          : progress.received / progress.total!,
+                      minHeight: 3,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      progress.total == null
+                          ? _size(progress.received)
+                          : '${_size(progress.received)} / '
+                                '${_size(progress.total!)}',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: PennaColors.slate500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (progress != null)
+              PennaButton(
+                label: '停止',
+                icon: Icons.stop_circle_outlined,
+                background: PennaColors.slate100,
+                onPressed: () => model.cancelDownload(keyName),
+              )
+            else if (ready)
+              IconButton(
+                tooltip: '删除',
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                color: PennaColors.slate500,
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => _remove(context),
+              )
+            else
+              PennaButton(
+                label: '下载',
+                icon: Icons.download,
+                background: PennaColors.primaryBg,
+                foreground: PennaColors.primary,
+                onPressed: model.dir == null ? null : () => _download(context),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _size(int bytes) => bytes >= 1 << 30
+    ? '${(bytes / (1 << 30)).toStringAsFixed(2)} GB'
+    : '${(bytes / (1 << 20)).toStringAsFixed(1)} MB';
+
+/// 结果下面那排:复制、放到成稿。
+class _ResultActions extends StatelessWidget {
+  const _ResultActions({required this.text, required this.onToDraft});
+
+  final String text;
+  final ValueChanged<String> onToDraft;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        PennaButton(
+          label: '复制',
+          icon: Icons.content_copy,
+          borderColor: PennaColors.border,
+          onPressed: () => copyWithToast(context, text, '已复制'),
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: '放到成稿',
+          icon: Icons.keyboard_double_arrow_up,
+          background: PennaColors.accent,
+          foreground: Colors.white,
+          onPressed: () => onToDraft(text),
+        ),
+      ],
+    );
+  }
+}
+
+/// 点按钮跑一件事,出错时弹提示。
+Future<void> _run(BuildContext context, Future<String?> Function() task) async {
+  final problem = await task();
+  if (problem != null && context.mounted) {
+    showToast(context, problem, warn: true);
+  }
+}

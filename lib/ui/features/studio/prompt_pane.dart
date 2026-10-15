@@ -522,7 +522,11 @@ class _SummarySectionState extends State<_SummarySection> {
                           const Text('历史提示词', style: draftLabelStyle),
                           for (final record in vm.promptLog) ...[
                             const SizedBox(height: 8),
-                            _HistoryCard(vm: vm, record: record),
+                            _HistoryCard(
+                              key: ObjectKey(record),
+                              vm: vm,
+                              record: record,
+                            ),
                           ],
                         ],
                       ],
@@ -587,12 +591,25 @@ class _Tab extends StatelessWidget {
   }
 }
 
-/// 历史提示词里的一条:当时的成稿,可以放回工作区或复制。
-class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.vm, required this.record});
+/// 历史提示词收起时最多显示几行。
+const _historyLines = 3;
+
+/// 历史提示词里的一条:当时的成稿,可以放回工作区或复制;长的可以展开看全。
+class _HistoryCard extends StatefulWidget {
+  const _HistoryCard({super.key, required this.vm, required this.record});
 
   final StudioViewModel vm;
   final PromptRecord record;
+
+  @override
+  State<_HistoryCard> createState() => _HistoryCardState();
+}
+
+class _HistoryCardState extends State<_HistoryCard> {
+  bool _open = false;
+
+  StudioViewModel get vm => widget.vm;
+  PromptRecord get record => widget.record;
 
   @override
   Widget build(BuildContext context) {
@@ -637,11 +654,43 @@ class _HistoryCard extends StatelessWidget {
               ),
             ],
           ),
-          Text(
-            clean,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: monoStyle.copyWith(fontSize: 11.5),
+          LayoutBuilder(
+            builder: (context, box) {
+              final style = monoStyle.copyWith(fontSize: 11.5);
+              // 收起时放得下就不用「展开」按钮。
+              final long = (TextPainter(
+                text: TextSpan(text: clean, style: style),
+                maxLines: _historyLines,
+                textDirection: TextDirection.ltr,
+              )..layout(maxWidth: box.maxWidth)).didExceedMaxLines;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOut,
+                    alignment: Alignment.topLeft,
+                    child: Text(
+                      clean,
+                      maxLines: _open ? null : _historyLines,
+                      overflow: _open ? null : TextOverflow.ellipsis,
+                      style: style,
+                    ),
+                  ),
+                  if (long)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: PennaButton(
+                        label: _open ? '收起' : '展开',
+                        icon: _open ? Icons.expand_less : Icons.expand_more,
+                        background: Colors.transparent,
+                        foreground: PennaColors.slate500,
+                        onPressed: () => setState(() => _open = !_open),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),

@@ -498,3 +498,54 @@ Widget pennaTextMenu(
     ),
   );
 }
+
+/// 问用户要一个名字。点「确定」返回文字(可以是空串),取消返回 null。
+Future<String?> askName(
+  BuildContext context,
+  String title,
+  String initial, {
+  String hint = '留空就用默认的',
+}) {
+  var text = initial;
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title, style: const TextStyle(fontSize: 16)),
+      content: SizedBox(
+        width: 320,
+        child: PennaField(
+          label: '名字',
+          hint: hint,
+          value: initial,
+          onChanged: (v) => text = v,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, text),
+          child: const Text('确定'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// 在鼠标的位置弹一个小菜单,返回选中的那一项。
+Future<String?> popMenu(BuildContext context, Offset at, List<String> items) {
+  return showMenu<String>(
+    context: context,
+    position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
+    items: [
+      for (final item in items)
+        PopupMenuItem(
+          value: item,
+          height: 34,
+          child: Text(item, style: const TextStyle(fontSize: 13)),
+        ),
+    ],
+  );
+}

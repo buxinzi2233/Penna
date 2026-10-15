@@ -1,10 +1,6 @@
-import 'dart:io';
-
-import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/harness/attachment.dart';
+import '../../core/image_drop.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'reverse_model.dart';
@@ -18,25 +14,6 @@ class ReversePane extends StatelessWidget {
 
   /// 把反推出的提示词交给 Agent(放进聊天输入框)。
   final ValueChanged<String>? onSend;
-
-  Future<void> _use(BuildContext context, String path) async {
-    try {
-      final picked = await readAttachment(File(path));
-      if (!picked.isImage) throw const AttachmentException('这不是图片');
-      model.setImage(picked);
-    } on AttachmentException catch (e) {
-      if (context.mounted) showToast(context, e.message, warn: true);
-    }
-  }
-
-  Future<void> _pick(BuildContext context) async {
-    final picked = await openFile(
-      acceptedTypeGroups: [
-        XTypeGroup(label: '图片', extensions: imageMimes.keys.toList()),
-      ],
-    );
-    if (picked != null && context.mounted) await _use(context, picked.path);
-  }
 
   Future<void> _run(BuildContext context) async {
     final problem = await model.run();
@@ -67,18 +44,7 @@ class ReversePane extends StatelessWidget {
             children: [
               // 图这边留一半宽:横构图的图也看得清。
               Expanded(
-                child: DropTarget(
-                  onDragDone: (d) {
-                    if (d.files.isNotEmpty) _use(context, d.files.first.path);
-                  },
-                  child: image == null
-                      ? _EmptyImage(onTap: () => _pick(context))
-                      : _ImageBox(
-                          image: image,
-                          onReplace: () => _pick(context),
-                          onClear: () => model.setImage(null),
-                        ),
-                ),
+                child: ImageDrop(image: image, onChanged: model.setImage),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -183,99 +149,6 @@ class ReversePane extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _EmptyImage extends StatelessWidget {
-  const _EmptyImage({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: const PennaCard(
-          color: PennaColors.slate50,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.add_photo_alternate_outlined,
-                  size: 26,
-                  color: PennaColors.slate400,
-                ),
-                SizedBox(height: 6),
-                Text(
-                  '点击或拖入参考图',
-                  style: TextStyle(fontSize: 12, color: PennaColors.slate500),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ImageBox extends StatelessWidget {
-  const _ImageBox({
-    required this.image,
-    required this.onReplace,
-    required this.onClear,
-  });
-
-  final Attachment image;
-  final VoidCallback onReplace;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return PennaCard(
-      color: PennaColors.slate50,
-      padding: const EdgeInsets.all(6),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.memory(
-              image.bytes!,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const Center(
-                child: Icon(
-                  Icons.broken_image_outlined,
-                  color: PennaColors.slate400,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Row(
-              children: [
-                PennaButton(
-                  label: '换图',
-                  icon: Icons.swap_horiz,
-                  borderColor: PennaColors.border,
-                  onPressed: onReplace,
-                ),
-                const SizedBox(width: 4),
-                PennaButton(
-                  label: '移除',
-                  icon: Icons.close,
-                  borderColor: PennaColors.border,
-                  onPressed: onClear,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

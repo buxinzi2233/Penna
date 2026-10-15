@@ -58,6 +58,12 @@ class _StudioPageState extends State<StudioPage> {
     _inputFocus.requestFocus();
   }
 
+  /// 快捷操作:接在输入框已有的话后面(中间空一格),不替换。
+  void _appendInput(String text) {
+    final had = _input.text.trimRight();
+    _fillInput(had.isEmpty ? text : '$had $text');
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -95,7 +101,7 @@ class _StudioPageState extends State<StudioPage> {
                   config: widget.config,
                   input: _input,
                   inputFocus: _inputFocus,
-                  onQuickAction: _fillInput,
+                  onQuickAction: _appendInput,
                   onOpenSettings: widget.onOpenSettings,
                 ),
               ),

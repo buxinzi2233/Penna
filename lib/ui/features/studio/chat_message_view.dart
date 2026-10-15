@@ -45,7 +45,11 @@ class ChatMessageView extends StatelessWidget {
     this.onAddSkill,
     this.lookups = const [],
     this.onOption,
+    this.draftSections = const [],
   });
+
+  /// 当前页成稿的各段(标注 + 提示词开头)。回复问"转哪几段"时直接从这里列。
+  final List<PickItem> draftSections;
 
   /// 用户点了回复里的一个选项;为 null 时选项只是灰的(不是最后一条回复,或正在生成)。
   final ValueChanged<String>? onOption;
@@ -88,6 +92,20 @@ class ChatMessageView extends StatelessWidget {
     );
     final newSkill = made.skill;
     final asked = splitOptions(made.prose);
+    // 挑成稿里的段:直接列当前页的各段。模型自己列出的多选项正好全是段名时也照此显示。
+    final labels = {for (final s in draftSections) s.label};
+    final bySection =
+        draftSections.isNotEmpty &&
+        (asked.sections ||
+            asked.multi &&
+                asked.options.isNotEmpty &&
+                asked.options.every(labels.contains));
+    final picks = <PickItem>[
+      if (bySection)
+        ...draftSections
+      else
+        for (final option in asked.options) (label: option, detail: ''),
+    ];
     final (:prose, :drafts) = splitDrafts(asked.prose);
     // 复制出去的是能直接用的:标注和中文对照不带。
     final copyable = [
@@ -128,11 +146,19 @@ class ChatMessageView extends StatelessWidget {
       ],
       // 给用户点的选项:点一下就当成他的回答发出去。
       // 这条回复已经把成稿写出来了就不显示:没有什么还要他先点头的。
-      if (asked.options.isNotEmpty && !streaming && drafts.isEmpty) ...[
+      // 问挑哪几段,当前页却一段都没有:说一声,让用户自己打字回答。
+      if (picks.isEmpty && asked.sections && !streaming && drafts.isEmpty) ...[
+        const SizedBox(height: 8),
+        const Text(
+          '当前页没有分段',
+          style: TextStyle(fontSize: 11.5, color: PennaColors.slate400),
+        ),
+      ],
+      if (picks.isNotEmpty && !streaming && drafts.isEmpty) ...[
         const SizedBox(height: 10),
         if (asked.multi)
           PopIn(
-            child: MultiPick(options: asked.options, onSubmit: onOption),
+            child: MultiPick(items: picks, onSubmit: onOption),
           )
         else
           PopIn(

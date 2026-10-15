@@ -13,7 +13,7 @@ import 'settings_sections.dart';
 
 const _protocolLabels = {protocolOpenAi: 'OpenAI', protocolGoogle: 'Google'};
 
-/// 模型:多个接口按顺序使用,失败自动换下一个;Agent 和润色可各自指定。
+/// API 管理:多个接口按顺序使用,失败自动换下一个;Agent 和润色可各自指定。
 class LlmSection extends StatelessWidget {
   const LlmSection({super.key, required this.service});
 
@@ -38,7 +38,7 @@ class LlmSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('模型', '按顺序使用,失败自动换下一个 · Key 仅存本机'),
+        const SectionHeading('API 管理', '按顺序使用,失败自动换下一个 · Key 仅存本机'),
         if (cfg.llms.isNotEmpty) ...[
           PennaCard(
             padding: const EdgeInsets.all(14),
@@ -174,11 +174,93 @@ class _LlmCardState extends State<_LlmCard> {
   /// 从列表里选过几次;模型名称输入框靠它重建来显示选中的名字。
   int _picks = 0;
 
+  /// 放弃过几次改动;所有输入框靠它重建,显示回已保存的值。
+  int _reverts = 0;
+
+  /// 还没保存的改动:名称、地址、模型、协议和 Key 都先改在这里,点「保存」才写进设置。
+  /// 开关、删除、拖动顺序不经过它,立即生效。
+  late LlmProfile _draft = widget.llm;
+  late String _key = service.config.llmKey(widget.llm.id);
+
+  /// 上次看到的已保存的 Key;别处改了 Key 时拿它判断这张卡片改没改过。
+  late String _savedKey = _key;
+  bool _saving = false;
+
   ConfigService get service => widget.service;
-  LlmProfile get llm => widget.llm;
+  LlmProfile get llm => _draft;
   int get index => widget.index;
 
-  void _put(LlmProfile next) => service.update(service.config.putLlm(next));
+  static bool _same(LlmProfile a, LlmProfile b) =>
+      a.name == b.name &&
+      a.baseUrl == b.baseUrl &&
+      a.model == b.model &&
+      a.protocol == b.protocol;
+
+  bool get _dirty =>
+      !_same(_draft, widget.llm) || _key != service.config.llmKey(llm.id);
+
+  @override
+  void didUpdateWidget(_LlmCard old) {
+    super.didUpdateWidget(old);
+    // 设置在别处变了(刚保存完、本地推理更新了地址):没改过的那几项跟着走,改过的留着草稿。
+    final was = old.llm, now = widget.llm;
+    final key = service.config.llmKey(now.id);
+    if (_same(was, now) && key == _savedKey) return;
+    String pick(String draft, String before, String after) =>
+        draft == before ? after : draft;
+    final next = now.copyWith(
+      name: pick(_draft.name, was.name, now.name),
+      baseUrl: pick(_draft.baseUrl, was.baseUrl, now.baseUrl),
+      model: pick(_draft.model, was.model, now.model),
+      protocol: pick(_draft.protocol, was.protocol, now.protocol),
+    );
+    final nextKey = pick(_key, _savedKey, key);
+    // 输入框只在创建时读一次值:显示的内容变了才重建它们(刚保存完不用)。
+    if (!_same(next, _draft) || nextKey != _key) _reverts++;
+    _draft = next;
+    _key = nextKey;
+    _savedKey = key;
+  }
+
+  @override
+  void dispose() {
+    // 换到别的分区时卡片会被拆掉:没保存的改动替用户存上,不悄悄丢掉。
+    // 删掉的卡片不算:不然会把刚删的接口又加回去。
+    if (_dirty) {
+      final draft = _draft.copyWith(enabled: widget.llm.enabled);
+      final key = _key;
+      Future.microtask(() {
+        final cfg = service.config;
+        if (!cfg.llms.any((l) => l.id == draft.id)) return;
+        service.update(
+          cfg.putLlm(draft).setSecret(llmSecretKey(draft.id), key),
+        );
+      });
+    }
+    super.dispose();
+  }
+
+  void _put(LlmProfile next) => setState(() => _draft = next);
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    service.update(
+      service.config
+          .putLlm(_draft.copyWith(enabled: widget.llm.enabled))
+          .setSecret(llmSecretKey(_draft.id), _key),
+    );
+    await service.flushed();
+    if (!mounted) return;
+    setState(() => _saving = false);
+    final error = service.lastError;
+    showToast(context, error ?? '已保存', warn: error != null);
+  }
+
+  void _revert() => setState(() {
+    _draft = widget.llm;
+    _key = _savedKey = service.config.llmKey(widget.llm.id);
+    _reverts++;
+  });
 
   Future<void> _pull() async {
     setState(() {
@@ -192,7 +274,7 @@ class _LlmCardState extends State<_LlmCard> {
       models = await listModels(
         protocol: llm.protocol,
         baseUrl: llm.baseUrl,
-        apiKey: service.config.llmKey(llm.id),
+        apiKey: _key,
       );
       if (models.isEmpty) error = '接口没有返回模型';
     } on LlmException catch (e) {
@@ -227,7 +309,7 @@ class _LlmCardState extends State<_LlmCard> {
             protocol: llm.protocol,
             baseUrl: llm.baseUrl,
             model: model,
-            apiKey: service.config.llmKey(llm.id),
+            apiKey: _key,
             messages: const [
               {'role': 'user', 'content': 'hi'},
             ],
@@ -291,9 +373,11 @@ class _LlmCardState extends State<_LlmCard> {
 
   @override
   Widget build(BuildContext context) {
-    final cfg = service.config;
+    final dirty = _dirty;
     return PennaCard(
-      borderColor: llm.enabled ? PennaColors.primaryBorder : PennaColors.border,
+      borderColor: widget.llm.enabled
+          ? PennaColors.primaryBorder
+          : PennaColors.border,
       padding: const EdgeInsets.fromLTRB(6, 6, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -317,7 +401,7 @@ class _LlmCardState extends State<_LlmCard> {
               Text(
                 '${index + 1}',
                 style: titleStyle.copyWith(
-                  color: llm.enabled
+                  color: widget.llm.enabled
                       ? PennaColors.primary
                       : PennaColors.slate400,
                 ),
@@ -342,8 +426,10 @@ class _LlmCardState extends State<_LlmCard> {
               Transform.scale(
                 scale: 0.8,
                 child: Switch(
-                  value: llm.enabled,
-                  onChanged: (on) => _put(llm.copyWith(enabled: on)),
+                  value: widget.llm.enabled,
+                  onChanged: (on) => service.update(
+                    service.config.putLlm(widget.llm.copyWith(enabled: on)),
+                  ),
                 ),
               ),
             ],
@@ -358,6 +444,7 @@ class _LlmCardState extends State<_LlmCard> {
                   children: [
                     Expanded(
                       child: PennaField(
+                        key: ValueKey('name-$_reverts'),
                         label: '显示名称',
                         value: llm.name,
                         onChanged: (v) => _put(llm.copyWith(name: v)),
@@ -366,7 +453,7 @@ class _LlmCardState extends State<_LlmCard> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: PennaField(
-                        key: ValueKey('model-$_picks'),
+                        key: ValueKey('model-$_picks-$_reverts'),
                         label: '模型名称',
                         hint: llm.protocol == protocolGoogle
                             ? 'gemini-2.5-flash,可填多个'
@@ -380,7 +467,7 @@ class _LlmCardState extends State<_LlmCard> {
                 gap,
                 PennaField(
                   // 换协议会改默认地址,要重建输入框才显示得出来。
-                  key: ValueKey('url-${llm.protocol}'),
+                  key: ValueKey('url-${llm.protocol}-$_reverts'),
                   label: 'Base URL',
                   hint: defaultBaseUrls[llm.protocol],
                   value: llm.baseUrl,
@@ -388,13 +475,12 @@ class _LlmCardState extends State<_LlmCard> {
                 ),
                 gap,
                 PennaField(
+                  key: ValueKey('key-$_reverts'),
                   label: 'API Key',
                   hint: '可留空',
                   obscure: true,
-                  value: cfg.llmKey(llm.id),
-                  onChanged: (v) => service.update(
-                    service.config.setSecret(llmSecretKey(llm.id), v),
-                  ),
+                  value: _key,
+                  onChanged: (v) => setState(() => _key = v),
                 ),
                 gap,
                 Row(
@@ -413,20 +499,37 @@ class _LlmCardState extends State<_LlmCard> {
                       onPressed: _pulling ? null : _test,
                     ),
                     const SizedBox(width: 10),
-                    if ((_pullError ?? _testOk) != null)
-                      Expanded(
-                        child: Text(
-                          (_pullError ?? _testOk)!,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _pullError != null
-                                ? PennaColors.diffDelText
-                                : PennaColors.diffAddText,
-                          ),
+                    Expanded(
+                      child: Text(
+                        (_pullError ?? _testOk) ?? (dirty ? '未保存' : ''),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _pullError != null
+                              ? PennaColors.diffDelText
+                              : _testOk != null
+                              ? PennaColors.diffAddText
+                              : PennaColors.amber,
                         ),
                       ),
+                    ),
+                    if (dirty) ...[
+                      PennaButton(
+                        label: '放弃',
+                        icon: Icons.undo,
+                        background: PennaColors.slate100,
+                        onPressed: _saving ? null : _revert,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    PennaButton(
+                      label: '保存',
+                      icon: Icons.check,
+                      background: PennaColors.primary,
+                      foreground: Colors.white,
+                      onPressed: dirty && !_saving ? _save : null,
+                    ),
                   ],
                 ),
                 // 已选的模型按使用顺序排在列表上面:列表再长也看得见选了什么。

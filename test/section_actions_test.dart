@@ -179,6 +179,61 @@ void main() {
     });
   });
 
+  group('改名与建立分段', () {
+    StudioViewModel plain(String text) => StudioViewModel(
+      config: tempConfig(),
+      streamChat: (_) => const Stream.empty(),
+      blocks: [(text: text, pinned: false)],
+    );
+
+    test('改名只换标注,交付的提示词不变;【】和换行去掉', () {
+      final vm = _studio();
+      final prompt = vm.finalPrompt;
+
+      vm.renameSection(0, 1, '光线');
+      expect(vm.body, '【主体】a fox\n〔译〕一只狐狸\n【光线】flat light\n【构图】wide shot');
+      expect(vm.finalPrompt, prompt);
+
+      expect(vm.renameSection(0, 0, '【新】\n名'), isTrue);
+      expect(vm.body, startsWith('【新名】a fox'));
+      expect(vm.actions.first.text, startsWith('「主体」改名为「新名」'));
+
+      // 和别的段重名不行:按标注并入的改动只会认第一个。
+      expect(vm.renameSection(0, 0, '构图'), isFalse);
+      expect(vm.body, startsWith('【新名】a fox'));
+      expect(vm.sectionNameTaken('构图'), isTrue);
+    });
+
+    test('整栏普通文字:选中的建成一段,后面剩下的仍是普通文字', () {
+      final vm = plain('red hat, blue coat')..bodySelection = (0, 8);
+
+      expect(vm.sectionSelection('帽子'), isTrue);
+
+      expect(vm.body, '【帽子】red hat,\n【】blue coat');
+      expect(vm.finalPrompt, 'red hat,\nblue coat');
+    });
+
+    test('脱离出来的那一行里选一截建成一段;分段里的文字不行', () {
+      const text = '【主体】a fox\n【】flat light, rim light';
+      final at = text.indexOf('rim');
+      final vm = plain(text)..bodySelection = (at, text.length);
+
+      expect(vm.sectionSelection('光'), isTrue);
+      expect(vm.body, '【主体】a fox\n【】flat light,\n【光】rim light');
+
+      vm.bodySelection = (4, 9);
+      expect(vm.sectionSelection('狐狸'), isFalse);
+    });
+
+    test('当前页的各段:标注和提示词,对照不带', () {
+      expect(_studio().sectionsHere, [
+        (label: '主体', text: 'a fox'),
+        (label: '光影', text: 'flat light'),
+        (label: '构图', text: 'wide shot'),
+      ]);
+    });
+  });
+
   group('回滚', () {
     test('回到某一步之前:它和它之后做的都撤销,回滚本身还能再滚回来', () {
       final vm = _studio();

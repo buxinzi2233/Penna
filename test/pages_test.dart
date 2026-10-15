@@ -34,6 +34,8 @@ StudioViewModel _studio({
   );
 }
 
+Finder _tab(int n) => find.byTooltip('第 $n 页 · 双击改名 · 右键更多');
+
 void main() {
   group('成稿标签', () {
     test('一条回复里的几份成稿都拆出来,各带各的页', () {
@@ -334,14 +336,14 @@ void main() {
 
     expect(find.text('系列 1'), findsOneWidget);
     // 页签的宽度跟着字走,不会被撑开。
-    expect(tester.getSize(find.byTooltip('第 1 页')).width, lessThan(40));
+    expect(tester.getSize(_tab(1)).width, lessThan(40));
     // 只有一页时没有「保存系列」。
     expect(find.text('保存系列'), findsNothing);
 
     await tester.tap(find.byTooltip('在这个系列里加一页'));
     await tester.pumpAndSettle();
     expect(vm.pageIndex, 1);
-    expect(find.byTooltip('第 2 页'), findsOneWidget);
+    expect(_tab(2), findsOneWidget);
     expect(find.text('保存系列'), findsOneWidget);
 
     await tester.tap(find.text('新系列'));
@@ -349,15 +351,15 @@ void main() {
     expect(vm.pages.map((p) => p.series), [0, 0, 1]);
     expect(find.text('系列 2'), findsOneWidget);
     // 每个系列的页码都从 1 数。
-    expect(find.byTooltip('第 1 页'), findsNWidgets(2));
+    expect(_tab(1), findsNWidgets(2));
 
-    await tester.tap(find.byTooltip('第 1 页').first);
+    await tester.tap(_tab(1).first);
     await tester.pumpAndSettle();
     expect(vm.pageIndex, 0);
     expect(find.text('a fox'), findsWidgets);
 
     // 右键页签:空白页直接删,不用确认。
-    await tester.tap(find.byTooltip('第 1 页').last, buttons: kSecondaryButton);
+    await tester.tap(_tab(1).last, buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('删除这一页'));
     await tester.pumpAndSettle();
@@ -373,6 +375,24 @@ void main() {
     await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();
     expect(find.text('狐狸'), findsOneWidget);
+
+    // 双击页签、系列名:直接改名。
+    await tester.tap(_tab(1));
+    await tester.tap(_tab(1));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '远景');
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    expect(vm.pages.first.name, '远景');
+    // 系列名用的是 Flutter 自带的双击:两下之间至少隔 40 毫秒才算。
+    await tester.tap(find.text('狐狸'));
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.tap(find.text('狐狸'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '狐');
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    expect(vm.seriesName(0), '狐');
   });
 
   group('整理页', () {
@@ -561,7 +581,7 @@ void main() {
 
   group('回复里的小部件', () {
     test('选项拆成一个个按钮的字,写完了才算', () {
-      final (:prose, :options, :multi) = splitOptions(
+      final (:prose, :options, :multi, sections: _) = splitOptions(
         '方案如上。\n<options>\n- 确认,开始写\n2. 我要改一下\n</options>',
       );
 
@@ -575,6 +595,16 @@ void main() {
       expect(options, ['确认,开始写', '我要改一下']);
       expect(splitOptions('方案如上。\n<options>\n确认').options, isEmpty);
       expect(splitOptions('方案如上。<opt').prose, '方案如上。');
+
+      // 挑成稿里的段:标签里可以不写,界面自己读出各段。
+      final parts = splitOptions('要转哪几段?\n<options sections></options>');
+      expect(
+        (parts.prose, parts.multi, parts.sections),
+        ('要转哪几段?', true, true),
+      );
+      expect(parts.options, isEmpty);
+      expect(splitOptions('要转哪几段?<options sec').prose, '要转哪几段?');
+      expect(pick.sections, isFalse);
     });
 
     test('Markdown 的记号不原样显示', () {

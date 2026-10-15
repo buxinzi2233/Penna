@@ -13,7 +13,7 @@ import 'settings_translate_section.dart';
 typedef _Tab = ({IconData icon, String label});
 
 const List<_Tab> _tabs = [
-  (icon: Icons.hub_outlined, label: '模型'),
+  (icon: Icons.hub_outlined, label: 'API 管理'),
   (icon: Icons.translate, label: '翻译'),
   (icon: Icons.theater_comedy_outlined, label: 'Preset'),
   (icon: Icons.school_outlined, label: 'Skills'),

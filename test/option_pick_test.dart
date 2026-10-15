@@ -9,7 +9,11 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: MultiPick(
-            options: const ['主体', '服装', '场景'],
+            items: const [
+              (label: '主体', detail: '1girl, solo'),
+              (label: '服装', detail: ''),
+              (label: '场景', detail: 'outdoors'),
+            ],
             onSubmit: sent.add,
           ),
         ),
@@ -31,5 +35,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('确定'));
     expect(sent.last, '全部');
+    // 段的预览跟在标注后面。
+    expect(find.text('1girl, solo'), findsOneWidget);
   });
 }

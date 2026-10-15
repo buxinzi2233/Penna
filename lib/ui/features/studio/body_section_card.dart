@@ -23,8 +23,12 @@ class _SectionCard extends StatefulWidget {
     this.locked = false,
     this.leading,
     this.onDetach,
+    this.onRename,
     required this.child,
   });
+
+  /// 右键标注那一行时的「改名」;为 null 时右键没有菜单。
+  final VoidCallback? onRename;
 
   /// 让这一段脱离分段,变成普通文字;为 null 时那个按钮是灰的。
   final VoidCallback? onDetach;
@@ -96,6 +100,24 @@ class _SectionCardState extends State<_SectionCard> {
     ),
   );
 
+  /// 标注那一行:能改名时右键弹出「改名」。
+  Widget _renamable(Widget header) {
+    final rename = widget.onRename;
+    if (rename == null) return header;
+    return Tooltip(
+      message: '右键改名',
+      waitDuration: const Duration(milliseconds: 600),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onSecondaryTapDown: (d) async {
+          final picked = await popMenu(context, d.globalPosition, const ['改名']);
+          if (picked == '改名') rename();
+        },
+        child: header,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tint = widget.tint;
@@ -153,45 +175,51 @@ class _SectionCardState extends State<_SectionCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              ?widget.leading,
-              Expanded(
-                child: hasZh
-                    ? MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => setState(() => _open = !_open),
-                          child: title,
-                        ),
-                      )
-                    : title,
-              ),
-              ...widget.actions,
-              if (widget.copyText case final text?) ...[
-                _action(Icons.content_copy, '复制这段', () {
-                  copyWithToast(context, text, '已复制');
-                  widget.onCopied?.call();
-                }),
-                const SizedBox(width: 2),
+          _renamable(
+            Row(
+              children: [
+                ?widget.leading,
+                Expanded(
+                  child: hasZh
+                      ? MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => setState(() => _open = !_open),
+                            child: title,
+                          ),
+                        )
+                      : title,
+                ),
+                ...widget.actions,
+                if (widget.copyText case final text?) ...[
+                  _action(Icons.content_copy, '复制这段', () {
+                    copyWithToast(context, text, '已复制');
+                    widget.onCopied?.call();
+                  }),
+                  const SizedBox(width: 2),
+                ],
+                if (widget.onUnpin != null)
+                  _action(Icons.push_pin, '取消固定', widget.onUnpin),
+                if (widget.onRemove != null) ...[
+                  _action(Icons.call_split, '脱离分段', widget.onDetach),
+                  const SizedBox(width: 2),
+                  _action(Icons.push_pin_outlined, '固定这段', widget.onPin),
+                  const SizedBox(width: 2),
+                  _action(Icons.auto_fix_high, '润色这段', widget.onPolish),
+                  const SizedBox(width: 2),
+                  _action(Icons.translate, '翻译这段', widget.onTranslate),
+                  const SizedBox(width: 2),
+                  _action(
+                    Icons.forum_outlined,
+                    '和 Agent 讨论这段',
+                    widget.onDiscuss,
+                  ),
+                  const SizedBox(width: 2),
+                  _action(Icons.close, '删除这段', widget.onRemove),
+                ],
               ],
-              if (widget.onUnpin != null)
-                _action(Icons.push_pin, '取消固定', widget.onUnpin),
-              if (widget.onRemove != null) ...[
-                _action(Icons.call_split, '脱离分段', widget.onDetach),
-                const SizedBox(width: 2),
-                _action(Icons.push_pin_outlined, '固定这段', widget.onPin),
-                const SizedBox(width: 2),
-                _action(Icons.auto_fix_high, '润色这段', widget.onPolish),
-                const SizedBox(width: 2),
-                _action(Icons.translate, '翻译这段', widget.onTranslate),
-                const SizedBox(width: 2),
-                _action(Icons.forum_outlined, '和 Agent 讨论这段', widget.onDiscuss),
-                const SizedBox(width: 2),
-                _action(Icons.close, '删除这段', widget.onRemove),
-              ],
-            ],
+            ),
           ),
           const SizedBox(height: 2),
           widget.child,
