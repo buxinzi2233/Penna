@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/attachment.dart';
 import 'package:penna/core/harness/local/caption_catalog.dart';
@@ -14,6 +15,11 @@ import 'package:penna/core/harness/local/model_scan.dart';
 import 'package:penna/core/harness/local/tagger.dart';
 import 'package:penna/core/harness/providers/llm_http.dart';
 import 'package:penna/ui/features/local/local_model.dart';
+import 'package:penna/ui/features/local/local_page.dart';
+import 'package:penna/ui/features/studio/studio_view_model.dart';
+import 'package:penna/ui/shell.dart';
+
+import 'fixtures.dart';
 
 /// 假的 llama-server 进程:不真的起程序,[exit] 之后算退出。
 class _FakeProcess implements Process {
@@ -265,6 +271,9 @@ void main() {
   });
 
   group('下载', () {
+    // 这个文件里有 testWidgets,Flutter 会拦掉真实的网络请求;这组要连本机的假服务器。
+    setUp(() => HttpOverrides.global = null);
+
     late HttpServer http;
     final body = List.generate(1000, (i) => i % 251);
     final ranges = <String?>[];
@@ -745,6 +754,41 @@ void main() {
     });
   });
 
+  group('看图描述的要求', () {
+    LocalModel fresh() =>
+        LocalModel(dir: tmp, streamChat: (_) => const Stream.empty());
+
+    test('像 Preset 一样:新建、改名、改正文、切换、删除,存盘后还在', () async {
+      final model = fresh();
+      expect(model.captionPrompts, defaultCaptionPrompts);
+      expect(model.currentPrompt.name, '详细描述');
+
+      model.addPrompt();
+      expect(model.currentPrompt.name, '详细描述 副本');
+      model.editPrompt(name: '中文', text: '用中文描述');
+      model.pickPrompt(1);
+
+      final again = fresh();
+      await again.load();
+      expect(again.captionPrompts.last, (name: '中文', text: '用中文描述'));
+      expect(again.currentPrompt.name, '简短描述');
+
+      again.pickPrompt(again.captionPrompts.length - 1);
+      again.removePrompt();
+      expect(again.captionPrompts, hasLength(defaultCaptionPrompts.length));
+      expect(again.currentPrompt.name, defaultCaptionPrompts.last.name);
+    });
+
+    test('以前只有一条要求:改过的那条留下来并选中', () async {
+      File('${tmp.path}/local.json')
+          .writeAsStringSync(jsonEncode({'captionPrompt': '您是一套图像分析系统'}));
+      final model = fresh();
+      await model.load();
+      expect(model.currentPrompt, (name: '我的要求', text: '您是一套图像分析系统'));
+      expect(model.captionPrompts, hasLength(defaultCaptionPrompts.length + 1));
+    });
+  });
+
   group('本地推理页的状态', () {
     test('换打标模型:阈值换成它的推荐值;设置存盘后还在', () async {
       final model = LocalModel(
@@ -799,6 +843,8 @@ void main() {
       expect(await model.runCaption(), isNull);
       expect(model.caption, 'a girl in a field');
       expect(asked!.baseUrl, 'http://127.0.0.1:8091/v1');
+      // 用的是选中的那条要求。
+      expect(asked!.messages.single['content'], model.currentPrompt.text);
       expect(asked!.images[0]!.single.bytes, [1, 2, 3]);
 
       // 正在用的模型不能删。
@@ -847,6 +893,65 @@ void main() {
       expect(model.caption, isEmpty);
       expect(model.captioning, isFalse);
       await model.stopServer();
+    });
+
+    testWidgets('结果「发送给 Agent」:切回工作台,填进聊天输入框', (tester) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final local = LocalModel(
+        dir: tmp,
+        streamChat: (_) => Stream.value('a cat on a sofa'),
+        server: LlamaServer(
+          start: (_, _) async => _FakeProcess(),
+          health: (_) async => true,
+        ),
+      );
+      await tester.runAsync(() async {
+        final spec = _spec(tmp);
+        local.update(() {
+          local.exePath = spec.exe;
+          local.modelPath = spec.model;
+        });
+        local.setImage(
+          Attachment.image(
+            name: 'a.png',
+            mime: 'image/png',
+            bytes: Uint8List.fromList([1, 2, 3]),
+          ),
+        );
+        await local.startServer();
+        await local.runCaption();
+      });
+      final vm = StudioViewModel(
+        config: tempConfig(),
+        streamChat: (_) => const Stream.empty(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShell(
+            vm: vm,
+            config: vm.config,
+            skills: tempSkills(),
+            local: local,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('本地反推'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('NL 反推'));
+      await tester.pumpAndSettle();
+      final send = find.descendant(
+        of: find.byType(LocalPage),
+        matching: find.text('发送给 Agent'),
+      );
+      await tester.ensureVisible(send);
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextField, 'a cat on a sofa'), findsOneWidget);
+      await tester.runAsync(local.stopServer);
     });
   });
 }

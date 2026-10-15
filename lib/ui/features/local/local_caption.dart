@@ -42,6 +42,50 @@ extension LocalCaption on LocalModel {
     () => captionOrder = _moved(captionGroups, (r) => r.id, group, from, to),
   );
 
+  // —— 看图描述的要求 ——
+
+  /// 选中的那条要求。
+  CaptionPrompt get currentPrompt =>
+      captionPrompts[promptIndex.clamp(0, captionPrompts.length - 1)];
+
+  void pickPrompt(int i) => update(() => promptIndex = i);
+
+  /// 改选中的那条:名字或正文。
+  void editPrompt({String? name, String? text}) {
+    final i = promptIndex.clamp(0, captionPrompts.length - 1);
+    final p = captionPrompts[i];
+    update(
+      () => captionPrompts = List.unmodifiable([
+        ...captionPrompts.take(i),
+        (name: name ?? p.name, text: text ?? p.text),
+        ...captionPrompts.skip(i + 1),
+      ]),
+    );
+  }
+
+  /// 以选中的那条为底稿复制一份,选中新的。
+  void addPrompt() => update(() {
+    final p = currentPrompt;
+    captionPrompts = List.unmodifiable([
+      ...captionPrompts,
+      (name: '${p.name} 副本', text: p.text),
+    ]);
+    promptIndex = captionPrompts.length - 1;
+  });
+
+  /// 删掉选中的那条;只剩一条时不删。
+  void removePrompt() {
+    if (captionPrompts.length < 2) return;
+    final i = promptIndex.clamp(0, captionPrompts.length - 1);
+    update(() {
+      captionPrompts = List.unmodifiable([
+        ...captionPrompts.take(i),
+        ...captionPrompts.skip(i + 1),
+      ]);
+      promptIndex = (i - 1).clamp(0, captionPrompts.length - 1);
+    });
+  }
+
   /// 这个模型要用哪个量化档:用户选过的,否则推荐的那档。
   Quant quantOf(CaptionModel m) =>
       m.quants.where((q) => q.label == quantPicks[m.id]).firstOrNull ??
@@ -198,7 +242,7 @@ extension LocalCaption on LocalModel {
             apiKey: '',
             temperature: 0.3,
             messages: [
-              {'role': 'user', 'content': captionPrompt},
+              {'role': 'user', 'content': currentPrompt.text},
             ],
             images: {
               0: [(mime: image.mime!, bytes: image.bytes!)],

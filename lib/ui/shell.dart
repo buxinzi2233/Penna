@@ -57,10 +57,20 @@ class _AppShellState extends State<AppShell> {
   late final _reverse = widget.reverse ?? ReverseModel(widget.vm);
   // 角色库跟着工作台走:Agent 存进去的和这一页上看到的是同一份。
   late final _characters = widget.vm.characters ?? CharacterStore();
+
+  /// 别的页面要交给 Agent 的话:工作台收到后填进聊天输入框。
+  final _toChat = ValueNotifier<String?>(null);
+
   late final _local =
       widget.local ?? LocalModel(streamChat: widget.vm.streamChat);
 
   void _go(int page) => setState(() => _page = page);
+
+  @override
+  void dispose() {
+    _toChat.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +97,7 @@ class _AppShellState extends State<AppShell> {
                             archive: _archive,
                             reverse: _reverse,
                             onOpenSettings: () => _go(_settings),
+                            inbox: _toChat,
                           ),
                         ),
                         _Page(
@@ -111,6 +122,10 @@ class _AppShellState extends State<AppShell> {
                             config: widget.config,
                             vm: widget.vm,
                             onOpenStudio: () => _go(_studio),
+                            onSendToAgent: (text) {
+                              _go(_studio);
+                              _toChat.value = text;
+                            },
                           ),
                         ),
                         _Page(

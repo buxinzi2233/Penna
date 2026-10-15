@@ -24,6 +24,7 @@ class StudioPage extends StatefulWidget {
     required this.archive,
     required this.reverse,
     required this.onOpenSettings,
+    this.inbox,
   });
 
   final StudioViewModel vm;
@@ -31,6 +32,9 @@ class StudioPage extends StatefulWidget {
   final ReverseModel reverse;
   final ConfigService config;
   final VoidCallback onOpenSettings;
+
+  /// 别的页面交过来的话(比如本地反推的结果):收到就填进聊天输入框。
+  final ValueNotifier<String?>? inbox;
 
   @override
   State<StudioPage> createState() => _StudioPageState();
@@ -43,7 +47,24 @@ class _StudioPageState extends State<StudioPage> {
   double _split = 0.53;
 
   @override
+  void initState() {
+    super.initState();
+    widget.inbox?.addListener(_takeInbox);
+  }
+
+  /// 收下别的页面交过来的话。这时工作台可能还没切到前面(拿不到焦点),等下一帧再填。
+  void _takeInbox() {
+    final text = widget.inbox?.value;
+    if (text == null) return;
+    widget.inbox!.value = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fillInput(text);
+    });
+  }
+
+  @override
   void dispose() {
+    widget.inbox?.removeListener(_takeInbox);
     _input.dispose();
     _inputFocus.dispose();
     super.dispose();

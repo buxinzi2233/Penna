@@ -11,11 +11,13 @@ class _NlTab extends StatelessWidget {
     required this.model,
     required this.config,
     required this.onToDraft,
+    required this.onSend,
   });
 
   final LocalModel model;
   final ConfigService config;
   final ValueChanged<String> onToDraft;
+  final ValueChanged<String> onSend;
 
   Future<String?> _pickGguf() async => (await openFile(
     acceptedTypeGroups: [
@@ -223,22 +225,32 @@ class _NlTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Florence-2 只认几个固定的指令;GGUF 模型照「设置 → 本地反推」里写的要求来。
-          if (florence != null) ...[
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
+          // Florence-2 只认几个固定的指令;GGUF 模型用「设置 → 本地反推」里存的要求,这里切换。
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              if (florence != null)
                 for (final task in florence.tasks)
                   PennaChip(
                     label: florenceTaskLabels[task] ?? task,
                     selected: model.florenceTaskOf(florence) == task,
                     onTap: () => model.update(() => model.florenceTask = task),
+                  )
+              else
+                for (final (i, p) in model.captionPrompts.indexed)
+                  Tooltip(
+                    message: p.text,
+                    waitDuration: const Duration(milliseconds: 600),
+                    child: PennaChip(
+                      label: p.name.trim().isEmpty ? '未命名' : p.name,
+                      selected: i == model.promptIndex,
+                      onTap: () => model.pickPrompt(i),
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 10),
-          ],
+            ],
+          ),
+          const SizedBox(height: 10),
           if (model.caption.isNotEmpty) ...[
             PennaCard(
               color: PennaColors.slate50,
@@ -251,7 +263,11 @@ class _NlTab extends StatelessWidget {
             ),
             if (!model.captioning) ...[
               const SizedBox(height: 8),
-              _ResultActions(text: model.caption, onToDraft: onToDraft),
+              _ResultActions(
+                text: model.caption,
+                onToDraft: onToDraft,
+                onSend: onSend,
+              ),
             ],
           ],
         ],

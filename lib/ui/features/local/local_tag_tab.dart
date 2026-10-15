@@ -3,10 +3,15 @@ part of 'local_page.dart';
 // 「Tag 反推」:按系列挑一个打标模型(WD14、PixAI、CL、OppaiOracle),下载后给左边的图打标。
 
 class _TagTab extends StatelessWidget {
-  const _TagTab({required this.model, required this.onToDraft});
+  const _TagTab({
+    required this.model,
+    required this.onToDraft,
+    required this.onSend,
+  });
 
   final LocalModel model;
   final ValueChanged<String> onToDraft;
+  final ValueChanged<String> onSend;
 
   /// 一个打标模型:自己下载过的可以删;文件夹里找到的标「本机」,直接用。
   Widget _taggerRow(TaggerModel m, {required bool selected}) {
@@ -98,7 +103,11 @@ class _TagTab extends StatelessWidget {
                     color: PennaColors.slate400,
                   ),
                 )
-              : _TagResultView(result: tags, onToDraft: onToDraft),
+              : _TagResultView(
+                  result: tags,
+                  onToDraft: onToDraft,
+                  onSend: onSend,
+                ),
         ),
       ],
     );
@@ -149,10 +158,15 @@ class _Threshold extends StatelessWidget {
 
 /// 打出来的标签:分级、角色(琥珀色)、通用标签,鼠标停上去看把握。
 class _TagResultView extends StatelessWidget {
-  const _TagResultView({required this.result, required this.onToDraft});
+  const _TagResultView({
+    required this.result,
+    required this.onToDraft,
+    required this.onSend,
+  });
 
   final TagResult result;
   final ValueChanged<String> onToDraft;
+  final ValueChanged<String> onSend;
 
   Widget _chip(TagScore t, {bool character = false}) => Tooltip(
     message: '${(t.prob * 100).toStringAsFixed(1)}%',
@@ -204,7 +218,7 @@ class _TagResultView extends StatelessWidget {
           )
         else ...[
           const SizedBox(height: 10),
-          _ResultActions(text: prompt, onToDraft: onToDraft),
+          _ResultActions(text: prompt, onToDraft: onToDraft, onSend: onSend),
         ],
       ],
     );

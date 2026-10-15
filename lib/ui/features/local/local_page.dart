@@ -28,6 +28,7 @@ class LocalPage extends StatefulWidget {
     required this.config,
     required this.vm,
     required this.onOpenStudio,
+    required this.onSendToAgent,
   });
 
   final LocalModel model;
@@ -36,6 +37,9 @@ class LocalPage extends StatefulWidget {
 
   /// 放到成稿后切去工作台。
   final VoidCallback onOpenStudio;
+
+  /// 把结果交给 Agent:填进工作台的聊天输入框。
+  final ValueChanged<String> onSendToAgent;
 
   @override
   State<LocalPage> createState() => _LocalPageState();
@@ -102,11 +106,13 @@ class _LocalPageState extends State<LocalPage> {
                             ? _TagTab(
                                 model: model,
                                 onToDraft: (text) => _toDraft(context, text),
+                                onSend: widget.onSendToAgent,
                               )
                             : _NlTab(
                                 model: model,
                                 config: widget.config,
                                 onToDraft: (text) => _toDraft(context, text),
+                                onSend: widget.onSendToAgent,
                               ),
                       ),
                     ),
@@ -494,12 +500,17 @@ String _size(int bytes) => bytes >= 1 << 30
     ? '${(bytes / (1 << 30)).toStringAsFixed(2)} GB'
     : '${(bytes / (1 << 20)).toStringAsFixed(1)} MB';
 
-/// 结果下面那排:复制、放到成稿。
+/// 结果下面那排:复制、发送给 Agent、放到成稿。
 class _ResultActions extends StatelessWidget {
-  const _ResultActions({required this.text, required this.onToDraft});
+  const _ResultActions({
+    required this.text,
+    required this.onToDraft,
+    required this.onSend,
+  });
 
   final String text;
   final ValueChanged<String> onToDraft;
+  final ValueChanged<String> onSend;
 
   @override
   Widget build(BuildContext context) {
@@ -511,6 +522,13 @@ class _ResultActions extends StatelessWidget {
           icon: Icons.content_copy,
           borderColor: PennaColors.border,
           onPressed: () => copyWithToast(context, text, '已复制'),
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: '发送给 Agent',
+          icon: Icons.send_outlined,
+          borderColor: PennaColors.border,
+          onPressed: () => onSend(text),
         ),
         const SizedBox(width: 6),
         PennaButton(

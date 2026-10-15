@@ -63,15 +63,7 @@ class LocalSection extends StatelessWidget {
           gap,
           _card('llama-server 参数', _Params(local: local)),
           gap,
-          _card(
-            '看图描述的要求',
-            PennaField(
-              label: 'GGUF 模型',
-              value: local.captionPrompt,
-              maxLines: 4,
-              onChanged: (v) => local.update(() => local.captionPrompt = v),
-            ),
-          ),
+          _Prompts(local: local),
         ],
       ),
     );
@@ -281,6 +273,84 @@ class _Runtime extends StatelessWidget {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// 看图描述的要求:像 Preset 一样存好几条,有名字,选中的那条就是 GGUF 模型用的。
+class _Prompts extends StatelessWidget {
+  const _Prompts({required this.local});
+
+  final LocalModel local;
+
+  Future<void> _remove(BuildContext context) async {
+    final ok = await confirmDelete(
+      context,
+      '删除「${local.currentPrompt.name}」?',
+      '此操作不可撤销。',
+    );
+    if (ok) local.removePrompt();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prompt = local.currentPrompt;
+    // 换了一条(或加、删)时输入框重建,显示那一条的文字。
+    final key = '${local.promptIndex}-${local.captionPrompts.length}';
+    return _card(
+      '看图描述的要求',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PennaButton(
+            label: '新建(复制当前)',
+            icon: Icons.add,
+            borderColor: PennaColors.border,
+            onPressed: local.addPrompt,
+          ),
+          if (local.captionPrompts.length > 1) ...[
+            const SizedBox(width: 6),
+            PennaButton(
+              label: '删除',
+              icon: Icons.delete_outline,
+              borderColor: PennaColors.border,
+              onPressed: () => _remove(context),
+            ),
+          ],
+        ],
+      ),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final (i, p) in local.captionPrompts.indexed)
+                PennaChip(
+                  label: p.name.trim().isEmpty ? '未命名' : p.name,
+                  selected: i == local.promptIndex,
+                  onTap: () => local.pickPrompt(i),
+                ),
+            ],
+          ),
+          gap,
+          PennaField(
+            key: ValueKey('prompt-name-$key'),
+            label: '名称',
+            value: prompt.name,
+            onChanged: (v) => local.editPrompt(name: v),
+          ),
+          gap,
+          PennaField(
+            key: ValueKey('prompt-text-$key'),
+            label: '要求',
+            value: prompt.text,
+            maxLines: 5,
+            onChanged: (v) => local.editPrompt(text: v),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -20,11 +20,31 @@ import '../../../data/services/onnx_model.dart';
 part 'local_caption.dart';
 part 'local_tagger.dart';
 
+/// 看图描述的一条要求:名字和正文。
+typedef CaptionPrompt = ({String name, String text});
+
 /// 看图写自然语言时默认的要求。
 const defaultCaptionPrompt =
     'Describe this image in detail as a prompt for an image generation model: '
     'subject, appearance, clothing, pose, expression, background, composition, '
     'lighting and art style. Output only the description in English.';
+
+/// 新装时给的几条要求,用户可以改、删、加。
+const defaultCaptionPrompts = <CaptionPrompt>[
+  (name: '详细描述', text: defaultCaptionPrompt),
+  (
+    name: '简短描述',
+    text:
+        'Describe this image in one or two sentences as a prompt for an image '
+        'generation model. Output only the description in English.',
+  ),
+  (
+    name: '标签',
+    text:
+        'List Danbooru-style tags for this image: lowercase, separated by '
+        'commas, most important first. Output only the tags.',
+  ),
+];
 
 /// 下载的进度:已有多少字节,总共多少(不知道时为 null)。
 typedef Progress = ({int received, int? total});
@@ -71,7 +91,10 @@ class LocalModel extends ChangeNotifier {
   int port = 8091;
   int context = 4096;
   int gpuLayers = -1;
-  String captionPrompt = defaultCaptionPrompt;
+
+  /// 看图描述的几条要求(GGUF 模型用),和选中的是第几条。
+  List<CaptionPrompt> captionPrompts = defaultCaptionPrompts;
+  int promptIndex = 0;
 
   /// 用户加的模型文件夹:连同子文件夹一起找已有的模型,找到的直接用,不用再下。
   List<String> modelFolders = const [];
@@ -329,7 +352,10 @@ class LocalModel extends ChangeNotifier {
     'port': port,
     'context': context,
     'gpuLayers': gpuLayers,
-    'captionPrompt': captionPrompt,
+    'captionPrompts': [
+      for (final p in captionPrompts) {'name': p.name, 'text': p.text},
+    ],
+    'promptIndex': promptIndex,
     'modelFolders': modelFolders,
     'taggerOrder': taggerOrder,
     'captionOrder': captionOrder,
@@ -364,7 +390,22 @@ class LocalModel extends ChangeNotifier {
       port = j['port'] as int? ?? port;
       context = j['context'] as int? ?? context;
       gpuLayers = j['gpuLayers'] as int? ?? gpuLayers;
-      captionPrompt = j['captionPrompt'] as String? ?? captionPrompt;
+      final prompts = [
+        for (final p in j['captionPrompts'] as List? ?? const [])
+          (name: (p as Map)['name'] as String, text: p['text'] as String),
+      ];
+      // 以前只有一条要求:改过的那条留着,接在默认的几条后面并选中它。
+      final old = j['captionPrompt'] as String?;
+      if (prompts.isEmpty && old != null && old != defaultCaptionPrompt) {
+        prompts.addAll([...defaultCaptionPrompts, (name: '我的要求', text: old)]);
+      }
+      if (prompts.isNotEmpty) {
+        captionPrompts = List.unmodifiable(prompts);
+        promptIndex = (j['promptIndex'] as int? ?? prompts.length - 1).clamp(
+          0,
+          prompts.length - 1,
+        );
+      }
       modelFolders = List.unmodifiable([
         for (final f in j['modelFolders'] as List? ?? const []) f as String,
       ]);
