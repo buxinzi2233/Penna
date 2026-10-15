@@ -1,7 +1,9 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/harness/local/caption_catalog.dart';
 import '../../../core/harness/local/download.dart';
+import '../../../core/harness/local/florence.dart';
 import '../../../core/harness/local/llama_server.dart';
 import '../../../core/harness/local/model_scan.dart';
 import '../../../core/harness/local/wd_tagger.dart';
@@ -19,7 +21,7 @@ part 'local_nl_tab.dart';
 part 'local_tag_tab.dart';
 
 /// 本地推理:左边放一张图,右边用本机的模型给它反推。
-/// 「Tag」用 ONNX 打标模型出 Danbooru 标签,「自然语言」用 llama-server 跑的看图模型写描述。
+/// 「Tag 反推」用 ONNX 打标模型出 Danbooru 标签,「NL 反推」用看图模型写描述。
 class LocalPage extends StatefulWidget {
   const LocalPage({
     super.key,
@@ -67,7 +69,7 @@ class _LocalPageState extends State<LocalPage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 16),
-                for (final (i, label) in const ['Tag', '自然语言'].indexed) ...[
+                for (final (i, label) in const ['Tag 反推', 'NL 反推'].indexed) ...[
                   PennaChip(
                     label: label,
                     selected: _tab == i,
@@ -202,7 +204,15 @@ class _DownloadRow extends StatelessWidget {
     this.onSelect,
     this.done,
     this.foundAt,
+    this.below,
+    this.onRemove,
   });
+
+  /// 说明下面再放的东西,比如量化档。
+  final Widget? below;
+
+  /// 删除下载好的文件;不给就删 [files]。
+  final Future<String?> Function()? onRemove;
 
   final LocalModel model;
 
@@ -234,7 +244,7 @@ class _DownloadRow extends StatelessWidget {
     if (!await confirmDelete(context, '删除「$name」?', '下载好的文件会从本机删掉。')) {
       return;
     }
-    final problem = await model.remove(files);
+    final problem = await (onRemove ?? () => model.remove(files))();
     if (problem != null && context.mounted) {
       showToast(context, problem, warn: true);
     }
@@ -279,13 +289,23 @@ class _DownloadRow extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(
-                    note,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: PennaColors.slate500,
+                  Tooltip(
+                    message: note,
+                    waitDuration: const Duration(milliseconds: 600),
+                    child: Text(
+                      note,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: PennaColors.slate500,
+                      ),
                     ),
                   ),
+                  if (below case final extra?) ...[
+                    const SizedBox(height: 4),
+                    extra,
+                  ],
                   if (progress != null) ...[
                     const SizedBox(height: 4),
                     LinearProgressIndicator(
@@ -338,6 +358,60 @@ class _DownloadRow extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 模型列表:最多这么高,再多就在框里滚动;按住左边的把手上下拖动排序。
+const _listMaxHeight = 330.0;
+
+class _ModelList extends StatelessWidget {
+  const _ModelList({
+    required this.ids,
+    required this.rows,
+    required this.onMove,
+  });
+
+  /// 每一行的 id,拖动时靠它认行。
+  final List<String> ids;
+  final List<Widget> rows;
+  final void Function(int from, int to) onMove;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: _listMaxHeight),
+      child: ReorderableListView(
+        shrinkWrap: true,
+        buildDefaultDragHandles: false,
+        onReorderItem: onMove,
+        proxyDecorator: (child, _, _) =>
+            Material(color: Colors.transparent, child: child),
+        children: [
+          for (final (i, row) in rows.indexed)
+            Row(
+              key: ValueKey(ids[i]),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ReorderableDragStartListener(
+                  index: i,
+                  child: const MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(0, 14, 4, 0),
+                      child: Icon(
+                        Icons.drag_indicator,
+                        size: 16,
+                        color: PennaColors.slate400,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(child: row),
+              ],
+            ),
+        ],
       ),
     );
   }

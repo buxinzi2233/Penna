@@ -1,6 +1,6 @@
 part of 'local_page.dart';
 
-// 「Tag」:选一个 WD14 打标模型,下载后给左边的图打标。
+// 「Tag 反推」:选一个 WD14 打标模型,下载后给左边的图打标。
 
 class _TagTab extends StatelessWidget {
   const _TagTab({required this.model, required this.onToDraft});
@@ -37,11 +37,13 @@ class _TagTab extends StatelessWidget {
         _Block(
           title: '模型',
           trailing: _SourcePicker(model: model),
-          child: Column(
-            children: [
-              for (final m in model.taggers)
+          child: _ModelList(
+            ids: [for (final m in model.orderedTaggers) m.repo],
+            rows: [
+              for (final m in model.orderedTaggers)
                 _taggerRow(m, selected: m.repo == current.repo),
             ],
+            onMove: model.moveTagger,
           ),
         ),
         _Block(

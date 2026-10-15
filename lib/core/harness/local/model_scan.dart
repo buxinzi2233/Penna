@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'llama_server.dart';
+import 'caption_catalog.dart';
+import 'florence.dart';
 import 'wd_tagger.dart';
 
 // 在用户指定的文件夹(连同子文件夹)里找已经有的模型,免得同一个模型反复下载。
@@ -21,6 +22,9 @@ typedef FoundModels = ({
   /// llama-server.exe。
   List<String> servers,
 
+  /// 放着 Florence-2 四个 ONNX 的文件夹(分词器在它或它的上一层)。
+  List<String> florences,
+
   /// 文件太多,没扫完就停了。
   bool truncated,
 });
@@ -30,6 +34,7 @@ const noModels = (
   ggufs: <String>[],
   mmprojs: <String>[],
   servers: <String>[],
+  florences: <String>[],
   truncated: false,
 );
 
@@ -54,7 +59,7 @@ FoundModels scanModelFolders(
   int maxEntries = 200000,
 }) {
   final taggers = <String>[], ggufs = <String>[], mmprojs = <String>[];
-  final servers = <String>[];
+  final servers = <String>[], florences = <String>[];
   var seen = 0;
   var truncated = false;
   final queue = <(Directory, int)>[for (final r in roots) (Directory(r), 0)];
@@ -95,6 +100,13 @@ FoundModels scanModelFolders(
     if (files.contains(taggerModelFile) && files.contains(taggerLabelsFile)) {
       taggers.add(dir.path);
     }
+    if (florenceOnnx.every(files.contains) &&
+        (files.contains(florenceTokenizer) ||
+            File(
+              '${dir.parent.path}${Platform.pathSeparator}$florenceTokenizer',
+            ).existsSync())) {
+      florences.add(dir.path);
+    }
     if (truncated) break;
   }
   return (
@@ -102,22 +114,24 @@ FoundModels scanModelFolders(
     ggufs: ggufs,
     mmprojs: mmprojs,
     servers: servers,
+    florences: florences,
     truncated: truncated,
   );
 }
 
 /// 这个文件夹是不是清单里的那个打标模型:路径里有一层的名字以模型名结尾
 /// (wd-vit-tagger-v3、SmilingWolf__wd-vit-tagger-v3、models--SmilingWolf--wd-vit-tagger-v3)。
-String? catalogTaggerFor(String dir) {
-  final segments = dir.toLowerCase().split(RegExp(r'[\\/]'));
-  for (final m in taggerModels) {
-    final base = m.repo.split('/').last.toLowerCase();
-    bool hit(String s) =>
-        s == base ||
-        s.endsWith(base) && '-_ '.contains(s[s.length - base.length - 1]);
-    if (segments.any(hit)) return m.repo;
-  }
-  return null;
+String? catalogTaggerFor(String dir) =>
+    taggerModels.where((m) => inRepoFolder(dir, m.repo)).firstOrNull?.repo;
+
+/// [dir] 的路径里有一层是 [repo] 的模型名(或 [id]),允许前面带「作者__」「models--作者--」。
+bool inRepoFolder(String dir, String repo, [String? id]) {
+  final base = repo.split('/').last.toLowerCase();
+  bool hit(String s) =>
+      s == base ||
+      s == id ||
+      s.endsWith(base) && '-_ '.contains(s[s.length - base.length - 1]);
+  return dir.toLowerCase().split(RegExp(r'[\\/]')).any(hit);
 }
 
 final _hash = RegExp(r'^[0-9a-f]{16,}$');
@@ -141,11 +155,33 @@ String _parent(String path) {
 String mmprojFor(String gguf, List<String> mmprojs) =>
     mmprojs.where((p) => _parent(p) == _parent(gguf)).firstOrNull ?? '';
 
-/// 清单里的看图模型在扫到的文件里有没有:按文件名找本体和视觉组件,同一个文件夹里的优先。
-({String model, String mmproj})? findCaption(CaptionModel m, FoundModels f) {
-  final model = f.ggufs.where((p) => fileName(p) == m.file).firstOrNull;
-  final pairs = f.mmprojs.where((p) => fileName(p) == m.mmproj).toList();
+/// 清单里的 GGUF 看图模型在扫到的文件里有没有:任何一个量化档的文件名对上就算,
+/// [prefer] 那一档优先;视觉组件按文件名找,同一个文件夹里的优先。
+({String model, String mmproj})? findCaption(
+  CaptionModel m,
+  FoundModels f, {
+  String? prefer,
+}) {
+  final mmproj = m.mmproj;
+  if (m.florence || mmproj == null) return null;
+  final names = [
+    for (final q in m.quants)
+      if (q.label == prefer) fileName(q.file.path),
+    for (final q in m.quants) fileName(q.file.path),
+  ];
+  final model = names
+      .map((n) => f.ggufs.where((p) => fileName(p) == n).firstOrNull)
+      .nonNulls
+      .firstOrNull;
+  final pairs = f.mmprojs
+      .where((p) => fileName(p) == fileName(mmproj.path))
+      .toList();
   if (model == null || pairs.isEmpty) return null;
   final same = pairs.where((p) => _parent(p) == _parent(model)).firstOrNull;
   return (model: model, mmproj: same ?? pairs.first);
 }
+
+/// 清单里的 Florence-2 在扫到的文件夹里有没有:路径里有它的模型名或 NLapt 的 id。
+String? findFlorence(CaptionModel m, FoundModels f) => m.florence
+    ? f.florences.where((d) => inRepoFolder(d, m.repo, m.id)).firstOrNull
+    : null;

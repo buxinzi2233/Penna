@@ -7,12 +7,17 @@ import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/harness/attachment.dart';
+import '../../../core/harness/local/caption_catalog.dart';
 import '../../../core/harness/local/download.dart';
+import '../../../core/harness/local/florence.dart';
 import '../../../core/harness/local/llama_server.dart';
 import '../../../core/harness/local/model_scan.dart';
 import '../../../core/harness/local/wd_tagger.dart';
 import '../../../core/harness/providers/llm_http.dart';
+import '../../../data/services/florence_engine.dart';
 import '../../../data/services/onnx_model.dart';
+
+part 'local_caption.dart';
 
 /// 看图写自然语言时默认的要求。
 const defaultCaptionPrompt =
@@ -25,7 +30,7 @@ typedef Progress = ({int received, int? total});
 
 typedef StreamChatFn = Stream<String> Function(LlmRequest request);
 
-/// 本地推理页的状态:Tag(ONNX 打标模型)和自然语言(llama-server 跑的看图模型)。
+/// 本地推理页的状态:Tag 反推(ONNX 打标模型)和 NL 反推(看图模型,见 [LocalCaption])。
 /// 设置存在「文档\Penna\local.json」,模型和运行时在「文档\Penna\models」「runtime」下。
 class LocalModel extends ChangeNotifier {
   /// [dir] 为 null 时只在内存里(测试用),也不能下载。
@@ -63,6 +68,19 @@ class LocalModel extends ChangeNotifier {
   /// 用户加的模型文件夹:连同子文件夹一起找已有的模型,找到的直接用,不用再下。
   List<String> modelFolders = const [];
 
+  /// 两个模型列表用户拖好的顺序(id 的先后);没列的排在后面。
+  List<String> taggerOrder = const [];
+  List<String> captionOrder = const [];
+
+  /// 各看图模型选的量化档(模型 id → 档名)。
+  Map<String, String> quantPicks = const {};
+
+  /// 选中的清单看图模型的 id;选的是自己的 GGUF 时为空串。
+  String captionPick = '';
+
+  /// Florence-2 用的指令。
+  String florenceTask = florenceTaskLabels.keys.first;
+
   // —— 只在内存里的 ——
   Attachment? _image;
   final _downloads = <String, Progress>{};
@@ -81,6 +99,8 @@ class LocalModel extends ChangeNotifier {
   bool _starting = false;
   bool _captioning = false;
   String _caption = '';
+  FlorenceEngine? _florence;
+  String? _florenceFor;
 
   Attachment? get image => _image;
   bool get tagging => _tagging;
@@ -121,6 +141,16 @@ class LocalModel extends ChangeNotifier {
         ),
   ];
 
+  /// 打标模型列表,按用户拖好的顺序。
+  List<TaggerModel> get orderedTaggers =>
+      _ordered(taggers, (m) => m.repo, taggerOrder);
+
+  void moveTagger(int from, int to) {
+    final ids = [for (final m in orderedTaggers) m.repo];
+    ids.insert(to, ids.removeAt(from));
+    update(() => taggerOrder = List.unmodifiable(ids));
+  }
+
   TaggerModel get tagger =>
       taggers.where((m) => m.repo == taggerRepo).firstOrNull ??
       taggerModels.first;
@@ -145,23 +175,6 @@ class LocalModel extends ChangeNotifier {
           );
   }
 
-  /// 看图模型要用的文件:自己下载的优先,其次是文件夹里找到的同名文件。
-  ({String model, String mmproj})? captionPaths(CaptionModel m) {
-    final files = captionFiles(m);
-    if (ready(files)) return (model: files[0].path, mmproj: files[1].path);
-    return findCaption(m, _found);
-  }
-
-  /// 文件夹里找到的、不在清单里的 GGUF 模型,配好同一个文件夹里的视觉组件。
-  List<({String model, String mmproj})> get foundGgufs {
-    final known = {for (final m in captionModels) m.file};
-    return [
-      for (final g in _found.ggufs)
-        if (!known.contains(fileName(g)))
-          (model: g, mmproj: mmprojFor(g, _found.mmprojs)),
-    ];
-  }
-
   // —— 文件位置 ——
 
   List<RemoteFile> taggerFiles(TaggerModel m) => [
@@ -175,24 +188,6 @@ class LocalModel extends ChangeNotifier {
         sha256: null,
       ),
   ];
-
-  List<RemoteFile> captionFiles(CaptionModel m) {
-    final folder = '$_home${_sep}models${_sep}gguf$_sep${m.id}';
-    return [
-      (
-        url: hfFileUrl(source, m.repo, m.file),
-        path: '$folder$_sep${m.file}',
-        size: m.size,
-        sha256: m.sha256,
-      ),
-      (
-        url: hfFileUrl(source, m.repo, m.mmproj),
-        path: '$folder$_sep${m.mmproj}',
-        size: m.mmprojSize,
-        sha256: m.mmprojSha256,
-      ),
-    ];
-  }
 
   RemoteFile get _runtimeZip => (
     url: llamaRuntimeUrl,
@@ -249,6 +244,9 @@ class LocalModel extends ChangeNotifier {
   }
 
   // —— 改设置 ——
+
+  /// 通知界面。扩展里不能直接调 notifyListeners(它是受保护的)。
+  void _changed() => notifyListeners();
 
   void update(void Function() change) {
     change();
@@ -348,6 +346,9 @@ class LocalModel extends ChangeNotifier {
       return '正在推理';
     }
     if (paths.any((p) => p.endsWith(taggerModelFile))) _dropTagger();
+    if (paths.any((p) => _florenceFor != null && p.startsWith(_florenceFor!))) {
+      _dropFlorence();
+    }
     String? problem;
     try {
       for (final path in paths) {
@@ -389,25 +390,6 @@ class LocalModel extends ChangeNotifier {
     }
     notifyListeners();
     return serverExe == null ? '运行时里没找到 llama-server.exe' : null;
-  }
-
-  /// 下载一个内置的看图模型,下好后就用它。
-  Future<String?> downloadCaption(CaptionModel m) async {
-    final files = captionFiles(m);
-    final problem = await download(m.id, files);
-    if (problem == null) useCaption(m);
-    return problem;
-  }
-
-  /// 用这个看图模型;下载的、文件夹里找到的都行。没有时返回 false。
-  bool useCaption(CaptionModel m) {
-    final paths = captionPaths(m);
-    if (paths == null) return false;
-    update(() {
-      modelPath = paths.model;
-      mmprojPath = paths.mmproj;
-    });
-    return true;
   }
 
   // —— Tag ——
@@ -471,89 +453,6 @@ class LocalModel extends ChangeNotifier {
     old?.close().catchError((Object _) {});
   }
 
-  // —— 自然语言 ——
-
-  /// 起 llama-server。失败时返回给用户看的原因。
-  Future<String?> startServer() async {
-    final exe = serverExe;
-    if (exe == null) return '先下载运行时,或选一个 llama-server.exe';
-    if (modelPath.isEmpty) return '先选一个模型';
-    _starting = true;
-    notifyListeners();
-    String? problem;
-    try {
-      await server.start((
-        exe: exe,
-        model: modelPath,
-        mmproj: mmprojPath,
-        port: port,
-        context: context,
-        gpuLayers: gpuLayers,
-      ));
-    } on LocalServerException catch (e) {
-      problem = e.message;
-    }
-    _starting = false;
-    notifyListeners();
-    return problem;
-  }
-
-  Future<void> stopServer() async {
-    await server.stop();
-    _starting = false;
-    notifyListeners();
-  }
-
-  /// 用跑着的本地模型看图写一段描述。失败时返回给用户看的原因。
-  Future<String?> runCaption() async {
-    final image = _image;
-    final url = server.baseUrl;
-    if (image == null) return '先放一张图';
-    if (url == null) return '先启动模型';
-    if (_captioning) return '正在生成';
-    _captioning = true;
-    _caption = '';
-    final round = _round;
-    notifyListeners();
-    String? problem;
-    try {
-      await for (final piece in streamChat(
-        LlmRequest(
-          baseUrl: url,
-          model: 'local',
-          apiKey: '',
-          temperature: 0.3,
-          messages: [
-            {'role': 'user', 'content': captionPrompt},
-          ],
-          images: {
-            0: [(mime: image.mime!, bytes: image.bytes!)],
-          },
-        ),
-      )) {
-        // 生成途中换了图:后面的字不是这张图的,停下不要了。
-        if (round != _round) break;
-        _caption += piece;
-        notifyListeners();
-      }
-      if (round == _round && _caption.trim().isEmpty) {
-        problem = '模型没有返回内容';
-      }
-    } on LlmException catch (e) {
-      problem = e.message;
-    } on Object catch (e) {
-      problem = '生成失败(${e.runtimeType})';
-    }
-    if (round == _round) {
-      _caption = _caption.trim();
-    } else {
-      problem = null;
-    }
-    _captioning = false;
-    notifyListeners();
-    return problem;
-  }
-
   // —— 存盘 ——
 
   File? get _file => dir == null ? null : File('$_home${_sep}local.json');
@@ -571,6 +470,11 @@ class LocalModel extends ChangeNotifier {
     'gpuLayers': gpuLayers,
     'captionPrompt': captionPrompt,
     'modelFolders': modelFolders,
+    'taggerOrder': taggerOrder,
+    'captionOrder': captionOrder,
+    'quantPicks': quantPicks,
+    'captionPick': captionPick,
+    'florenceTask': florenceTask,
   };
 
   void _save() {
@@ -603,6 +507,16 @@ class LocalModel extends ChangeNotifier {
       modelFolders = List.unmodifiable([
         for (final f in j['modelFolders'] as List? ?? const []) f as String,
       ]);
+      List<String> strings(String key) => List.unmodifiable([
+        for (final v in j[key] as List? ?? const []) v as String,
+      ]);
+      taggerOrder = strings('taggerOrder');
+      captionOrder = strings('captionOrder');
+      quantPicks = Map.unmodifiable(
+        (j['quantPicks'] as Map? ?? const {}).cast<String, String>(),
+      );
+      captionPick = j['captionPick'] as String? ?? '';
+      florenceTask = j['florenceTask'] as String? ?? florenceTask;
       // 不等它扫完:文件夹大的话要好一会儿,不拦着程序启动。
       if (modelFolders.isNotEmpty) rescan();
       notifyListeners();
@@ -617,19 +531,24 @@ class LocalModel extends ChangeNotifier {
       c.cancel();
     }
     _dropTagger();
+    _dropFlorence();
     server.stop();
     super.dispose();
   }
 }
 
-/// 读出图片的像素,缩到长边不超过 [size](不放大)。透明度是没乘进颜色的。
+/// 读出图片的像素,缩到长边不超过 [size](不放大);[stretch] 为真时直接拉成 [size]×[size]。
+/// 透明度是没乘进颜色的。
 Future<({Uint8List rgba, int width, int height})> decodeImage(
   Uint8List bytes,
-  int size,
-) async {
+  int size, {
+  bool stretch = false,
+}) async {
   final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
   final descriptor = await ui.ImageDescriptor.encoded(buffer);
-  final fit = fitInside(descriptor.width, descriptor.height, size);
+  final fit = stretch
+      ? (width: size, height: size)
+      : fitInside(descriptor.width, descriptor.height, size);
   final codec = await descriptor.instantiateCodec(
     targetWidth: fit.width,
     targetHeight: fit.height,

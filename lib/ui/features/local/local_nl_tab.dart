@@ -1,6 +1,7 @@
 part of 'local_page.dart';
 
-// 「自然语言」:下载 llama.cpp 运行时和一个看图模型,在本机起服务,看图写描述。
+// 「NL 反推」:选一个看图模型写描述。GGUF 要下载 llama.cpp 运行时、在本机起服务;
+// Florence-2 在程序里直接跑,只要选指令。
 
 /// 加进「API 管理」的那个本地模型用这个 id,再点一次是更新它的地址。
 const _localLlmId = 'local-llama';
@@ -56,10 +57,13 @@ class _NlTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _FoldersBlock(model: model),
-        _runtime(context),
         _models(context),
-        _params(),
-        _service(context),
+        // Florence-2 不用 llama-server:运行时、参数、服务都用不上。
+        if (!model.florenceMode) ...[
+          _runtime(context),
+          _params(),
+          _service(context),
+        ],
         _caption(context),
       ],
     );
@@ -106,66 +110,101 @@ class _NlTab extends StatelessWidget {
     );
   }
 
+  /// 清单里的一个模型:名字、系列和大小,下面是量化档;文件夹里找到的标「本机」。
+  Widget _catalogRow(BuildContext context, CaptionModel m) {
+    final quant = model.quantOf(m);
+    final total = [
+      quant.file.size,
+      ?m.mmproj?.size,
+      for (final e in m.extra) e.size,
+    ].fold<int>(0, (a, b) => a + b);
+    final paths = model.captionPaths(m);
+    return _DownloadRow(
+      model: model,
+      keyName: m.id,
+      name: m.name,
+      note: '${m.series} · ${m.params} · ${_size(total)} · ${m.note}',
+      files: model.captionFiles(m),
+      onDownload: () => model.downloadCaption(m),
+      onRemove: () => model.removeCaption(m),
+      // 选中的那档没下、但别的档或文件夹里有:标「本机」直接用。
+      foundAt: model.ready(model.captionFiles(m)) ? null : paths?.model,
+      selected: model.captionPick == m.id,
+      onSelect: () => model.useCaption(m)
+          ? null
+          : showToast(context, '先下载这个模型', warn: true),
+      below: m.quants.length < 2
+          ? null
+          : Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                for (final q in m.quants)
+                  _QuantChip(
+                    label:
+                        '${q.recommended ? '★ ' : ''}${q.label} '
+                        '${_size(q.file.size)}',
+                    selected: q.label == quant.label,
+                    onTap: () => model.pickQuant(m, q.label),
+                  ),
+              ],
+            ),
+    );
+  }
+
+  /// 模型文件夹里找到的 GGUF:点一下就用它(同文件夹里的视觉组件一起配上)。
+  Widget _ggufRow(({String model, String mmproj}) g) => _DownloadRow(
+    model: model,
+    keyName: g.model,
+    name: fileName(g.model),
+    note: g.mmproj.isEmpty ? '本机 · 仅文本' : '本机 · 视觉组件 ${fileName(g.mmproj)}',
+    files: const [],
+    done: true,
+    onDownload: () async => null,
+    foundAt: g.model,
+    selected: model.captionPick.isEmpty && model.modelPath == g.model,
+    onSelect: () => model.useGguf(g.model, g.mmproj),
+  );
+
   Widget _models(BuildContext context) {
+    final rows = model.captionRows;
     return _Block(
       title: '模型',
       trailing: _SourcePicker(model: model),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final m in captionModels)
-            _DownloadRow(
-              model: model,
-              keyName: m.id,
-              name: m.name,
-              note: m.note,
-              files: model.captionFiles(m),
-              onDownload: () => model.downloadCaption(m),
-              foundAt: model.ready(model.captionFiles(m))
-                  ? null
-                  : model.captionPaths(m)?.model,
-              selected: model.modelPath == model.captionPaths(m)?.model,
-              onSelect: () => model.useCaption(m)
-                  ? null
-                  : showToast(context, '先下载这个模型', warn: true),
-            ),
-          // 文件夹里找到的别的 GGUF:点一下就用它(同文件夹里的视觉组件一起配上)。
-          for (final g in model.foundGgufs)
-            _DownloadRow(
-              model: model,
-              keyName: g.model,
-              name: fileName(g.model),
-              note: g.mmproj.isEmpty
-                  ? '本机 · 仅文本'
-                  : '本机 · 视觉组件 ${fileName(g.mmproj)}',
-              files: const [],
-              done: true,
-              onDownload: () async => null,
-              foundAt: g.model,
-              selected: model.modelPath == g.model,
-              onSelect: () => model.update(() {
-                model.modelPath = g.model;
-                model.mmprojPath = g.mmproj;
-              }),
-            ),
-          const SizedBox(height: 6),
-          _PathPicker(
-            label: '模型',
-            path: model.modelPath,
-            onPick: () async {
-              final path = await _pickGguf();
-              if (path != null) model.update(() => model.modelPath = path);
-            },
+          _ModelList(
+            ids: [for (final r in rows) r.id],
+            rows: [
+              for (final r in rows)
+                if (r.model case final m?)
+                  _catalogRow(context, m)
+                else
+                  _ggufRow(r.gguf!),
+            ],
+            onMove: model.moveCaption,
           ),
-          _PathPicker(
-            label: '视觉组件',
-            path: model.mmprojPath,
-            onPick: () async {
-              final path = await _pickGguf();
-              if (path != null) model.update(() => model.mmprojPath = path);
-            },
-            onClear: () => model.update(() => model.mmprojPath = ''),
-          ),
+          if (!model.florenceMode) ...[
+            const SizedBox(height: 6),
+            _PathPicker(
+              label: '模型',
+              path: model.modelPath,
+              onPick: () async {
+                final path = await _pickGguf();
+                if (path != null) model.useGguf(path, model.mmprojPath);
+              },
+            ),
+            _PathPicker(
+              label: '视觉组件',
+              path: model.mmprojPath,
+              onPick: () async {
+                final path = await _pickGguf();
+                if (path != null) model.useGguf(model.modelPath, path);
+              },
+              onClear: () => model.useGguf(model.modelPath, ''),
+            ),
+          ],
         ],
       ),
     );
@@ -259,7 +298,8 @@ class _NlTab extends StatelessWidget {
   }
 
   Widget _caption(BuildContext context) {
-    final running = model.serverRunning && !model.starting;
+    final florence = model.florenceMode ? model.pickedCaption : null;
+    final running = florence != null || model.serverRunning && !model.starting;
     return _Block(
       title: '看图描述',
       trailing: PennaButton(
@@ -274,12 +314,27 @@ class _NlTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PennaField(
-            label: '要求',
-            value: model.captionPrompt,
-            maxLines: 3,
-            onChanged: (v) => model.update(() => model.captionPrompt = v),
-          ),
+          // Florence-2 只认几个固定的指令;GGUF 模型照写的要求来。
+          if (florence != null)
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final task in florence.tasks)
+                  PennaChip(
+                    label: florenceTaskLabels[task] ?? task,
+                    selected: model.florenceTaskOf(florence) == task,
+                    onTap: () => model.update(() => model.florenceTask = task),
+                  ),
+              ],
+            )
+          else
+            PennaField(
+              label: '要求',
+              value: model.captionPrompt,
+              maxLines: 3,
+              onChanged: (v) => model.update(() => model.captionPrompt = v),
+            ),
           const SizedBox(height: 10),
           if (model.caption.isNotEmpty) ...[
             PennaCard(
@@ -370,6 +425,44 @@ class _PathText extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: monoStyle.copyWith(fontSize: 11.5, color: PennaColors.slate700),
+      ),
+    );
+  }
+}
+
+/// 量化档的小标签:选中的描边加深。
+class _QuantChip extends StatelessWidget {
+  const _QuantChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: selected ? PennaColors.primaryBg : PennaColors.slate50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: selected ? PennaColors.primary : PennaColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            color: selected ? PennaColors.primary : PennaColors.slate500,
+          ),
+        ),
       ),
     );
   }

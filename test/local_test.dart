@@ -6,7 +6,9 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/attachment.dart';
+import 'package:penna/core/harness/local/caption_catalog.dart';
 import 'package:penna/core/harness/local/download.dart';
+import 'package:penna/core/harness/local/florence.dart';
 import 'package:penna/core/harness/local/llama_server.dart';
 import 'package:penna/core/harness/local/model_scan.dart';
 import 'package:penna/core/harness/local/wd_tagger.dart';
@@ -460,6 +462,131 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
       expect(model.taggerPaths(vit), isNull);
+    });
+  });
+
+  group('Florence-2', () {
+    // 一个很小的 BPE 词表:单个字母,加上 "Wh"、"Wha"、"What" 三条合并;Ġ 是空格。
+    const tokenizer = '''{
+      "model": {
+        "vocab": {"<s>": 0, "<pad>": 1, "</s>": 2, "W": 3, "h": 4, "a": 5,
+          "t": 6, "Wh": 7, "Wha": 8, "What": 9, "Ġ": 10, "Ġa": 11},
+        "merges": ["W h", "Wh a", "Wha t", "Ġ a"]
+      },
+      "added_tokens": [{"id": 12, "content": "<loc_1>"}]
+    }''';
+
+    test('分词:按合并规则拼词,首尾套上 <s> </s>;解码去掉特殊符号', () {
+      final t = FlorenceTokenizer.parse(tokenizer);
+      expect(t.encode('What a'), [9, 11]);
+      expect(t.encodePrompt('What'), [florenceBos, 9, florenceEos]);
+      expect(t.decode([0, 9, 11, 12, 2]), 'What a<loc_1>');
+      expect(
+        () => FlorenceTokenizer.parse('{}'),
+        throwsA(isA<FlorenceException>()),
+      );
+    });
+
+    test('防重复:出了就会重复一个三连词的那个字不能出;挑最大的时跳过它', () {
+      expect(bannedNext([5, 6, 7, 5, 6]), {7});
+      expect(bannedNext([5, 6]), isEmpty);
+      expect(argmaxExcept([0.1, 0.9, 0.5], {1}), 2);
+    });
+
+    test('指令:官方的几个换成英文问句,PromptGen 的原样', () {
+      expect(florencePrompt('<CAPTION>'), 'What does the image describe?');
+      expect(florencePrompt('<GENERATE_TAGS>'), '<GENERATE_TAGS>');
+    });
+
+    test('像素:透明算白,按 ImageNet 均值方差归一化,通道在前', () {
+      // 1×1:一个全透明的点 → 白色。
+      final px = florencePixels(Uint8List.fromList([0, 0, 0, 0]), 1);
+      expect(px[0], closeTo((1 - 0.485) / 0.229, 1e-5));
+      expect(px[2], closeTo((1 - 0.406) / 0.225, 1e-5));
+    });
+  });
+
+  group('模型清单、量化档与排序', () {
+    LocalModel fresh() =>
+        LocalModel(dir: tmp, streamChat: (_) => const Stream.empty());
+    CaptionModel byId(String id) => captionModels.firstWhere((m) => m.id == id);
+
+    test('清单只收能看图的;默认用推荐档,选过的档存盘后还在', () async {
+      expect(
+        captionModels.map((m) => m.id),
+        isNot(contains('gemma4-26b-a4b-heretic')),
+      );
+      expect(
+        captionModels.every((m) => m.florence || m.mmproj != null),
+        isTrue,
+      );
+
+      final model = fresh();
+      final gemma = byId('gemma4-e4b');
+      expect(model.quantOf(gemma).label, 'Q4_K_M');
+      model.pickQuant(gemma, 'Q8_0');
+      expect(
+        fileName(model.captionFiles(gemma).first.path),
+        'gemma-4-E4B-it-Q8_0.gguf',
+      );
+      // GGUF:本体 + 视觉组件;Florence-2:解码器 + 另外三个 ONNX + 分词器。
+      expect(model.captionFiles(gemma), hasLength(2));
+      expect(model.captionFiles(byId('florence2-base-ft')), hasLength(5));
+
+      final again = fresh();
+      await again.load();
+      expect(again.quantOf(gemma).label, 'Q8_0');
+    });
+
+    test('拖动排序存盘后还在;新出现的接在后面', () async {
+      final model = fresh();
+      final first = model.orderedTaggers.first.repo;
+      model.moveTagger(0, 2);
+      expect(model.orderedTaggers[2].repo, first);
+      final last = model.captionRows.last.id;
+      model.moveCaption(model.captionRows.length - 1, 0);
+      expect(model.captionRows.first.id, last);
+
+      final again = fresh();
+      await again.load();
+      expect(again.orderedTaggers[2].repo, first);
+      expect(again.captionRows.first.id, last);
+      expect(again.captionRows, hasLength(captionModels.length));
+    });
+
+    test('文件夹里有别的量化档、NLapt 放的 Florence-2:都直接能用', () async {
+      for (final p in [
+        'nl/gemma4-e4b/gemma-4-E4B-it-Q8_0.gguf',
+        'nl/gemma4-e4b/mmproj-F16.gguf',
+        for (final f in [...florenceOnnx, florenceTokenizer])
+          'nl/florence2-base-ft/$f',
+      ]) {
+        File('${tmp.path}/$p')
+          ..createSync(recursive: true)
+          ..writeAsStringSync('x');
+      }
+      final model = fresh()..addFolder('${tmp.path}/nl');
+      while (model.scanning) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+
+      final gemma = model.captionPaths(byId('gemma4-e4b'))!;
+      expect(fileName(gemma.model), 'gemma-4-E4B-it-Q8_0.gguf');
+      expect(fileName(gemma.mmproj), 'mmproj-F16.gguf');
+
+      final florence = byId('florence2-base-ft');
+      expect(model.useCaption(florence), isTrue);
+      expect(model.florenceMode, isTrue);
+      expect(
+        model.captionPaths(florence)!.model,
+        endsWith('florence2-base-ft'),
+      );
+      // 用的指令:它不认的换成它的第一个。
+      model.update(() => model.florenceTask = '<ANALYZE>');
+      expect(model.florenceTaskOf(florence), florence.tasks.first);
+      // 选回 GGUF 就不是 Florence 了。
+      expect(model.useCaption(byId('gemma4-e4b')), isTrue);
+      expect(model.florenceMode, isFalse);
     });
   });
 
