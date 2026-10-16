@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:pasteboard/pasteboard.dart';
 
@@ -461,6 +462,10 @@ class _ChatPaneState extends State<ChatPane> {
                       onNotification: _onScroll,
                       child: ListView.separated(
                         controller: _scroll,
+                        // ponytail: 整场对话都排好版,总高度是量出来的而不是估的;
+                        // 只排看得见的那几条时,底下的成稿卡片很高,估出的总高度偏差大,
+                        // 拖滚动条会一下跳很远。上限是一场对话约 100 万像素高。
+                        scrollCacheExtent: const ScrollCacheExtent.pixels(1e6),
                         padding: const EdgeInsets.all(24),
                         itemCount: rows.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 24),
