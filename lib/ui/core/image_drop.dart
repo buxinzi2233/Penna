@@ -9,7 +9,7 @@ import 'theme.dart';
 import 'widgets.dart';
 
 /// 一张图的位置:点一下选图或直接拖进来;有图时显示它,右上角可以换图、移除。
-class ImageDrop extends StatelessWidget {
+class ImageDrop extends StatefulWidget {
   const ImageDrop({
     super.key,
     required this.image,
@@ -25,11 +25,23 @@ class ImageDrop extends StatelessWidget {
   /// 换了图(移除时是 null)。
   final ValueChanged<Attachment?> onChanged;
 
+  @override
+  State<ImageDrop> createState() => _ImageDropState();
+}
+
+class _ImageDropState extends State<ImageDrop> {
+  /// 有文件拖在上面:亮起来告诉用户可以松手。
+  bool _over = false;
+
+  void _hover(bool over) {
+    if (over != _over) setState(() => _over = over);
+  }
+
   Future<void> _use(BuildContext context, String path) async {
     try {
       final picked = await readAttachment(File(path));
       if (!picked.isImage) throw const AttachmentException('这不是图片');
-      onChanged(picked);
+      widget.onChanged(picked);
     } on AttachmentException catch (e) {
       if (context.mounted) showToast(context, e.message, warn: true);
     }
@@ -46,18 +58,69 @@ class ImageDrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = this.image;
+    final image = widget.image;
     return DropTarget(
+      onDragEntered: (_) => _hover(true),
+      onDragExited: (_) => _hover(false),
       onDragDone: (d) {
+        _hover(false);
         if (d.files.isNotEmpty) _use(context, d.files.first.path);
       },
-      child: image == null
-          ? _EmptyImage(hint: hint, onTap: () => _pick(context))
-          : _ImageBox(
-              image: image,
-              onReplace: () => _pick(context),
-              onClear: () => onChanged(null),
+      child: Stack(
+        // 外面给多大就多大,和没加这层时一样。
+        fit: StackFit.passthrough,
+        children: [
+          image == null
+              ? _EmptyImage(hint: widget.hint, onTap: () => _pick(context))
+              : _ImageBox(
+                  image: image,
+                  onReplace: () => _pick(context),
+                  onClear: () => widget.onChanged(null),
+                ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _over ? 1 : 0,
+                duration: const Duration(milliseconds: 120),
+                child: const _DropHint(),
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 拖着文件经过时盖在上面的一层:蓝框、浅蓝底、「松开放入图片」。
+class _DropHint extends StatelessWidget {
+  const _DropHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PennaColors.primaryBg.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: PennaColors.primary, width: 2),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.file_download_outlined,
+              size: 30,
+              color: PennaColors.primary,
+            ),
+            SizedBox(height: 6),
+            Text(
+              '松开放入图片',
+              style: TextStyle(fontSize: 13, color: PennaColors.primary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

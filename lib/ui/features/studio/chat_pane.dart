@@ -100,7 +100,7 @@ class _ChatPaneState extends State<ChatPane> {
       final image = await Pasteboard.image;
       if (image == null || !mounted) return;
       final problem = image.length > maxImageBytes
-          ? '图片超过 5 MB'
+          ? '图片超过 $maxImageLabel'
           : _attachments.length >= maxAttachments
           ? '最多 $maxAttachments 个附件'
           : null;

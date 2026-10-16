@@ -7,7 +7,10 @@ import 'package:flutter/foundation.dart';
 const maxAttachments = 6;
 
 /// 单张图片的大小上限(字节)。图片会整张编码进请求,太大接口会拒收。
-const maxImageBytes = 5 * 1024 * 1024;
+const maxImageBytes = 10 * 1024 * 1024;
+
+/// 给用户看的图片大小上限。
+const maxImageLabel = '10 MB';
 
 /// 单个文本附件的长度上限(字符数),和 Skill 正文的上限一致。
 const maxFileChars = 60000;
@@ -64,7 +67,7 @@ Future<Attachment> readAttachment(File file) async {
   try {
     final size = await file.length();
     if (mime != null && size > maxImageBytes) {
-      throw AttachmentException('「$name」超过 5 MB');
+      throw AttachmentException('「$name」超过 $maxImageLabel');
     }
     // UTF-8 一个字符最多 4 字节,超过这个数一定超长,不用读进来再数。
     if (mime == null && size > maxFileChars * 4) {
