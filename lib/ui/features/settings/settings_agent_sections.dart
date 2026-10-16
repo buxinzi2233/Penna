@@ -5,6 +5,7 @@ import '../../../data/models/app_config.dart';
 import '../../../data/services/config_service.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../update/update_flow.dart';
 import 'settings_sections.dart';
 
 /// 一排 Preset 药丸;选中的就是当前使用的 Preset。
@@ -215,6 +216,8 @@ class AbilitySection extends StatelessWidget {
           selected: preset.tools,
           onChanged: (s) => put(preset.copyWith(tools: s)),
         ),
+        gap,
+        const UpdateCard(),
       ],
     );
   }

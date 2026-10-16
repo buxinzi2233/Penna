@@ -5,6 +5,7 @@ import '../data/services/character_store.dart';
 import '../data/services/config_service.dart';
 import '../data/services/skill_store.dart';
 import 'core/theme.dart';
+import 'core/version.dart';
 import 'core/widgets.dart';
 import 'features/archive/archive_page.dart';
 import 'features/characters/characters_page.dart';
@@ -14,9 +15,9 @@ import 'features/settings/settings_page.dart';
 import 'features/studio/reverse_model.dart';
 import 'features/studio/studio_page.dart';
 import 'features/studio/studio_view_model.dart';
+import 'features/update/update_flow.dart';
 
-/// 显示在右下角的版本号;要和 pubspec.yaml 的 version 一致(version_test.dart 会查)。
-const appVersion = '1.0.1';
+export 'core/version.dart';
 
 const _studio = 0,
     _archivePage = 1,
@@ -34,6 +35,7 @@ class AppShell extends StatefulWidget {
     this.archive,
     this.reverse,
     this.local,
+    this.checkUpdates = false,
   });
 
   final StudioViewModel vm;
@@ -47,11 +49,24 @@ class AppShell extends StatefulWidget {
   /// 本地反推;不给就用一个只在内存里、不能下载的(测试用)。
   final LocalModel? local;
 
+  /// 打开时悄悄检查一次更新,有新版本才弹窗(正式版才开,测试里不联网)。
+  final bool checkUpdates;
+
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.checkUpdates) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => checkForUpdate(context, quiet: true),
+      );
+    }
+  }
+
   int _page = _studio;
   late final _archive = widget.archive ?? ArchiveStore();
   late final _reverse = widget.reverse ?? ReverseModel(widget.vm);

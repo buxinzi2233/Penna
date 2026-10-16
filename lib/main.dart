@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -206,6 +207,7 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
             archive: widget.archive,
             reverse: widget.reverse,
             local: widget.local,
+            checkUpdates: kReleaseMode,
           ),
         );
       },
