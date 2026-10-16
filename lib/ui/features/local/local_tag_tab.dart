@@ -104,6 +104,8 @@ class _TagTab extends StatelessWidget {
                   ),
                 )
               : _TagResultView(
+                  // 换了图就从全选开始;只调阈值时取消勾选的照旧不要。
+                  key: ObjectKey(model.image),
                   result: tags,
                   onToDraft: onToDraft,
                   onSend: onSend,
@@ -157,8 +159,10 @@ class _Threshold extends StatelessWidget {
 }
 
 /// 打出来的标签:分级、角色(琥珀色)、通用标签,鼠标停上去看把握。
-class _TagResultView extends StatelessWidget {
+/// 默认全选,点一个标签取消或选回它;「全选」在全选时变成全不选。
+class _TagResultView extends StatefulWidget {
   const _TagResultView({
+    super.key,
     required this.result,
     required this.onToDraft,
     required this.onSend,
@@ -168,39 +172,106 @@ class _TagResultView extends StatelessWidget {
   final ValueChanged<String> onToDraft;
   final ValueChanged<String> onSend;
 
-  Widget _chip(TagScore t, {bool character = false}) => Tooltip(
-    message: '${(t.prob * 100).toStringAsFixed(1)}%',
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: character ? PennaColors.lock : PennaColors.slate50,
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(
-          color: character ? PennaColors.lockBorder : PennaColors.border,
-        ),
-      ),
-      child: Text(
-        tagText(t.tag),
-        style: monoStyle.copyWith(
-          fontSize: 11.5,
-          color: character ? PennaColors.lockText : PennaColors.text,
-        ),
-      ),
-    ),
+  @override
+  State<_TagResultView> createState() => _TagResultViewState();
+}
+
+class _TagResultViewState extends State<_TagResultView> {
+  /// 取消勾选的标签名。
+  Set<String> _off = const {};
+
+  List<TagScore> get _all => [
+    ...widget.result.characters,
+    ...widget.result.general,
+  ];
+
+  void _toggle(String tag) => setState(
+    () => _off = _off.contains(tag) ? ({..._off}..remove(tag)) : {..._off, tag},
   );
+
+  Widget _chip(TagScore t, {bool character = false}) {
+    final on = !_off.contains(t.tag);
+    return Tooltip(
+      message: '${(t.prob * 100).toStringAsFixed(1)}%',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => _toggle(t.tag),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: !on
+                  ? PennaColors.card
+                  : character
+                  ? PennaColors.lock
+                  : PennaColors.slate50,
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(
+                color: on && character
+                    ? PennaColors.lockBorder
+                    : PennaColors.border,
+              ),
+            ),
+            child: Text(
+              tagText(t.tag),
+              style: monoStyle.copyWith(
+                fontSize: 11.5,
+                color: !on
+                    ? PennaColors.slate400
+                    : character
+                    ? PennaColors.lockText
+                    : PennaColors.text,
+                decoration: on ? null : TextDecoration.lineThrough,
+                decorationColor: PennaColors.slate400,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final prompt = tagPrompt(result);
+    final result = widget.result;
+    final all = _all;
+    final picked = all.where((t) => !_off.contains(t.tag)).length;
+    final everything = picked == all.length;
+    final prompt = tagPrompt(result, without: _off);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (result.rating case final rating?)
+        if (all.isNotEmpty || result.rating != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '分级:$rating',
-              style: const TextStyle(fontSize: 11, color: PennaColors.slate500),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    result.rating == null ? '' : '分级:${result.rating}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: PennaColors.slate500,
+                    ),
+                  ),
+                ),
+                if (all.isNotEmpty)
+                  PennaButton(
+                    label: '全选 $picked/${all.length}',
+                    icon: everything
+                        ? Icons.check_box_outlined
+                        : picked == 0
+                        ? Icons.check_box_outline_blank
+                        : Icons.indeterminate_check_box_outlined,
+                    borderColor: PennaColors.border,
+                    onPressed: () => setState(
+                      () => _off = everything
+                          ? {for (final t in all) t.tag}
+                          : const {},
+                    ),
+                  ),
+              ],
             ),
           ),
         Wrap(
@@ -211,14 +282,26 @@ class _TagResultView extends StatelessWidget {
             for (final t in result.general) _chip(t),
           ],
         ),
-        if (prompt.isEmpty)
+        if (all.isEmpty)
           const Text(
             '没有超过阈值的标签',
             style: TextStyle(fontSize: 12, color: PennaColors.slate400),
           )
+        else if (prompt.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 10),
+            child: Text(
+              '没有选中的标签',
+              style: TextStyle(fontSize: 12, color: PennaColors.slate400),
+            ),
+          )
         else ...[
           const SizedBox(height: 10),
-          _ResultActions(text: prompt, onToDraft: onToDraft, onSend: onSend),
+          _ResultActions(
+            text: prompt,
+            onToDraft: widget.onToDraft,
+            onSend: widget.onSend,
+          ),
         ],
       ],
     );

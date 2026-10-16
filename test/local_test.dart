@@ -130,6 +130,7 @@ void main() {
       expect(r.characters.map((t) => t.tag), ['hatsune_miku']);
       expect(r.general.map((t) => t.tag), ['smile', 'long_hair']);
       expect(tagPrompt(r), 'hatsune miku, smile, long hair');
+      expect(tagPrompt(r, without: {'smile'}), 'hatsune miku, long hair');
 
       final logits = decodeTags(
         [-5, -5, 3, -3, -1],

@@ -399,5 +399,8 @@ String tagText(String tag) =>
     _kaomoji.contains(tag) ? tag : tag.replaceAll('_', ' ');
 
 /// 推出来的标签连成一条提示词:角色在前,通用标签在后,用英文逗号隔开。
-String tagPrompt(TagResult r) =>
-    [...r.characters, ...r.general].map((t) => tagText(t.tag)).join(', ');
+/// 名字在 [without] 里的(用户取消勾选的)不要。
+String tagPrompt(TagResult r, {Set<String> without = const {}}) => [
+  ...r.characters,
+  ...r.general,
+].where((t) => !without.contains(t.tag)).map((t) => tagText(t.tag)).join(', ');
