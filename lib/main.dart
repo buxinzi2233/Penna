@@ -187,18 +187,23 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
             physics: const BouncingScrollPhysics(),
           ),
           // 标题栏放在 Navigator 外面:弹窗的遮罩盖不到它,窗口随时能拖。
-          builder: (context, child) => Column(
-            children: [
-              const SizedBox(
-                height: kWindowCaptionHeight,
-                child: WindowCaption(
-                  brightness: Brightness.light,
-                  backgroundColor: PennaColors.sidebar,
-                  title: _Brand(),
+          // ponytail: 整个界面不出无障碍语义树。Flutter 3.47 的 Windows 无障碍桥有空指针崩溃
+          // (flutter/flutter#175041,accessibility_bridge.cc:229):有读屏、输入法这类 UIA
+          // 程序在读窗口时,切页就会闪退。代价是读屏软件读不到 Penna;引擎修好后去掉这层。
+          builder: (context, child) => ExcludeSemantics(
+            child: Column(
+              children: [
+                const SizedBox(
+                  height: kWindowCaptionHeight,
+                  child: WindowCaption(
+                    brightness: Brightness.light,
+                    backgroundColor: PennaColors.sidebar,
+                    title: _Brand(),
+                  ),
                 ),
-              ),
-              Expanded(child: child!),
-            ],
+                Expanded(child: child!),
+              ],
+            ),
           ),
           home: AppShell(
             vm: _vm,
