@@ -56,24 +56,44 @@ extension StudioContext on StudioViewModel {
           ].join('\n\n'),
           time: time,
           toolSummary: [
-            if (results.isNotEmpty) '查了 Danbooru 标签 · ${hits.length} 个',
+            if (results.isNotEmpty) tr('查了 Danbooru 标签 · {0} 个', [hits.length]),
             if (people.isNotEmpty)
-              '查了角色库 · ${people.values.expand((h) => h).length} 个',
+              tr('查了角色库 · {0} 个', [people.values.expand((h) => h).length]),
           ].join(' · '),
           toolDetails: [
             for (final MapEntry(key: query, value: found) in results.entries)
-              '「$query」(${found.source}):'
-                  '${found.hits.isEmpty ? '没有找到' : found.hits.map((h) => h.tag).join(', ')}',
+              tr(
+                '「{0}」({1}):'
+                '{2}',
+                [
+                  query,
+                  found.source,
+                  found.hits.isEmpty
+                      ? tr('没有找到')
+                      : found.hits.map((h) => h.tag).join(', '),
+                ],
+              ),
             for (final MapEntry(key: name, value: found) in people.entries)
-              '「$name」(角色库):'
-                  '${found.isEmpty ? '没有找到' : found.map((h) => h.name).join(', ')}',
+              tr(
+                '「{0}」(角色库):'
+                '{1}',
+                [
+                  name,
+                  found.isEmpty
+                      ? tr('没有找到')
+                      : found.map((h) => h.name).join(', '),
+                ],
+              ),
           ],
         ),
       ], time);
       // 接不下去(比如模型被删了):在那条回复上说明,不留一个空气泡。
       if (problem != null) {
         _updateReply(
-          (m) => m.copyWith(text: '${m.text}\n[出错] $problem', failed: true),
+          (m) => m.copyWith(
+            text: tr('{0}\n[出错] {1}', [m.text, problem]),
+            failed: true,
+          ),
         );
       }
     }());
@@ -98,7 +118,7 @@ extension StudioContext on StudioViewModel {
     if (unknown.isEmpty) return;
     _updateReply(
       (m) => m.copyWith(
-        toolSummary: '${unknown.length} 个标签不在词库里',
+        toolSummary: tr('{0} 个标签不在词库里', [unknown.length]),
         toolDetails: unknown,
       ),
     );
@@ -150,7 +170,10 @@ extension StudioContext on StudioViewModel {
     if (names.isEmpty) return;
     _updateReply(
       (m) => m.copyWith(
-        toolSummary: [?m.toolSummary, '已存进角色库:${names.join('、')}'].join(' · '),
+        toolSummary: [
+          ?m.toolSummary,
+          tr('已存进角色库:{0}', [names.join(tr('、'))]),
+        ].join(' · '),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 /// 对话顶栏下面的一行标签:一个标签一场对话(`vm.chatTabs`)。
 /// 点一下换过去;叉掉只是关标签,对话还在历史里;最后的加号开一场新的。
@@ -57,7 +58,7 @@ class _ChatTabsState extends State<ChatTabs> {
     }
     return Container(
       height: 40,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: PennaColors.slate50,
         border: Border(bottom: BorderSide(color: PennaColors.border)),
       ),
@@ -102,7 +103,7 @@ class _ChatTabsState extends State<ChatTabs> {
                           : () => vm.openChat(chat.id),
                       onClose: () {
                         if (!vm.closeChat(chat.id)) {
-                          showToast(context, '正在生成,请先停止当前回复', warn: true);
+                          showToast(context, tr('正在生成,请先停止当前回复'), warn: true);
                         }
                       },
                     );
@@ -112,7 +113,7 @@ class _ChatTabsState extends State<ChatTabs> {
             ),
           ),
           Tooltip(
-            message: '新对话',
+            message: tr('新对话'),
             child: InkWell(
               onTap: busy || vm.messages.isEmpty ? null : vm.newChat,
               child: SizedBox(
@@ -189,12 +190,12 @@ class _Tab extends StatelessWidget {
           ),
           const SizedBox(width: 2),
           Tooltip(
-            message: '关掉这个标签(历史里还在)',
+            message: tr('关掉这个标签(历史里还在)'),
             waitDuration: const Duration(milliseconds: 600),
             child: InkWell(
               onTap: onClose,
               borderRadius: BorderRadius.circular(4),
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.all(2),
                 child: Icon(Icons.close, size: 12, color: PennaColors.slate400),
               ),

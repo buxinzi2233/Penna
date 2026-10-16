@@ -11,6 +11,7 @@ import '../../core/smooth_scroll.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../settings/settings_sections.dart';
+import '../../../l10n/l10n.dart';
 
 /// 添加或修改角色的窗口交回来的内容;[image] 为 null 表示图没动。
 typedef _Draft = ({String name, String prompt, CharacterImage? image});
@@ -61,11 +62,15 @@ class _CharactersPageState extends State<CharactersPage> {
       prompt: draft.prompt,
       image: draft.image,
     );
-    if (saved != null) showToast(context, '已存进角色库');
+    if (saved != null) showToast(context, tr('已存进角色库'));
   }
 
   Future<void> _delete(CharacterCard card) async {
-    if (await confirmDelete(context, '删除角色「${card.name}」?', '删掉后找不回来。')) {
+    if (await confirmDelete(
+      context,
+      tr('删除角色「{0}」?', [card.name]),
+      tr('删掉后找不回来。'),
+    )) {
       widget.store.remove(card.id);
     }
   }
@@ -83,9 +88,9 @@ class _CharactersPageState extends State<CharactersPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (q.isNotEmpty)
-          _Heading('内置', '${found.length} 个')
+          _Heading(tr('内置'), tr('{0} 个', [found.length]))
         else if (series == null) ...[
-          _Heading('内置', '${dict.series.length} 个系列'),
+          _Heading(tr('内置'), tr('{0} 个系列', [dict.series.length])),
           const SizedBox(height: 8),
           // 一格一个系列,格子一样大,排成整齐的几列(宽的时候 5 列)。
           LayoutBuilder(
@@ -118,16 +123,18 @@ class _CharactersPageState extends State<CharactersPage> {
           Row(
             children: [
               PennaButton(
-                label: '全部系列',
+                label: tr('全部系列'),
                 icon: Icons.arrow_back,
                 borderColor: PennaColors.border,
                 onPressed: () => setState(() => _series = null),
               ),
               const SizedBox(width: 10),
-              Expanded(child: _Heading(series, '前 ${hits.length} 个 · 图多的在前')),
+              Expanded(
+                child: _Heading(series, tr('前 {0} 个 · 图多的在前', [hits.length])),
+              ),
             ],
           ),
-        if (q.isNotEmpty && hits.isEmpty) const _Empty('没有找到'),
+        if (q.isNotEmpty && hits.isEmpty) _Empty(tr('没有找到')),
         for (final hit in hits) ...[
           const SizedBox(height: 8),
           _BuiltinCard(hit: hit, onSave: () => _edit(null, hit)),
@@ -154,30 +161,36 @@ class _CharactersPageState extends State<CharactersPage> {
               PennaBar(
                 color: PennaColors.card,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.face_retouching_natural_outlined,
                     size: 15,
                     color: PennaColors.primary,
                   ),
                   const SizedBox(width: 6),
-                  const Text(
-                    '角色库',
+                  Text(
+                    tr('角色库'),
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '我的 ${widget.store.cards.length} 个'
-                      '${dict == null ? '' : ' · 内置 ${dict.length} 个'}',
+                      tr(
+                        '我的 {0} 个'
+                        '{1}',
+                        [
+                          widget.store.cards.length,
+                          dict == null ? '' : tr(' · 内置 {0} 个', [dict.length]),
+                        ],
+                      ),
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: PennaColors.slate500,
                       ),
                     ),
                   ),
                   PennaButton(
-                    label: '添加角色',
+                    label: tr('添加角色'),
                     icon: Icons.add,
                     background: PennaColors.primary,
                     foreground: Colors.white,
@@ -197,13 +210,13 @@ class _CharactersPageState extends State<CharactersPage> {
                           contextMenuBuilder: pennaTextMenu,
                           onChanged: (v) => setState(() => _query = v),
                           style: const TextStyle(fontSize: 13),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             icon: Icon(
                               Icons.search,
                               size: 17,
                               color: PennaColors.slate400,
                             ),
-                            hintText: '按名字找:初音未来、甘雨、hatsune miku',
+                            hintText: tr('按名字找:初音未来、甘雨、hatsune miku'),
                             hintStyle: TextStyle(
                               fontSize: 12.5,
                               color: PennaColors.slate400,
@@ -214,10 +227,12 @@ class _CharactersPageState extends State<CharactersPage> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _Heading('我的', '${mine.length} 个'),
+                      _Heading(tr('我的'), tr('{0} 个', [mine.length])),
                       if (mine.isEmpty)
                         _Empty(
-                          q.isEmpty ? '还没有角色 · 点「添加角色」,或让 Agent 存' : '没有找到',
+                          q.isEmpty
+                              ? tr('还没有角色 · 点「添加角色」,或让 Agent 存')
+                              : tr('没有找到'),
                         ),
                       for (final card in mine) ...[
                         const SizedBox(height: 8),
@@ -257,7 +272,7 @@ class _CharactersPageState extends State<CharactersPage> {
                                 ),
                             child: KeyedSubtree(
                               key: ValueKey(
-                                q.isNotEmpty ? '查' : _series ?? '系列',
+                                q.isNotEmpty ? tr('查') : _series ?? tr('系列'),
                               ),
                               child: _builtin(dict, q, builtin),
                             ),
@@ -322,8 +337,8 @@ class _SeriesTile extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '$count 个角色',
-                    style: const TextStyle(
+                    tr('{0} 个角色', [count]),
+                    style: TextStyle(
                       fontSize: 11.5,
                       color: PennaColors.slate500,
                     ),
@@ -356,10 +371,7 @@ class _Heading extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 8),
-      Text(
-        note,
-        style: const TextStyle(fontSize: 11, color: PennaColors.slate500),
-      ),
+      Text(note, style: TextStyle(fontSize: 11, color: PennaColors.slate500)),
     ],
   );
 }
@@ -375,7 +387,7 @@ class _Empty extends StatelessWidget {
     child: Center(
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, color: PennaColors.slate400),
+        style: TextStyle(fontSize: 12, color: PennaColors.slate400),
       ),
     ),
   );
@@ -390,7 +402,7 @@ class _Portrait extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const blank = ColoredBox(
+    final blank = ColoredBox(
       color: PennaColors.slate100,
       child: Icon(Icons.person_outline, color: PennaColors.slate400),
     );
@@ -452,18 +464,18 @@ class _MineCard extends StatelessWidget {
                       ),
                     ),
                     PennaButton(
-                      label: '复制',
+                      label: tr('复制'),
                       icon: Icons.content_copy,
                       onPressed: () =>
-                          copyWithToast(context, card.prompt, '已复制'),
+                          copyWithToast(context, card.prompt, tr('已复制')),
                     ),
                     PennaButton(
-                      label: '修改',
+                      label: tr('修改'),
                       icon: Icons.edit_outlined,
                       onPressed: onEdit,
                     ),
                     IconButton(
-                      tooltip: '删除',
+                      tooltip: tr('删除'),
                       iconSize: 15,
                       visualDensity: VisualDensity.compact,
                       color: PennaColors.slate400,
@@ -503,7 +515,7 @@ class _BuiltinCard extends StatelessWidget {
         children: [
           TextSpan(
             text: '$label ',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: PennaColors.slate500,
@@ -537,25 +549,25 @@ class _BuiltinCard extends StatelessWidget {
                 ),
               ),
               PennaButton(
-                label: '复制',
+                label: tr('复制'),
                 icon: Icons.content_copy,
-                tooltip: '触发词、外貌和服装',
+                tooltip: tr('触发词、外貌和服装'),
                 onPressed: () =>
-                    copyWithToast(context, _fullPrompt(hit), '已复制'),
+                    copyWithToast(context, _fullPrompt(hit), tr('已复制')),
               ),
               if (hit.looks.isNotEmpty && hit.outfit.isNotEmpty)
                 PennaButton(
-                  label: '只要外貌',
+                  label: tr('只要外貌'),
                   icon: Icons.face_outlined,
-                  tooltip: '不带服装的词',
+                  tooltip: tr('不带服装的词'),
                   onPressed: () => copyWithToast(
                     context,
                     '$trigger, ${hit.looks}',
-                    '已复制(不带服装)',
+                    tr('已复制(不带服装)'),
                   ),
                 ),
               PennaButton(
-                label: '存到我的',
+                label: tr('存到我的'),
                 icon: Icons.bookmark_add_outlined,
                 onPressed: onSave,
               ),
@@ -566,10 +578,10 @@ class _BuiltinCard extends StatelessWidget {
               hit.alias,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: PennaColors.slate500),
+              style: TextStyle(fontSize: 11, color: PennaColors.slate500),
             ),
-          if (hit.looks.isNotEmpty) _line('外貌', hit.looks),
-          if (hit.outfit.isNotEmpty) _line('服装', hit.outfit),
+          if (hit.looks.isNotEmpty) _line(tr('外貌'), hit.looks),
+          if (hit.outfit.isNotEmpty) _line(tr('服装'), hit.outfit),
         ],
       ),
     );
@@ -611,12 +623,12 @@ class _CharacterDialogState extends State<_CharacterDialog> {
     final dot = path.lastIndexOf('.');
     final ext = dot < 0 ? '' : path.substring(dot + 1).toLowerCase();
     if (!imageMimes.containsKey(ext)) {
-      return showToast(context, '只能放图片(png、jpg、webp、gif)', warn: true);
+      return showToast(context, tr('只能放图片(png、jpg、webp、gif)'), warn: true);
     }
     try {
       final file = File(path);
       if (file.lengthSync() > maxCharacterImageBytes) {
-        return showToast(context, '图片太大(上限 20 MB)', warn: true);
+        return showToast(context, tr('图片太大(上限 20 MB)'), warn: true);
       }
       final bytes = file.readAsBytesSync();
       setState(() {
@@ -624,14 +636,14 @@ class _CharacterDialogState extends State<_CharacterDialog> {
         _preview = path;
       });
     } on FileSystemException {
-      showToast(context, '读不了这张图', warn: true);
+      showToast(context, tr('读不了这张图'), warn: true);
     }
   }
 
   Future<void> _pick() async {
     final picked = await openFile(
       acceptedTypeGroups: [
-        XTypeGroup(label: '图片', extensions: imageMimes.keys.toList()),
+        XTypeGroup(label: tr('图片'), extensions: imageMimes.keys.toList()),
       ],
     );
     if (picked != null && mounted) _useImage(picked.path);
@@ -649,7 +661,7 @@ class _CharacterDialogState extends State<_CharacterDialog> {
       },
       child: AlertDialog(
         title: Text(
-          widget.editing ? '修改角色' : '添加角色',
+          widget.editing ? tr('修改角色') : tr('添加角色'),
           style: const TextStyle(fontSize: 16),
         ),
         content: SizedBox(
@@ -678,9 +690,9 @@ class _CharacterDialogState extends State<_CharacterDialog> {
                       children: [
                         _Portrait(path: _preview, size: 64),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            '拖入图片,或点击选择',
+                            tr('拖入图片,或点击选择'),
                             style: TextStyle(
                               fontSize: 12,
                               color: PennaColors.slate500,
@@ -693,14 +705,14 @@ class _CharacterDialogState extends State<_CharacterDialog> {
                 ),
                 const SizedBox(height: 12),
                 PennaField(
-                  label: '名字',
+                  label: tr('名字'),
                   value: _name,
                   onChanged: (v) => setState(() => _name = v),
                 ),
                 const SizedBox(height: 8),
                 PennaField(
-                  label: '提示词',
-                  hint: '这个角色的长相和标志性的穿着',
+                  label: tr('提示词'),
+                  hint: tr('这个角色的长相和标志性的穿着'),
                   maxLines: 7,
                   value: _prompt,
                   onChanged: (v) => setState(() => _prompt = v),
@@ -712,7 +724,7 @@ class _CharacterDialogState extends State<_CharacterDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(tr('取消')),
           ),
           TextButton(
             onPressed: ready
@@ -722,7 +734,7 @@ class _CharacterDialogState extends State<_CharacterDialog> {
                     image: _image,
                   ))
                 : null,
-            child: const Text('保存'),
+            child: Text(tr('保存')),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'tagger_catalog.dart';
+import '../../../l10n/l10n.dart';
 
 export 'tagger_catalog.dart';
 
@@ -86,7 +87,7 @@ List<TagLabel> _pixaiCsv(String csv) => [
 
 /// 一串按下标排好的标签;缺的位置用跳过的空标签补上,免得后面的错位。
 List<TagLabel> _aligned(Map<int, TagLabel> byIndex) {
-  if (byIndex.isEmpty) throw const FormatException('标签表是空的');
+  if (byIndex.isEmpty) throw FormatException(tr('标签表是空的'));
   final size = byIndex.keys.reduce(math.max) + 1;
   return [
     for (var i = 0; i < size; i++) byIndex[i] ?? (name: '', category: _skipped),

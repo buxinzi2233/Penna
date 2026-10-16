@@ -20,6 +20,7 @@ import 'chat_message_view.dart';
 import 'chat_tabs.dart';
 import 'mention.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 part 'chat_composer.dart';
 part 'chat_header.dart';
@@ -74,7 +75,9 @@ class _ChatPaneState extends State<ChatPane> {
   Future<void> _attach(Iterable<String> paths) async {
     for (final path in paths) {
       if (_attachments.length >= maxAttachments) {
-        if (mounted) showToast(context, '最多 $maxAttachments 个附件', warn: true);
+        if (mounted) {
+          showToast(context, tr('最多 {0} 个附件', [maxAttachments]), warn: true);
+        }
         return;
       }
       try {
@@ -100,15 +103,19 @@ class _ChatPaneState extends State<ChatPane> {
       final image = await Pasteboard.image;
       if (image == null || !mounted) return;
       final problem = image.length > maxImageBytes
-          ? '图片超过 $maxImageLabel'
+          ? tr('图片超过 {0}', [maxImageLabel])
           : _attachments.length >= maxAttachments
-          ? '最多 $maxAttachments 个附件'
+          ? tr('最多 {0} 个附件', [maxAttachments])
           : null;
       if (problem != null) return showToast(context, problem, warn: true);
       setState(() {
         _attachments = List.unmodifiable([
           ..._attachments,
-          Attachment.image(name: '粘贴的图片.png', mime: 'image/png', bytes: image),
+          Attachment.image(
+            name: tr('粘贴的图片.png'),
+            mime: 'image/png',
+            bytes: image,
+          ),
         ]);
       });
     } on Object {
@@ -293,7 +300,7 @@ class _ChatPaneState extends State<ChatPane> {
 
   void _adopt(PromptVariant variant) {
     widget.vm.proposeVariant(variant);
-    showToast(context, '已标出改动');
+    showToast(context, tr('已标出改动'));
   }
 
   /// [replacing] 是这条回复讨论的那一段成稿;为 null 表示换整篇。
@@ -303,7 +310,7 @@ class _ChatPaneState extends State<ChatPane> {
       page: draft.page,
       replacing: replacing,
     );
-    showToast(context, problem ?? '已放到左侧', warn: problem != null);
+    showToast(context, problem ?? tr('已放到左侧'), warn: problem != null);
   }
 
   /// 把回复里新写的 Skill 加进(或替换进)用户的 Skills。
@@ -319,7 +326,7 @@ class _ChatPaneState extends State<ChatPane> {
     if (!mounted) return;
     // 卡片上的状态是照着 Skills 列表算的,加完要重画一次。
     setState(() {});
-    showToast(context, problem ?? '已加入 Skills', warn: problem != null);
+    showToast(context, problem ?? tr('已加入 Skills'), warn: problem != null);
   }
 
   DraftStatus _draftStatus(String text) {
@@ -450,9 +457,9 @@ class _ChatPaneState extends State<ChatPane> {
         ChatTabs(vm: widget.vm),
         Expanded(
           child: messages.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
-                    '描述画面,或贴上要改的提示词',
+                    tr('描述画面,或贴上要改的提示词'),
                     style: TextStyle(fontSize: 13, color: PennaColors.slate400),
                   ),
                 )
@@ -482,11 +489,11 @@ class _ChatPaneState extends State<ChatPane> {
                           duration: const Duration(milliseconds: 160),
                           curve: Curves.easeOutBack,
                           child: Tooltip(
-                            message: '回到底部',
+                            message: tr('回到底部'),
                             child: Material(
                               color: PennaColors.card,
                               elevation: 3,
-                              shape: const CircleBorder(
+                              shape: CircleBorder(
                                 side: BorderSide(color: PennaColors.border),
                               ),
                               child: InkWell(
@@ -495,7 +502,7 @@ class _ChatPaneState extends State<ChatPane> {
                                   _follow = true;
                                   _toBottom();
                                 },
-                                child: const Padding(
+                                child: Padding(
                                   padding: EdgeInsets.all(7),
                                   child: Icon(
                                     Icons.arrow_downward,
@@ -533,7 +540,7 @@ class _ChatPaneState extends State<ChatPane> {
             for (final (i, m) in widget.vm.outbox.indexed)
               _QueuedRow(
                 text: m.text.isEmpty
-                    ? '${m.attachments.length} 个附件'
+                    ? tr('{0} 个附件', [m.attachments.length])
                     : m.text.replaceAll('\n', ' '),
                 onSendNow: () {
                   final problem = widget.vm.sendQueuedNow(i);
@@ -547,7 +554,7 @@ class _ChatPaneState extends State<ChatPane> {
             if (widget.vm.quote != null)
               MentionChip(
                 name: sectionTitle(widget.vm.quote!),
-                prefix: '段 · ',
+                prefix: tr('段 · '),
                 onRemove: () => widget.vm.quoteSection(null),
               ),
             for (final (i, attachment) in _attachments.indexed)

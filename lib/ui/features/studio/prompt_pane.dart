@@ -12,6 +12,9 @@ import 'polish_dialog.dart';
 import 'reverse_model.dart';
 import 'reverse_pane.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
+
+part 'prompt_summary.dart';
 
 /// 顶栏里的小计数,例如「128 字符」。
 class _Stat extends StatelessWidget {
@@ -31,7 +34,7 @@ class _Stat extends StatelessWidget {
           children: [
             TextSpan(
               text: '$value',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: PennaColors.text,
               ),
@@ -39,7 +42,7 @@ class _Stat extends StatelessWidget {
             TextSpan(text: ' $unit'),
           ],
         ),
-        style: const TextStyle(fontSize: 11, color: PennaColors.slate500),
+        style: TextStyle(fontSize: 11, color: PennaColors.slate500),
       ),
     );
   }
@@ -133,7 +136,11 @@ class _DraftSectionState extends State<_DraftSection> {
   }
 
   Future<void> _clear(BuildContext context) async {
-    if (await confirmDelete(context, '清空工作区?', '当前成稿会记进历史提示词,可以从那里放回来。')) {
+    if (await confirmDelete(
+      context,
+      tr('清空工作区?'),
+      tr('当前成稿会记进历史提示词,可以从那里放回来。'),
+    )) {
       vm.clearDraft();
     }
   }
@@ -144,13 +151,13 @@ class _DraftSectionState extends State<_DraftSection> {
     final picked = await showSaveDialog(context, archive.categories);
     if (picked == null) return;
     archive.add(text: text, title: picked.title, category: picked.category);
-    if (context.mounted) showToast(context, '已存进档案库');
+    if (context.mounted) showToast(context, tr('已存进档案库'));
   }
 
   /// 把眼前这个系列的每一页都存进档案库:一页一条,分类就是系列的名字。
   void _saveSeries(BuildContext context) {
     final prompts = vm.seriesPrompts;
-    if (prompts.isEmpty) return showToast(context, '这个系列还是空的', warn: true);
+    if (prompts.isEmpty) return showToast(context, tr('这个系列还是空的'), warn: true);
     final category = vm.seriesName(vm.series);
     final now = DateTime.now();
     // 档案库里新的在前:倒着存,第 1 页才排在最上面。时间各错开一点,编号不会撞。
@@ -162,7 +169,7 @@ class _DraftSectionState extends State<_DraftSection> {
         now: now.add(Duration(microseconds: i)),
       );
     }
-    showToast(context, '「$category」的 ${prompts.length} 页已存进档案库');
+    showToast(context, tr('「{0}」的 {1} 页已存进档案库', [category, prompts.length]));
   }
 
   Future<void> _pin(BuildContext context) async {
@@ -181,135 +188,170 @@ class _DraftSectionState extends State<_DraftSection> {
     }
   }
 
+  /// 工作区顶栏。[label] 放不下时把按钮上的字变成空串,[tip] 那时把名字放进悬停提示。
+  Widget _toolbar(
+    BuildContext context,
+    String prompt,
+    int words,
+    bool series,
+    String Function(String) label,
+    String? Function(String, [String?]) tip,
+  ) {
+    return PennaBar(
+      color: PennaColors.card,
+      children: [
+        CircleAvatar(radius: 4, backgroundColor: PennaColors.amber),
+        const SizedBox(width: 6),
+        Text(
+          tr('工作区'),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(width: 10),
+        // 窄的时候计数先让位,再是状态;放不下就不画,按钮始终完整。
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final chip = vm.pending != null && box.maxWidth >= _chipRoom;
+              final stats =
+                  prompt.isNotEmpty &&
+                  box.maxWidth >= _statsRoom + (chip ? _chipRoom : 0);
+              return ClipRect(
+                child: Row(
+                  children: [
+                    if (stats) ...[
+                      _Stat(value: prompt.length, unit: tr('字符')),
+                      const SizedBox(width: 6),
+                      _Stat(value: words, unit: tr('词')),
+                      const SizedBox(width: 6),
+                    ],
+                    if (chip)
+                      Flexible(child: _PendingChip(more: vm.queuedDiffs)),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        PennaButton(
+          label: label(tr('清空')),
+          icon: Icons.cleaning_services_outlined,
+          borderColor: PennaColors.border,
+          tooltip: tip(tr('清空'), tr('清空工作区,开始写下一条')),
+          onPressed: vm.body.isEmpty ? null : () => _clear(context),
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: label(tr('保存')),
+          icon: Icons.bookmark_add_outlined,
+          borderColor: PennaColors.border,
+          tooltip: tip(tr('保存'), tr('存进档案库')),
+          onPressed: prompt.isEmpty ? null : () => _save(context),
+        ),
+        // 这个系列不止一页时滑出来:把整个系列一起存。
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.centerLeft,
+          child: series
+              ? Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: PopIn(
+                    child: PennaButton(
+                      label: label(tr('保存系列')),
+                      icon: Icons.collections_bookmark_outlined,
+                      background: PennaColors.accent,
+                      foreground: Colors.white,
+                      tooltip: tip(tr('保存系列'), tr('把这个系列的每一页都存进档案库')),
+                      onPressed: () => _saveSeries(context),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: label(tr('固定')),
+          icon: Icons.push_pin_outlined,
+          borderColor: PennaColors.border,
+          tooltip: tip(tr('固定'), tr('固定选中的文字,没选就新增一段')),
+          onPressed: vm.pending != null ? null : () => _pin(context),
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: label(tr('润色')),
+          icon: Icons.auto_fix_high,
+          borderColor: PennaColors.border,
+          tooltip: tip(tr('润色'), tr('改写选中的一段,没选就是整栏')),
+          onPressed: prompt.isEmpty || vm.isPolishing || vm.pending != null
+              ? null
+              : () => _polish(context),
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: label(tr('翻译')),
+          icon: Icons.translate,
+          borderColor: PennaColors.border,
+          tooltip: tip(tr('翻译')),
+          onPressed: prompt.isEmpty || vm.isTranslating
+              ? null
+              : () => _translate(context),
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: label(tr('合并')),
+          icon: Icons.merge_type,
+          borderColor: PennaColors.border,
+          tooltip: tip(tr('合并'), tr('去掉分段,合成一整段文字')),
+          onPressed:
+              vm.pending == null &&
+                  vm.blocks.any(
+                    (b) => !b.pinned && sectionSpans(b.text).isNotEmpty,
+                  )
+              ? vm.unsection
+              : null,
+        ),
+        const SizedBox(width: 6),
+        PennaButton(
+          label: label(_zhOpen ? tr('收起') : tr('展开')),
+          icon: _zhOpen ? Icons.unfold_less : Icons.unfold_more,
+          borderColor: PennaColors.border,
+          tooltip: tip(_zhOpen ? tr('收起') : tr('展开'), tr('展开或收起每一段的中文')),
+          onPressed: vm.body.contains(zhMark)
+              ? () => setState(() => _zhOpen = !_zhOpen)
+              : null,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final prompt = vm.finalPrompt;
     final words = RegExp(r'\S+').allMatches(prompt).length;
+    final series = vm.seriesLength > 1;
     return Column(
       children: [
-        PennaBar(
-          color: PennaColors.card,
-          children: [
-            const CircleAvatar(radius: 4, backgroundColor: PennaColors.amber),
-            const SizedBox(width: 6),
-            const Text(
-              '工作区',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(width: 10),
-            // 窄的时候计数先让位,再是状态;放不下就不画,按钮始终完整。
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, box) {
-                  final chip = vm.pending != null && box.maxWidth >= _chipRoom;
-                  final stats =
-                      prompt.isNotEmpty &&
-                      box.maxWidth >= _statsRoom + (chip ? _chipRoom : 0);
-                  return ClipRect(
-                    child: Row(
-                      children: [
-                        if (stats) ...[
-                          _Stat(value: prompt.length, unit: '字符'),
-                          const SizedBox(width: 6),
-                          _Stat(value: words, unit: '词'),
-                          const SizedBox(width: 6),
-                        ],
-                        if (chip)
-                          Flexible(child: _PendingChip(more: vm.queuedDiffs)),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            PennaButton(
-              label: '清空',
-              icon: Icons.cleaning_services_outlined,
-              borderColor: PennaColors.border,
-              tooltip: '清空工作区,开始写下一条',
-              onPressed: vm.body.isEmpty ? null : () => _clear(context),
-            ),
-            const SizedBox(width: 6),
-            PennaButton(
-              label: '保存',
-              icon: Icons.bookmark_add_outlined,
-              borderColor: PennaColors.border,
-              tooltip: '存进档案库',
-              onPressed: prompt.isEmpty ? null : () => _save(context),
-            ),
-            // 这个系列不止一页时滑出来:把整个系列一起存。
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.centerLeft,
-              child: vm.seriesLength > 1
-                  ? Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: PopIn(
-                        child: PennaButton(
-                          label: '保存系列',
-                          icon: Icons.collections_bookmark_outlined,
-                          background: PennaColors.accent,
-                          foreground: Colors.white,
-                          tooltip: '把这个系列的每一页都存进档案库',
-                          onPressed: () => _saveSeries(context),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            const SizedBox(width: 6),
-            PennaButton(
-              label: '固定',
-              icon: Icons.push_pin_outlined,
-              borderColor: PennaColors.border,
-              tooltip: '固定选中的文字,没选就新增一段',
-              onPressed: vm.pending != null ? null : () => _pin(context),
-            ),
-            const SizedBox(width: 6),
-            PennaButton(
-              label: '润色',
-              icon: Icons.auto_fix_high,
-              borderColor: PennaColors.border,
-              tooltip: '改写选中的一段,没选就是整栏',
-              onPressed: prompt.isEmpty || vm.isPolishing || vm.pending != null
-                  ? null
-                  : () => _polish(context),
-            ),
-            const SizedBox(width: 6),
-            PennaButton(
-              label: '翻译',
-              icon: Icons.translate,
-              borderColor: PennaColors.border,
-              onPressed: prompt.isEmpty || vm.isTranslating
-                  ? null
-                  : () => _translate(context),
-            ),
-            const SizedBox(width: 6),
-            PennaButton(
-              label: '合并',
-              icon: Icons.merge_type,
-              borderColor: PennaColors.border,
-              tooltip: '去掉分段,合成一整段文字',
-              onPressed:
-                  vm.pending == null &&
-                      vm.blocks.any(
-                        (b) => !b.pinned && sectionSpans(b.text).isNotEmpty,
-                      )
-                  ? vm.unsection
-                  : null,
-            ),
-            const SizedBox(width: 6),
-            PennaButton(
-              label: _zhOpen ? '收起' : '展开',
-              icon: _zhOpen ? Icons.unfold_less : Icons.unfold_more,
-              borderColor: PennaColors.border,
-              tooltip: '展开或收起每一段的中文',
-              onPressed: vm.body.contains(zhMark)
-                  ? () => setState(() => _zhOpen = !_zhOpen)
-                  : null,
-            ),
-          ],
+        // 按钮的字放不下时(窄窗口、英文这类长的语言)只留图标,名字挪进悬停提示。
+        LayoutBuilder(
+          builder: (context, box) {
+            final labels = [
+              tr('清空'),
+              tr('保存'),
+              if (series) tr('保存系列'),
+              tr('固定'),
+              tr('润色'),
+              tr('翻译'),
+              tr('合并'),
+              _zhOpen ? tr('收起') : tr('展开'),
+            ];
+            // 左右边距、圆点和「工作区」三个字大约占 140。
+            final compact =
+                box.maxWidth < 140 + pennaButtonsWidth(context, labels);
+            String label(String s) => compact ? '' : s;
+            String? tip(String s, [String? more]) =>
+                compact ? (more == null ? s : '$s · $more') : more;
+            return _toolbar(context, prompt, words, series, label, tip);
+          },
         ),
         Expanded(
           child: ColoredBox(
@@ -377,7 +419,7 @@ class _PendingChip extends StatelessWidget {
       radius: 99,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Text(
-        more == 0 ? 'Diff 待合并' : 'Diff 待合并 · 后面还有 $more 处',
+        more == 0 ? tr('Diff 待合并') : tr('Diff 待合并 · 后面还有 {0} 处', [more]),
         overflow: TextOverflow.ellipsis,
         style: monoStyle.copyWith(fontSize: 11, color: PennaColors.lockText),
       ),
@@ -404,10 +446,10 @@ class _TranslationCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.translate, size: 13, color: PennaColors.primary),
+              Icon(Icons.translate, size: 13, color: PennaColors.primary),
               const SizedBox(width: 4),
               Text(
-                engine == null ? '中文对照' : '中文对照 · $engine',
+                engine == null ? tr('中文对照') : tr('中文对照 · {0}', [engine]),
                 style: draftLabelStyle,
               ),
             ],
@@ -416,349 +458,10 @@ class _TranslationCard extends StatelessWidget {
           SelectableText(
             contextMenuBuilder: pennaTextMenu,
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               height: 1.5,
               color: PennaColors.slate700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummarySection extends StatefulWidget {
-  const _SummarySection({
-    required this.vm,
-    required this.reverse,
-    this.onSendToAgent,
-  });
-
-  final StudioViewModel vm;
-  final ReverseModel reverse;
-  final ValueChanged<String>? onSendToAgent;
-
-  @override
-  State<_SummarySection> createState() => _SummarySectionState();
-}
-
-class _SummarySectionState extends State<_SummarySection> {
-  /// 现在看的是「图像反推」而不是「成稿汇总」。
-  bool _reversing = false;
-
-  StudioViewModel get vm => widget.vm;
-
-  @override
-  Widget build(BuildContext context) {
-    final prompt = vm.finalPrompt;
-    return Column(
-      children: [
-        const Divider(height: 1),
-        PennaBar(
-          children: [
-            _Tab(
-              icon: Icons.inventory_2_outlined,
-              label: '成稿汇总',
-              selected: !_reversing,
-              onTap: () => setState(() => _reversing = false),
-            ),
-            const SizedBox(width: 6),
-            _Tab(
-              icon: Icons.image_search,
-              label: '图像反推',
-              selected: _reversing,
-              onTap: () => setState(() => _reversing = true),
-            ),
-          ],
-        ),
-        Expanded(
-          child: ColoredBox(
-            color: PennaColors.editorBg,
-            child: _reversing
-                ? ReversePane(
-                    model: widget.reverse,
-                    onSend: widget.onSendToAgent,
-                  )
-                : prompt.isEmpty && vm.tags.isEmpty && vm.promptLog.isEmpty
-                ? const Center(
-                    child: Text(
-                      '暂无内容',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: PennaColors.slate400,
-                      ),
-                    ),
-                  )
-                : SmoothScroller(
-                    builder: (controller) => ListView(
-                      controller: controller,
-                      padding: const EdgeInsets.all(14),
-                      children: [
-                        if (vm.tags.isNotEmpty) ...[
-                          _CopyCard(
-                            icon: Icons.sell_outlined,
-                            iconColor: PennaColors.amber,
-                            title: 'Danbooru 风格 Tag 汇总',
-                            text: vm.tags,
-                            toast: '已复制全部 Tag',
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        if (prompt.isNotEmpty)
-                          _CopyCard(
-                            icon: Icons.verified_outlined,
-                            iconColor: PennaColors.accent,
-                            title: vm.pages.length > 1
-                                ? '最终提示词 · ${vm.seriesName(vm.series)}'
-                                      ' · 第 ${vm.pageNumber(vm.pageIndex)} 页'
-                                : '最终提示词',
-                            text: prompt,
-                            toast: '已复制',
-                            onCopied: vm.recordPrompt,
-                          ),
-                        if (vm.promptLog.isNotEmpty) ...[
-                          const SizedBox(height: 14),
-                          const Text('历史提示词', style: draftLabelStyle),
-                          for (final record in vm.promptLog) ...[
-                            const SizedBox(height: 8),
-                            _HistoryCard(
-                              key: ObjectKey(record),
-                              vm: vm,
-                              record: record,
-                            ),
-                          ],
-                        ],
-                      ],
-                    ),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 下半区顶上的一个页签。
-class _Tab extends StatelessWidget {
-  const _Tab({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? PennaColors.primary : PennaColors.slate500;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: selected ? PennaColors.card : PennaColors.slate50,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: selected ? PennaColors.border : PennaColors.slate50,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? PennaColors.text : color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 历史提示词收起时最多显示几行。
-const _historyLines = 3;
-
-/// 历史提示词里的一条:当时的成稿,可以放回工作区或复制;长的可以展开看全。
-class _HistoryCard extends StatefulWidget {
-  const _HistoryCard({super.key, required this.vm, required this.record});
-
-  final StudioViewModel vm;
-  final PromptRecord record;
-
-  @override
-  State<_HistoryCard> createState() => _HistoryCardState();
-}
-
-class _HistoryCardState extends State<_HistoryCard> {
-  bool _open = false;
-
-  StudioViewModel get vm => widget.vm;
-  PromptRecord get record => widget.record;
-
-  @override
-  Widget build(BuildContext context) {
-    // 复制和预览都用干净的提示词:标注和中文对照不带。
-    final clean = stripSectionLabels(record.text);
-    return PennaCard(
-      padding: const EdgeInsets.fromLTRB(10, 6, 6, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  shortTime(record.time),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: PennaColors.slate400,
-                  ),
-                ),
-              ),
-              PennaButton(
-                label: '放回成稿',
-                icon: Icons.keyboard_double_arrow_up,
-                onPressed: () {
-                  final problem = vm.restorePrompt(record);
-                  if (problem != null) showToast(context, problem, warn: true);
-                },
-              ),
-              PennaButton(
-                label: '复制这条',
-                icon: Icons.content_copy,
-                onPressed: () => copyWithToast(context, clean, '已复制'),
-              ),
-              IconButton(
-                tooltip: '删除这条',
-                iconSize: 14,
-                visualDensity: VisualDensity.compact,
-                color: PennaColors.slate400,
-                icon: const Icon(Icons.close),
-                onPressed: () => vm.deletePrompt(record),
-              ),
-            ],
-          ),
-          LayoutBuilder(
-            builder: (context, box) {
-              final style = monoStyle.copyWith(fontSize: 11.5);
-              // 收起时放得下就不用「展开」按钮。
-              final long = (TextPainter(
-                text: TextSpan(text: clean, style: style),
-                maxLines: _historyLines,
-                textDirection: TextDirection.ltr,
-              )..layout(maxWidth: box.maxWidth)).didExceedMaxLines;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 160),
-                    curve: Curves.easeOut,
-                    alignment: Alignment.topLeft,
-                    child: Text(
-                      clean,
-                      maxLines: _open ? null : _historyLines,
-                      overflow: _open ? null : TextOverflow.ellipsis,
-                      style: style,
-                    ),
-                  ),
-                  if (long)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: PennaButton(
-                        label: _open ? '收起' : '展开',
-                        icon: _open ? Icons.expand_less : Icons.expand_more,
-                        background: Colors.transparent,
-                        foreground: PennaColors.slate500,
-                        onPressed: () => setState(() => _open = !_open),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CopyCard extends StatelessWidget {
-  const _CopyCard({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.text,
-    required this.toast,
-    this.onCopied,
-  });
-
-  /// 点了复制之后顺带做的事(记进历史提示词)。
-  final VoidCallback? onCopied;
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String text;
-  final String toast;
-
-  @override
-  Widget build(BuildContext context) {
-    return PennaCard(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: iconColor),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              PennaButton(
-                label: '一键复制',
-                icon: Icons.content_copy,
-                background: PennaColors.primaryBg,
-                foreground: PennaColors.primary,
-                borderColor: PennaColors.primaryBorder,
-                onPressed: () {
-                  onCopied?.call();
-                  copyWithToast(context, text, toast);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          PennaCard(
-            color: PennaColors.slate50,
-            radius: 4,
-            child: SelectableText(
-              contextMenuBuilder: pennaTextMenu,
-              text,
-              style: monoStyle.copyWith(fontSize: 11.5),
             ),
           ),
         ],

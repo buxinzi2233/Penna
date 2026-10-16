@@ -5,6 +5,7 @@ import '../../../data/services/config_service.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'settings_sections.dart';
+import '../../../l10n/l10n.dart';
 
 /// 翻译:引擎按顺序使用,失败自动换下一个。
 class TranslateSection extends StatelessWidget {
@@ -25,15 +26,15 @@ class TranslateSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('翻译', '按顺序使用,失败自动换下一个'),
+        SectionHeading(tr('翻译'), tr('按顺序使用,失败自动换下一个')),
         PennaCard(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               Expanded(
                 child: _NumberStepper(
-                  label: '每个引擎尝试',
-                  unit: '次',
+                  label: tr('每个引擎尝试'),
+                  unit: tr('次'),
                   value: cfg.mtAttempts,
                   min: minMtAttempts,
                   max: maxMtAttempts,
@@ -44,8 +45,8 @@ class TranslateSection extends StatelessWidget {
               const SizedBox(width: 24),
               Expanded(
                 child: _NumberStepper(
-                  label: '单次超时',
-                  unit: '秒',
+                  label: tr('单次超时'),
+                  unit: tr('秒'),
                   value: cfg.mtTimeoutSeconds,
                   step: 5,
                   min: minMtTimeoutSeconds,
@@ -84,14 +85,14 @@ class TranslateSection extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('LLM 意译', style: titleStyle),
+                    Text(tr('LLM 意译'), style: titleStyle),
                     SizedBox(height: 2),
                     Text(
-                      '使用当前模型',
+                      tr('使用当前模型'),
                       style: TextStyle(
                         fontSize: 12,
                         color: PennaColors.slate500,
@@ -139,7 +140,7 @@ class _EngineRow extends StatelessWidget {
             children: [
               ReorderableDragStartListener(
                 index: index,
-                child: const MouseRegion(
+                child: MouseRegion(
                   cursor: SystemMouseCursors.grab,
                   child: Padding(
                     padding: EdgeInsets.all(8),
@@ -158,7 +159,7 @@ class _EngineRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(engine.label, style: titleStyle),
+              Text(tr(engine.label), style: titleStyle),
               const SizedBox(width: 8),
               PennaCard(
                 color: free ? PennaColors.diffAdd : PennaColors.slate100,
@@ -166,7 +167,7 @@ class _EngineRow extends StatelessWidget {
                 radius: 99,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
                 child: Text(
-                  free ? '免费' : '需凭据',
+                  free ? tr('免费') : tr('需凭据'),
                   style: TextStyle(
                     fontSize: 11,
                     color: free
@@ -269,7 +270,7 @@ class _MtFieldInput extends StatelessWidget {
     final cfg = service.config;
     final key = engine.keyOf(field);
     return PennaField(
-      label: field.label,
+      label: tr(field.label),
       obscure: field.secret,
       value: (field.secret ? cfg.secrets[key] : cfg.fields[key]) ?? '',
       onChanged: (v) => service.update(

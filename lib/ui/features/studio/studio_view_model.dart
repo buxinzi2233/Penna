@@ -18,6 +18,7 @@ import '../../../data/services/skill_store.dart';
 import '../../../data/services/translate_chain.dart';
 import '../../../data/services/translate_engines.dart';
 import 'chat_message.dart';
+import '../../../l10n/l10n.dart';
 
 export 'chat_message.dart';
 
@@ -133,7 +134,7 @@ class StudioViewModel extends ChangeNotifier {
         ..renameSync(file.path);
     } on FileSystemException catch (e) {
       // 这次没存上,下次有改动会再试。
-      debugPrint('保存工作台失败:${e.message}');
+      debugPrint(tr('保存工作台失败:{0}', [e.message]));
     }
   }
 
@@ -186,7 +187,7 @@ class StudioViewModel extends ChangeNotifier {
   /// 回滚本身也记一笔,所以滚错了还能再滚回来。生成中不能回滚,返回原因。
   String? rollback(int index) {
     if (index < 0 || index >= _actions.length) return null;
-    if (isStreaming) return '正在生成,请先停止当前回复';
+    if (isStreaming) return tr('正在生成,请先停止当前回复');
     final target = _undo[index];
     final now = _snapshot();
     final undone = _actions[index].text;
@@ -210,13 +211,14 @@ class StudioViewModel extends ChangeNotifier {
     // 被撤销的那几条不留了,换成「回滚」这一条。
     _actions = List.unmodifiable(_actions.skip(index + 1));
     _undo = List.unmodifiable(_undo.skip(index + 1));
-    _log('回滚到「$undone」之前', before: now);
+    _log(tr('回滚到「{0}」之前', [undone]), before: now);
     notifyListeners();
     return null;
   }
 
   /// 眼前这一页叫什么,记操作时用:「系列 1 · 第 2 页」。
-  String get _here => '${seriesName(series)} · 第 ${pageNumber(_page)} 页';
+  String get _here =>
+      tr('{0} · 第 {1} 页', [seriesName(series), pageNumber(_page)]);
 
   String _chatId = _newId();
   List<ChatSession> _archive = const [];

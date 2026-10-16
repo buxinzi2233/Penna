@@ -6,13 +6,14 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'page_strip.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 part 'body_diff.dart';
 part 'body_editor.dart';
 part 'body_pins.dart';
 part 'body_section_card.dart';
 
-const draftLabelStyle = TextStyle(
+TextStyle get draftLabelStyle => TextStyle(
   fontSize: 11,
   fontWeight: FontWeight.w600,
   color: PennaColors.slate500,
@@ -24,7 +25,9 @@ typedef _Tint = ({Color bg, Color border, Color text});
 typedef _SectionDrag = ({int part, int span});
 
 /// 分段框的配色,按段的先后轮着用;避开琥珀色,那是固定区的。
-const _sectionTints = <_Tint>[
+List<_Tint> get _sectionTints => PennaColors.isDark ? _darkTints : _lightTints;
+
+const _lightTints = <_Tint>[
   (bg: Color(0xFFEFF6FF), border: Color(0xFFBFDBFE), text: Color(0xFF1D4ED8)),
   (bg: Color(0xFFECFDF5), border: Color(0xFFA7F3D0), text: Color(0xFF047857)),
   (bg: Color(0xFFF5F3FF), border: Color(0xFFDDD6FE), text: Color(0xFF6D28D9)),
@@ -33,10 +36,19 @@ const _sectionTints = <_Tint>[
   (bg: Color(0xFFFDF4FF), border: Color(0xFFF5D0FE), text: Color(0xFFA21CAF)),
 ];
 
-const _labelHint = '例如 主体、服装、光影';
+const _darkTints = <_Tint>[
+  (bg: Color(0xFF172238), border: Color(0xFF2B4270), text: Color(0xFF93B4FF)),
+  (bg: Color(0xFF12291F), border: Color(0xFF225A41), text: Color(0xFF6EE7B7)),
+  (bg: Color(0xFF221B36), border: Color(0xFF45366E), text: Color(0xFFC4B5FD)),
+  (bg: Color(0xFF2C171C), border: Color(0xFF64303A), text: Color(0xFFFDA4AF)),
+  (bg: Color(0xFF10272C), border: Color(0xFF1F5560), text: Color(0xFF67E8F9)),
+  (bg: Color(0xFF2A1830), border: Color(0xFF5D3266), text: Color(0xFFF0ABFC)),
+];
+
+String get _labelHint => tr('例如 主体、服装、光影');
 
 /// 没有标注的那段用的中性色。
-const _Tint _plainTint = (
+_Tint get _plainTint => (
   bg: PennaColors.slate50,
   border: PennaColors.border,
   text: PennaColors.slate500,
@@ -48,12 +60,12 @@ Future<String?> showPinDialog(BuildContext context) {
   return showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('添加固定区', style: TextStyle(fontSize: 16)),
+      title: Text(tr('添加固定区'), style: TextStyle(fontSize: 16)),
       content: SizedBox(
         width: 420,
         child: PennaField(
-          label: '固定内容',
-          hint: '例如 masterpiece, best quality,',
+          label: tr('固定内容'),
+          hint: tr('例如 masterpiece, best quality,'),
           maxLines: 3,
           value: '',
           onChanged: (v) => text = v,
@@ -62,11 +74,11 @@ Future<String?> showPinDialog(BuildContext context) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(tr('取消')),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, text),
-          child: const Text('添加'),
+          child: Text(tr('添加')),
         ),
       ],
     ),
@@ -142,10 +154,10 @@ class BodyCard extends StatelessWidget {
       // 选中一截文字后右键菜单里多出来的几项;「脱离」只有分段框里才有,
       // 「建立分段」只有普通文字里才有。
       selectionMenu: [
-        ('固定选中的', Icons.push_pin_outlined, vm.pinSelection),
+        (tr('固定选中的'), Icons.push_pin_outlined, vm.pinSelection),
         if (onPolish != null)
           (
-            '润色选中的',
+            tr('润色选中的'),
             Icons.auto_fix_high,
             () {
               final range = vm.bodySelection;
@@ -153,11 +165,11 @@ class BodyCard extends StatelessWidget {
             },
           ),
         if (onTranslateSelection != null)
-          ('翻译选中的', Icons.translate, onTranslateSelection!),
-        if (detach) ('脱离选中的', Icons.call_split, vm.detachSelection),
+          (tr('翻译选中的'), Icons.translate, onTranslateSelection!),
+        if (detach) (tr('脱离选中的'), Icons.call_split, vm.detachSelection),
         if (!detach)
           (
-            '建立分段',
+            tr('建立分段'),
             Icons.dashboard_customize_outlined,
             () => _sectionSelection(context),
           ),
@@ -195,7 +207,7 @@ class BodyCard extends StatelessWidget {
                       ? null
                       : _SectionHandle(
                           drag: (part: p.index, span: i),
-                          label: s.label.isEmpty ? '未标注' : s.label,
+                          label: s.label.isEmpty ? tr('未标注') : s.label,
                           tint: s.label.isEmpty
                               ? _plainTint
                               : _sectionTints[(tintFrom + i) %
@@ -210,7 +222,7 @@ class BodyCard extends StatelessWidget {
                   onRename: () async {
                     final name = await askName(
                       context,
-                      '分段的名字',
+                      tr('分段的名字'),
                       s.label,
                       hint: _labelHint,
                     );
@@ -218,7 +230,9 @@ class BodyCard extends StatelessWidget {
                     if (!vm.renameSection(p.index, i, name)) {
                       showToast(
                         context,
-                        sectionLabel(name).isEmpty ? '名字不能为空' : '已经有叫这个名字的段了',
+                        sectionLabel(name).isEmpty
+                            ? tr('名字不能为空')
+                            : tr('已经有叫这个名字的段了'),
                         warn: true,
                       );
                     }
@@ -270,15 +284,15 @@ class BodyCard extends StatelessWidget {
   /// 把选中的普通文字建成一段:先问名字。问的时候输入框会失焦,选区先记下来。
   Future<void> _sectionSelection(BuildContext context) async {
     final selection = vm.bodySelection;
-    final name = await askName(context, '新分段的名字', '', hint: _labelHint);
+    final name = await askName(context, tr('新分段的名字'), '', hint: _labelHint);
     if (name == null || !context.mounted) return;
     vm.bodySelection = selection;
     if (sectionLabel(name).isEmpty) {
-      showToast(context, '名字不能为空', warn: true);
+      showToast(context, tr('名字不能为空'), warn: true);
     } else if (vm.sectionNameTaken(name)) {
-      showToast(context, '已经有叫这个名字的段了', warn: true);
+      showToast(context, tr('已经有叫这个名字的段了'), warn: true);
     } else if (!vm.sectionSelection(name)) {
-      showToast(context, '只能把普通文字建成分段', warn: true);
+      showToast(context, tr('只能把普通文字建成分段'), warn: true);
     }
   }
 
@@ -364,14 +378,14 @@ class BodyCard extends StatelessWidget {
   /// 某一段自己的「采纳」「驳回」。
   List<Widget> _sectionActions(String label) => [
     PennaButton(
-      label: '采纳',
+      label: tr('采纳'),
       background: PennaColors.diffAdd,
       foreground: PennaColors.diffAddText,
       onPressed: () => vm.acceptSection(label),
     ),
     const SizedBox(width: 4),
     PennaButton(
-      label: '驳回',
+      label: tr('驳回'),
       background: PennaColors.diffDel,
       foreground: PennaColors.diffDelText,
       onPressed: () => vm.rejectSection(label),

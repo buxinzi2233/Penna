@@ -5,6 +5,8 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 
+import '../../l10n/l10n.dart';
+
 /// 一个机翻引擎:用 [client] 把 [text] 从 [from] 译到 [to]。
 /// 语言用 'en' / 'zh';各引擎自己换成它认的代码。
 typedef Translator = Future<String> Function(
@@ -49,35 +51,35 @@ Future<TranslateResult> translateWithFailover({
   required int attempts,
   required Duration timeout,
 }) async {
-  if (chain.isEmpty) throw const TranslateException('没有启用翻译引擎');
+  if (chain.isEmpty) throw TranslateException(tr('没有启用翻译引擎'));
   final failures = <String>[];
   for (final (id, run) in chain) {
     for (var attempt = 1; attempt <= attempts; attempt++) {
       final client = HttpClient()..connectionTimeout = timeout;
       try {
         final out = await run(client, text, from, to).timeout(timeout);
-        if (out.trim().isEmpty) throw const TranslateException('返回为空');
+        if (out.trim().isEmpty) throw TranslateException(tr('返回为空'));
         return TranslateResult(out, id, List.unmodifiable(failures));
       } on TranslateConfigException catch (e) {
         failures.add('$id:${e.message}');
         break;
       } on Object catch (e) {
-        failures.add('$id 第 $attempt 次:${_brief(e)}');
+        failures.add(tr('{0} 第 {1} 次:{2}', [id, attempt, _brief(e)]));
       } finally {
         // 超时后请求还挂着,强制关掉免得占着连接。
         client.close(force: true);
       }
     }
   }
-  throw TranslateException('翻译失败\n${failures.join('\n')}');
+  throw TranslateException(tr('翻译失败\n{0}', [failures.join('\n')]));
 }
 
 /// 认不出的异常只报类型:原始文本可能带着 URL 里的 Key。
 String _brief(Object e) => switch (e) {
   TranslateException() => e.message,
-  TimeoutException() => '超时',
-  SocketException() => '连不上',
-  HandshakeException() => 'HTTPS 握手失败',
+  TimeoutException() => tr('超时'),
+  SocketException() => tr('连不上'),
+  HandshakeException() => tr('HTTPS 握手失败'),
   _ => '${e.runtimeType}',
 };
 
@@ -96,7 +98,7 @@ Future<Object?> _send(HttpClientRequest request, [String? body]) async {
   try {
     return jsonDecode(text);
   } on FormatException {
-    throw const TranslateException('返回的不是 JSON');
+    throw TranslateException(tr('返回的不是 JSON'));
   }
 }
 
@@ -132,7 +134,7 @@ Future<String> googleFree(
     {'q': text},
   );
   final parts = json is List && json.isNotEmpty ? json.first : null;
-  if (parts is! List) throw const TranslateException('返回格式不认识');
+  if (parts is! List) throw TranslateException(tr('返回格式不认识'));
   return [
     for (final p in parts)
       if (p is List && p.isNotEmpty && p.first is String) p.first as String,
@@ -160,14 +162,14 @@ Future<String> myMemory(
     final json = await _send(request);
     if (json is! Map || json['responseStatus'] != 200) {
       final detail = json is Map ? json['responseDetails'] : null;
-      throw TranslateException(detail is String ? detail : '返回格式不认识');
+      throw TranslateException(detail is String ? detail : tr('返回格式不认识'));
     }
     final data = json['responseData'];
     final piece = data is Map ? data['translatedText'] : null;
-    if (piece is! String) throw const TranslateException('返回格式不认识');
+    if (piece is! String) throw TranslateException(tr('返回格式不认识'));
     // 额度用完时它照样回 200,只是把提示塞在译文里。
     if (piece.startsWith('MYMEMORY WARNING')) {
-      throw const TranslateException('今日免费额度已用完');
+      throw TranslateException(tr('今日免费额度已用完'));
     }
     out.add(piece);
   }
@@ -213,7 +215,7 @@ List<String> splitByBytes(String text, int maxBytes) {
 /// Google Cloud Translation v2(官方,需要 API Key)。
 Translator googleCloud(String apiKey) => (client, text, from, to) async {
   if (apiKey.trim().isEmpty) {
-    throw const TranslateConfigException('没填 API Key');
+    throw TranslateConfigException(tr('没填 API Key'));
   }
   final json = await _postForm(
     client,
@@ -231,7 +233,7 @@ Translator googleCloud(String apiKey) => (client, text, from, to) async {
   final list = data is Map ? data['translations'] : null;
   final first = list is List && list.isNotEmpty ? list.first : null;
   final out = first is Map ? first['translatedText'] : null;
-  if (out is! String) throw const TranslateException('返回格式不认识');
+  if (out is! String) throw TranslateException(tr('返回格式不认识'));
   return out;
 };
 
@@ -239,7 +241,7 @@ Translator googleCloud(String apiKey) => (client, text, from, to) async {
 Translator baidu(String appId, String secret) =>
     (client, text, from, to) async {
       if (appId.trim().isEmpty || secret.trim().isEmpty) {
-        throw const TranslateConfigException('没填 APP ID 或密钥');
+        throw TranslateConfigException(tr('没填 APP ID 或密钥'));
       }
       final salt = '${Random.secure().nextInt(1 << 32)}';
       final sign = md5
@@ -257,14 +259,17 @@ Translator baidu(String appId, String secret) =>
           'sign': sign,
         },
       );
-      if (json is! Map) throw const TranslateException('返回格式不认识');
+      if (json is! Map) throw TranslateException(tr('返回格式不认识'));
       if (json['error_code'] != null) {
         throw TranslateException(
-          '百度报错 ${json['error_code']}:${_clip('${json['error_msg']}')}',
+          tr('百度报错 {0}:{1}', [
+            json['error_code'],
+            _clip('${json['error_msg']}'),
+          ]),
         );
       }
       final list = json['trans_result'];
-      if (list is! List) throw const TranslateException('返回格式不认识');
+      if (list is! List) throw TranslateException(tr('返回格式不认识'));
       return [
         for (final item in list)
           if (item is Map && item['dst'] is String) item['dst'] as String,
@@ -292,7 +297,7 @@ String aliSignature(Map<String, String> params, String secret) {
 /// 阿里云机器翻译通用版(需要 AccessKey ID 和 Secret)。
 Translator ali(String keyId, String secret) => (client, text, from, to) async {
   if (keyId.trim().isEmpty || secret.trim().isEmpty) {
-    throw const TranslateConfigException('没填 AccessKey');
+    throw TranslateConfigException(tr('没填 AccessKey'));
   }
   final now = DateTime.now().toUtc();
   final params = {
@@ -339,7 +344,7 @@ Translator ali(String keyId, String secret) => (client, text, from, to) async {
   final message = json is Map ? json['Message'] : null;
   throw TranslateException(
     message is String
-        ? '阿里报错:${_clip(message)}'
+        ? tr('阿里报错:{0}', [_clip(message)])
         : 'HTTP ${response.statusCode}',
   );
 };

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 
 import '../../core/harness/local/florence.dart';
+import '../../l10n/l10n.dart';
 
 /// 跑 Florence-2 的四个 ONNX 模型:看图 → 文字嵌入 → 编码 → 一个字一个字地解码。
 /// 解码器的缓存(past_key_values)一直留在运行库那边,只把每一步的打分拿回来挑字。
@@ -33,7 +34,7 @@ class FlorenceEngine {
       File('${Directory(dir).parent.path}$sep$florenceTokenizer'),
     ].where((f) => f.existsSync()).firstOrNull;
     if (tokenizerFile == null) {
-      throw const FlorenceException('缺少 tokenizer.json');
+      throw FlorenceException(tr('缺少 tokenizer.json'));
     }
     final ort = OnnxRuntime();
     try {
@@ -57,7 +58,7 @@ class FlorenceEngine {
         },
       );
     } on PlatformException catch (e) {
-      throw FlorenceException('模型加载失败:${_brief(e.message)}');
+      throw FlorenceException(tr('模型加载失败:{0}', [_brief(e.message)]));
     }
   }
 
@@ -114,7 +115,7 @@ class FlorenceEngine {
       final tokens = await _generate(hidden, mask, stale);
       return tokenizer.decode(tokens).trim();
     } on PlatformException catch (e) {
-      throw FlorenceException('推理失败:${_brief(e.message)}');
+      throw FlorenceException(tr('推理失败:{0}', [_brief(e.message)]));
     } finally {
       for (final v in made) {
         await v.dispose();
@@ -198,6 +199,6 @@ Future<List<double>> _floats(OrtValue v) async {
 }
 
 String _brief(String? message) {
-  final text = (message ?? '未知错误').trim();
+  final text = (message ?? tr('未知错误')).trim();
   return text.length > 200 ? '${text.substring(0, 200)}…' : text;
 }

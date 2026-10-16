@@ -16,6 +16,7 @@ import '../../../core/harness/local/tagger.dart';
 import '../../../core/harness/providers/llm_http.dart';
 import '../../../data/services/florence_engine.dart';
 import '../../../data/services/onnx_model.dart';
+import '../../../l10n/l10n.dart';
 
 part 'local_caption.dart';
 part 'local_tagger.dart';
@@ -203,7 +204,7 @@ class LocalModel extends ChangeNotifier {
     try {
       result = await Isolate.run(() => scanModelFolders(roots));
     } on Object catch (e) {
-      debugPrint('扫描模型文件夹失败:${e.runtimeType}');
+      debugPrint(tr('扫描模型文件夹失败:{0}', [e.runtimeType]));
     }
     // 扫的时候文件夹又变了:以后面那次为准。
     if (!identical(roots, modelFolders)) return;
@@ -240,8 +241,8 @@ class LocalModel extends ChangeNotifier {
     List<RemoteFile> files, {
     Map<String, String> headers = const {},
   }) async {
-    if (dir == null) return '没有存放的地方';
-    if (_downloads.containsKey(key)) return '正在下载';
+    if (dir == null) return tr('没有存放的地方');
+    if (_downloads.containsKey(key)) return tr('正在下载');
     final cancel = _cancels[key] = DownloadCancel();
     final sizes = [for (final f in files) f.size];
     final total = sizes.contains(null)
@@ -270,7 +271,7 @@ class LocalModel extends ChangeNotifier {
     } on DownloadException catch (e) {
       problem = e.message;
     } on FileSystemException catch (e) {
-      problem = '存不下来:${e.osError?.message ?? e.message}';
+      problem = tr('存不下来:{0}', [e.osError?.message ?? e.message]);
     }
     _downloads.remove(key);
     _cancels.remove(key);
@@ -285,10 +286,10 @@ class LocalModel extends ChangeNotifier {
     final paths = {for (final f in files) f.path};
     if (server.running &&
         (paths.contains(modelPath) || paths.contains(mmprojPath))) {
-      return '这个模型正在用,先停止服务';
+      return tr('这个模型正在用,先停止服务');
     }
     if (_tagging && paths.any((p) => p.endsWith(taggerModelFile))) {
-      return '正在推理';
+      return tr('正在推理');
     }
     if (paths.any((p) => p.endsWith(taggerModelFile))) _dropTagger();
     if (paths.any((p) => _florenceFor != null && p.startsWith(_florenceFor!))) {
@@ -302,7 +303,7 @@ class LocalModel extends ChangeNotifier {
         }
       }
     } on FileSystemException catch (e) {
-      problem = '删不掉:${e.osError?.message ?? e.message}';
+      problem = tr('删不掉:{0}', [e.osError?.message ?? e.message]);
     }
     // 选着的模型删掉了就不再指着它。
     if (paths.contains(modelPath) || paths.contains(mmprojPath)) {
@@ -331,10 +332,10 @@ class LocalModel extends ChangeNotifier {
       await File(zip.path).delete();
     } on Object catch (e) {
       // 下好的压缩包留着,再点一次直接重新解压。
-      return '运行时解压失败(${e.runtimeType})';
+      return tr('运行时解压失败({0})', [e.runtimeType]);
     }
     notifyListeners();
-    return serverExe == null ? '运行时里没找到 llama-server.exe' : null;
+    return serverExe == null ? tr('运行时里没找到 llama-server.exe') : null;
   }
 
   // —— 存盘 ——
@@ -371,7 +372,7 @@ class LocalModel extends ChangeNotifier {
       file.parent.createSync(recursive: true);
       file.writeAsStringSync(jsonEncode(toJson()));
     } on FileSystemException catch (e) {
-      debugPrint('本地反推的设置没存上:${e.message}');
+      debugPrint(tr('本地反推的设置没存上:{0}', [e.message]));
     }
   }
 
@@ -459,7 +460,7 @@ Future<({Uint8List rgba, int width, int height})> decodeImage(
   codec.dispose();
   descriptor.dispose();
   buffer.dispose();
-  if (data == null) throw const OnnxException('读不了这张图');
+  if (data == null) throw OnnxException(tr('读不了这张图'));
   return (
     rgba: data.buffer.asUint8List(),
     width: fit.width,

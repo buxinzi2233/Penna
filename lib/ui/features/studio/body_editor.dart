@@ -123,8 +123,8 @@ class _BodyEditorState extends State<_BodyEditor> {
     style: monoStyle,
     contextMenuBuilder: (context, state) =>
         pennaTextMenu(context, state, extra: widget.selectionMenu),
-    decoration: const InputDecoration(
-      hintText: '正面提示词…',
+    decoration: InputDecoration(
+      hintText: tr('正面提示词…'),
       hintStyle: TextStyle(color: PennaColors.slate400),
       border: InputBorder.none,
       isDense: true,

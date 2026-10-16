@@ -46,7 +46,7 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: PennaColors.card,
         border: Border(top: BorderSide(color: PennaColors.border)),
       ),
@@ -71,15 +71,16 @@ class _Composer extends StatelessWidget {
               runSpacing: 6,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text(
-                  '快捷操作:',
+                Text(
+                  tr('快捷操作:'),
                   style: TextStyle(fontSize: 11, color: PennaColors.slate400),
                 ),
                 for (final action in quickActions)
                   PennaButton(
-                    label: action.label,
+                    // 默认的两个按界面语言翻译,自己加的原样。
+                    label: tr(action.label),
                     background: PennaColors.slate100,
-                    onPressed: () => onQuickAction(action.prompt),
+                    onPressed: () => onQuickAction(tr(action.prompt)),
                   ),
               ],
             ),
@@ -111,8 +112,8 @@ class _Composer extends StatelessWidget {
                     minLines: 3,
                     maxLines: 3,
                     style: const TextStyle(fontSize: 14, height: 1.5),
-                    decoration: const InputDecoration(
-                      hintText: 'Enter 发送 · Shift+Enter 换行 · @ 引用 Skill',
+                    decoration: InputDecoration(
+                      hintText: tr('Enter 发送 · Shift+Enter 换行 · @ 引用 Skill'),
                       hintStyle: TextStyle(color: PennaColors.slate400),
                       border: InputBorder.none,
                       isDense: true,
@@ -126,7 +127,7 @@ class _Composer extends StatelessWidget {
                       offset: const Offset(-6, 0),
                       child: IconButton(
                         onPressed: onAttach,
-                        tooltip: '添加图片或文本文件',
+                        tooltip: tr('添加图片或文本文件'),
                         icon: const Icon(Icons.attach_file, size: 17),
                         color: PennaColors.slate500,
                         style: IconButton.styleFrom(
@@ -140,7 +141,7 @@ class _Composer extends StatelessWidget {
                     Bouncy(
                       child: IconButton.filled(
                         onPressed: onStop ?? onSend,
-                        tooltip: onStop == null ? '发送' : '停止生成(Esc)',
+                        tooltip: onStop == null ? tr('发送') : tr('停止生成(Esc)'),
                         icon: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 200),
                           transitionBuilder: (child, animation) =>
@@ -192,27 +193,24 @@ class _QueuedRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(10, 3, 2, 3),
         child: Row(
           children: [
-            const Icon(Icons.schedule, size: 14, color: PennaColors.slate400),
+            Icon(Icons.schedule, size: 14, color: PennaColors.slate400),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: PennaColors.slate700,
-                ),
+                style: TextStyle(fontSize: 12.5, color: PennaColors.slate700),
               ),
             ),
             PennaButton(
-              label: '立刻发送',
+              label: tr('立刻发送'),
               icon: Icons.bolt,
-              tooltip: '打断正在生成的回复,马上发这条',
+              tooltip: tr('打断正在生成的回复,马上发这条'),
               onPressed: onSendNow,
             ),
             IconButton(
-              tooltip: '撤掉',
+              tooltip: tr('撤掉'),
               iconSize: 14,
               visualDensity: VisualDensity.compact,
               color: PennaColors.slate400,

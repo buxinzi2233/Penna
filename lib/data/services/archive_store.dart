@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../l10n/l10n.dart';
+
 /// 档案库里的一条:用户主动存下来的一份成稿。
 typedef ArchiveEntry = ({
   String id,
@@ -82,7 +84,7 @@ class ArchiveStore extends ChangeNotifier {
         );
       temp.renameSync(file.path);
     } on FileSystemException catch (e) {
-      debugPrint('档案库没存上:${e.message}');
+      debugPrint(tr('档案库没存上:{0}', [e.message]));
     }
   }
 

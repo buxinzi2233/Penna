@@ -4,6 +4,8 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 
+import '../../../l10n/l10n.dart';
+
 /// 要下载的一个文件。[size]、[sha256] 知道才校验(null 表示不校验)。
 typedef RemoteFile = ({String url, String path, int? size, String? sha256});
 
@@ -62,15 +64,15 @@ Future<void> downloadFile(
       have = await _fetch(client, f, part, have, onProgress, cancel, headers);
     }
   } on Object catch (e) {
-    if (cancel?.cancelled ?? false) throw const DownloadException('已停止下载');
+    if (cancel?.cancelled ?? false) throw DownloadException(tr('已停止下载'));
     if (e is DownloadException) rethrow;
     // 只报类型:原文里可能带着地址。
-    throw DownloadException('下载失败(${e.runtimeType}),可以再点一次接着下');
+    throw DownloadException(tr('下载失败({0}),可以再点一次接着下', [e.runtimeType]));
   } finally {
     client.close(force: true);
   }
   if (f.size != null && have != f.size) {
-    throw const DownloadException('下载不完整,可以再点一次接着下');
+    throw DownloadException(tr('下载不完整,可以再点一次接着下'));
   }
   if (f.sha256 case final want?) {
     final path = part.path;
@@ -79,7 +81,7 @@ Future<void> downloadFile(
     );
     if (got != want.toLowerCase()) {
       await part.delete();
-      throw const DownloadException('文件校验没通过,已删掉,请重新下载');
+      throw DownloadException(tr('文件校验没通过,已删掉,请重新下载'));
     }
   }
   final target = File(f.path);
@@ -110,9 +112,9 @@ Future<int> _fetch(
   if (status != HttpStatus.ok && status != HttpStatus.partialContent) {
     await response.drain<void>();
     throw DownloadException(switch (status) {
-      401 || 403 => '下载被拒绝(HTTP $status):这个模型可能要登录才能下',
-      404 => '找不到这个文件(HTTP 404)',
-      _ => '下载失败(HTTP $status)',
+      401 || 403 => tr('下载被拒绝(HTTP {0}):这个模型可能要登录才能下', [status]),
+      404 => tr('找不到这个文件(HTTP 404)'),
+      _ => tr('下载失败(HTTP {0})', [status]),
     });
   }
   // 服务器不认断点续传,只能从头来。
@@ -132,6 +134,6 @@ Future<int> _fetch(
   } finally {
     await sink.close();
   }
-  if (cancel?.cancelled ?? false) throw const DownloadException('已停止下载');
+  if (cancel?.cancelled ?? false) throw DownloadException(tr('已停止下载'));
   return have;
 }

@@ -45,11 +45,11 @@ class _PinCard extends StatelessWidget {
           Expanded(child: Text(text, style: style)),
           if (onUnpin != null)
             Tooltip(
-              message: '取消固定',
+              message: tr('取消固定'),
               child: InkWell(
                 onTap: onUnpin,
                 borderRadius: BorderRadius.circular(4),
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.all(2),
                   child: Icon(
                     Icons.push_pin,
@@ -140,7 +140,7 @@ class _SectionHandle extends StatelessWidget {
         ),
       ),
       child: Tooltip(
-        message: '拖动调整先后',
+        message: tr('拖动调整先后'),
         waitDuration: const Duration(milliseconds: 600),
         child: MouseRegion(
           cursor: SystemMouseCursors.grab,

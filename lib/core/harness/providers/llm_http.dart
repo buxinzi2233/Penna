@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../l10n/l10n.dart';
+
 /// 随某条消息发出的一张图片。
 typedef LlmImage = ({String mime, Uint8List bytes});
 
@@ -87,11 +89,11 @@ Stream<String> runLlmStream(Stream<String> Function(HttpClient client) chat) {
 /// 所以认不出的异常只报类型,不原样转述。
 LlmException _friendly(Object e) => switch (e) {
   LlmException() => e,
-  SocketException() => LlmException('连不上模型接口:${e.message}'),
-  HandshakeException() => LlmException('HTTPS 握手失败:${e.message}'),
-  HttpException() => LlmException('网络请求中断:${e.message}'),
-  FormatException() => const LlmException('请求发不出去:API Key 或接口地址里有非法字符'),
-  _ => LlmException('调用模型失败(${e.runtimeType})'),
+  SocketException() => LlmException(tr('连不上模型接口:{0}', [e.message])),
+  HandshakeException() => LlmException(tr('HTTPS 握手失败:{0}', [e.message])),
+  HttpException() => LlmException(tr('网络请求中断:{0}', [e.message])),
+  FormatException() => LlmException(tr('请求发不出去:API Key 或接口地址里有非法字符')),
+  _ => LlmException(tr('调用模型失败({0})', [e.runtimeType])),
 };
 
 /// 拼出接口地址;[baseUrl] 不是 http(s) 地址时报错。
@@ -99,7 +101,7 @@ Uri llmEndpoint(String baseUrl, String path) {
   final base = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
   final uri = Uri.tryParse('$base$path');
   if (uri == null || !uri.isScheme('http') && !uri.isScheme('https')) {
-    throw const LlmException('Base URL 无效:要以 http:// 或 https:// 开头');
+    throw LlmException(tr('Base URL 无效:要以 http:// 或 https:// 开头'));
   }
   return uri;
 }
@@ -126,7 +128,7 @@ Stream<String> postForLines(
 LlmException _statusError(int status, String body) {
   // 回来的是一张网页:多半是地址填错了,打到了网站而不是接口上。
   if (body.trimLeft().startsWith('<')) {
-    return LlmException('模型接口返回 $status:地址不对,返回的是网页。请检查 Base URL');
+    return LlmException(tr('模型接口返回 {0}:地址不对,返回的是网页。请检查 Base URL', [status]));
   }
   // 多数接口把原因放在 error.message 里;取得到就只显示这一句,不显示整坨 JSON。
   var reason = body;
@@ -144,7 +146,7 @@ LlmException _statusError(int status, String body) {
   final shown = reason.length > _maxErrorBody
       ? reason.substring(0, _maxErrorBody)
       : reason;
-  return LlmException('模型接口返回 $status:$shown');
+  return LlmException(tr('模型接口返回 {0}:{1}', [status, shown]));
 }
 
 const _getTimeout = Duration(seconds: 30);
@@ -162,7 +164,7 @@ Future<Object?> getJson(Uri uri, Map<String, String> headers) async {
       throw _statusError(response.statusCode, text);
     }
   } on TimeoutException {
-    throw const LlmException('模型接口超时');
+    throw LlmException(tr('模型接口超时'));
   } on Object catch (e) {
     throw _friendly(e);
   } finally {
@@ -171,7 +173,7 @@ Future<Object?> getJson(Uri uri, Map<String, String> headers) async {
   try {
     return jsonDecode(text);
   } on FormatException {
-    throw const LlmException('接口返回的不是模型列表');
+    throw LlmException(tr('接口返回的不是模型列表'));
   }
 }
 

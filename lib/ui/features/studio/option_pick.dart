@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../../../l10n/l10n.dart';
 
 /// 多选里的一项:[label] 是发出去的字,[detail] 是排在它后面的一行预览(可以是空串)。
 typedef PickItem = ({String label, String detail});
@@ -111,7 +112,7 @@ class _PickState extends State<MultiPick> {
               Row(
                 children: [
                   PennaButton(
-                    label: all ? '全不选' : '全选',
+                    label: all ? tr('全不选') : tr('全选'),
                     icon: all ? Icons.deselect : Icons.select_all,
                     borderColor: PennaColors.border,
                     onPressed: () => setState(
@@ -123,15 +124,15 @@ class _PickState extends State<MultiPick> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '已选 ${_picked.length} / ${items.length}',
-                      style: const TextStyle(
+                      tr('已选 {0} / {1}', [_picked.length, items.length]),
+                      style: TextStyle(
                         fontSize: 11,
                         color: PennaColors.slate500,
                       ),
                     ),
                   ),
                   PennaButton(
-                    label: '确定',
+                    label: tr('确定'),
                     icon: Icons.check,
                     background: PennaColors.primary,
                     foreground: Colors.white,

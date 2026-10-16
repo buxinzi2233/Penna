@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../../l10n/l10n.dart';
 
 const gap = SizedBox(height: 12);
 
@@ -18,12 +19,12 @@ Future<bool> confirmDelete(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('取消'),
+          child: Text(tr('取消')),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, true),
           style: TextButton.styleFrom(foregroundColor: PennaColors.diffDelText),
-          child: const Text('删除'),
+          child: Text(tr('删除')),
         ),
       ],
     ),
@@ -51,7 +52,7 @@ class SectionHeading extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             note,
-            style: const TextStyle(fontSize: 12, color: PennaColors.slate500),
+            style: TextStyle(fontSize: 12, color: PennaColors.slate500),
           ),
         ],
       ),

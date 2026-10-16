@@ -16,14 +16,14 @@ class _Header extends StatelessWidget {
   /// 「新对话」和「历史」两个按钮;生成中换不了,所以先禁用。
   List<Widget> _chatButtons(BuildContext context) => [
     PennaButton(
-      label: '新对话',
+      label: tr('新对话'),
       icon: Icons.add_comment_outlined,
       borderColor: PennaColors.border,
       onPressed: vm.isStreaming || vm.messages.isEmpty ? null : vm.newChat,
     ),
     const SizedBox(width: 6),
     PopupMenuButton<String>(
-      tooltip: '历史对话',
+      tooltip: tr('历史对话'),
       enabled: !vm.isStreaming && vm.pastChats.isNotEmpty,
       position: PopupMenuPosition.under,
       offset: const Offset(0, 6),
@@ -45,16 +45,22 @@ class _Header extends StatelessWidget {
                         chatTitle(chat.messages),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                           color: PennaColors.slate700,
                         ),
                       ),
                       Text(
-                        '${shortTime(chat.messages.first.time)} · '
-                        '${chat.messages.length} 条',
-                        style: const TextStyle(
+                        tr(
+                          '{0} · '
+                          '{1} 条',
+                          [
+                            shortTime(chat.messages.first.time),
+                            chat.messages.length,
+                          ],
+                        ),
+                        style: TextStyle(
                           fontSize: 11,
                           color: PennaColors.slate400,
                         ),
@@ -63,7 +69,7 @@ class _Header extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: '删除这场对话',
+                  tooltip: tr('删除这场对话'),
                   iconSize: 14,
                   visualDensity: VisualDensity.compact,
                   color: PennaColors.slate400,
@@ -94,7 +100,7 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '历史',
+                tr('历史'),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -132,7 +138,7 @@ class _Header extends StatelessWidget {
       children: [
         if (chain.isEmpty)
           PennaButton(
-            label: '未连接模型 · 去设置',
+            label: tr('未连接模型 · 去设置'),
             icon: Icons.auto_awesome,
             background: PennaColors.slate50,
             foreground: PennaColors.slate500,
@@ -141,7 +147,7 @@ class _Header extends StatelessWidget {
           )
         else
           PopupMenuButton<String>(
-            tooltip: 'Agent 使用的模型',
+            tooltip: tr('Agent 使用的模型'),
             position: PopupMenuPosition.under,
             offset: const Offset(0, 6),
             onSelected: (id) => id == _manageModels
@@ -150,15 +156,15 @@ class _Header extends StatelessWidget {
                     cfg.copyWith(activeLlmId: () => id == _byOrder ? null : id),
                   ),
             itemBuilder: (_) => [
-              item(_byOrder, '按顺序', pinned == null),
+              item(_byOrder, tr('按顺序'), pinned == null),
               for (final l in chain)
                 item(
                   l.id,
-                  l.name.trim().isEmpty ? '未命名' : l.name,
+                  l.name.trim().isEmpty ? tr('未命名') : l.name,
                   pinned == l.id,
                 ),
               const PopupMenuDivider(height: 8),
-              item(_manageModels, '管理模型…', false),
+              item(_manageModels, tr('管理模型…'), false),
             ],
             child: Bouncy(
               child: PennaCard(
@@ -171,7 +177,7 @@ class _Header extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.auto_awesome,
                       size: 14,
                       color: PennaColors.primary,
@@ -179,14 +185,14 @@ class _Header extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       chain.first.name.trim().isEmpty
-                          ? '未命名'
+                          ? tr('未命名')
                           : chain.first.name,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.keyboard_arrow_down,
                       size: 14,
                       color: PennaColors.slate500,
@@ -199,7 +205,7 @@ class _Header extends StatelessWidget {
         const Spacer(),
         ..._chatButtons(context),
         PopupMenuButton<String>(
-          tooltip: '切换 Preset',
+          tooltip: tr('切换 Preset'),
           position: PopupMenuPosition.under,
           offset: const Offset(0, 6),
           onSelected: (id) => config.update(cfg.copyWith(activePresetId: id)),
@@ -224,17 +230,17 @@ class _Header extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.tune, size: 14, color: PennaColors.slate500),
+                  Icon(Icons.tune, size: 14, color: PennaColors.slate500),
                   const SizedBox(width: 4),
                   Text(
                     cfg.activePreset.displayName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: PennaColors.slate700,
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.keyboard_arrow_down,
                     size: 14,
                     color: PennaColors.slate500,

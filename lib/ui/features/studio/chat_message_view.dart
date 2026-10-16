@@ -12,6 +12,7 @@ import 'mention.dart';
 import 'option_pick.dart';
 import 'skill_card.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 String _clock(DateTime t) =>
     [t.hour, t.minute, t.second].map((n) => '$n'.padLeft(2, '0')).join(':');
@@ -149,8 +150,8 @@ class ChatMessageView extends StatelessWidget {
       // 问挑哪几段,当前页却一段都没有:说一声,让用户自己打字回答。
       if (picks.isEmpty && asked.sections && !streaming && drafts.isEmpty) ...[
         const SizedBox(height: 8),
-        const Text(
-          '当前页没有分段',
+        Text(
+          tr('当前页没有分段'),
           style: TextStyle(fontSize: 11.5, color: PennaColors.slate400),
         ),
       ],
@@ -188,29 +189,29 @@ class ChatMessageView extends StatelessWidget {
           child: Row(
             children: [
               if (m.stopped) ...[
-                const Icon(
+                Icon(
                   Icons.stop_circle_outlined,
                   size: 13,
                   color: PennaColors.slate400,
                 ),
                 const SizedBox(width: 4),
-                const Text(
-                  '已停止',
+                Text(
+                  tr('已停止'),
                   style: TextStyle(fontSize: 11, color: PennaColors.slate400),
                 ),
                 const SizedBox(width: 8),
               ],
               if (copyable.isNotEmpty)
                 PennaButton(
-                  label: '复制回复',
+                  label: tr('复制回复'),
                   icon: Icons.content_copy,
                   background: Colors.transparent,
                   foreground: PennaColors.slate500,
-                  onPressed: () => copyWithToast(context, copyable, '已复制'),
+                  onPressed: () => copyWithToast(context, copyable, tr('已复制')),
                 ),
               if (onRetry != null)
                 PennaButton(
-                  label: '重新运行',
+                  label: tr('重新运行'),
                   icon: Icons.refresh,
                   background: Colors.transparent,
                   foreground: PennaColors.slate500,
@@ -241,7 +242,7 @@ class ChatMessageView extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    m.fromUser ? '用户' : 'Penna Agent',
+                    m.fromUser ? tr('用户') : 'Penna Agent',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -254,10 +255,7 @@ class ChatMessageView extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     _clock(m.time),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: PennaColors.slate400,
-                    ),
+                    style: TextStyle(fontSize: 11, color: PennaColors.slate400),
                   ),
                 ],
               ),
@@ -266,8 +264,8 @@ class ChatMessageView extends StatelessWidget {
               if (lookups.isNotEmpty) ...[
                 _ToolBlock(
                   summary: lookups.length == 1
-                      ? lookups.single.toolSummary ?? '查了资料'
-                      : '查了资料 · ${lookups.length} 次',
+                      ? lookups.single.toolSummary ?? tr('查了资料')
+                      : tr('查了资料 · {0} 次', [lookups.length]),
                   details: [for (final l in lookups) ...l.toolDetails],
                 ),
                 const SizedBox(height: 10),
@@ -302,7 +300,10 @@ class ChatMessageView extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     if (m.quote != null)
-                      MentionChip(name: sectionTitle(m.quote!), prefix: '段 · '),
+                      MentionChip(
+                        name: sectionTitle(m.quote!),
+                        prefix: tr('段 · '),
+                      ),
                     for (final name in skillNames) MentionChip(name: name),
                   ],
                 ),
@@ -414,12 +415,12 @@ class _DraftCardState extends State<_DraftCard> {
     // 已经送到左侧的收起来(内容在左边看),还没送的、正在写的摊开。
     final open = _open ?? (writing || status == DraftStatus.ready);
     final (label, icon) = switch (status) {
-      _ when writing => ('正在写', Icons.edit_outlined),
+      _ when writing => (tr('正在写'), Icons.edit_outlined),
       // 被打断或出错的半截成稿不让放,免得把残缺的内容盖到成稿上。
-      _ when !draft.complete => ('不完整', Icons.error_outline),
-      DraftStatus.ready => ('放到成稿', Icons.keyboard_double_arrow_left),
-      DraftStatus.pending => ('待确认', Icons.hourglass_empty),
-      DraftStatus.applied => ('已在成稿', Icons.check),
+      _ when !draft.complete => (tr('不完整'), Icons.error_outline),
+      DraftStatus.ready => (tr('放到成稿'), Icons.keyboard_double_arrow_left),
+      DraftStatus.pending => (tr('待确认'), Icons.hourglass_empty),
+      DraftStatus.applied => (tr('已在成稿'), Icons.check),
     };
     final ready = !writing && draft.complete && status == DraftStatus.ready;
     return AnimatedContainer(
@@ -449,7 +450,7 @@ class _DraftCardState extends State<_DraftCard> {
                         AnimatedRotation(
                           turns: open ? 0.25 : 0,
                           duration: const Duration(milliseconds: 160),
-                          child: const Icon(
+                          child: Icon(
                             Icons.chevron_right,
                             size: 16,
                             color: PennaColors.primary,
@@ -460,10 +461,10 @@ class _DraftCardState extends State<_DraftCard> {
                           child: Text(
                             [
                               switch (draft.page) {
-                                null => '新成稿',
+                                null => tr('新成稿'),
                                 final page when int.tryParse(page) != null =>
-                                  '新成稿 · 第 $page 页',
-                                _ => '新成稿 · 新的一页',
+                                  tr('新成稿 · 第 {0} 页', [page]),
+                                _ => tr('新成稿 · 新的一页'),
                               },
                               ?draft.name,
                               // 收起时用各段的标注当摘要。
@@ -471,10 +472,10 @@ class _DraftCardState extends State<_DraftCard> {
                                 draft.sections
                                     .map((s) => s.label)
                                     .where((l) => l.isNotEmpty)
-                                    .join('、'),
+                                    .join(tr('、')),
                             ].where((s) => s.isNotEmpty).join(' · '),
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: PennaColors.primary,
@@ -527,7 +528,7 @@ class _DraftCardState extends State<_DraftCard> {
                         if (s.label.isNotEmpty) ...[
                           Text(
                             s.label,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: PennaColors.primary,
@@ -543,7 +544,7 @@ class _DraftCardState extends State<_DraftCard> {
                         if (s.zh.isNotEmpty)
                           Text(
                             s.zh,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11.5,
                               height: 1.5,
                               color: PennaColors.slate400,
@@ -578,7 +579,7 @@ class _ModelTag extends StatelessWidget {
       child: Text(
         name,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 11, color: PennaColors.slate500),
+        style: TextStyle(fontSize: 11, color: PennaColors.slate500),
       ),
     );
   }
@@ -609,14 +610,14 @@ class _ToolBlock extends StatelessWidget {
             childrenPadding: const EdgeInsets.fromLTRB(34, 0, 10, 10),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
             expandedAlignment: Alignment.centerLeft,
-            leading: const Icon(
+            leading: Icon(
               Icons.check_circle_outline,
               size: 15,
               color: PennaColors.accent,
             ),
             title: Text(
               summary,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: PennaColors.slate700,
@@ -673,7 +674,7 @@ class _VariantCard extends StatelessWidget {
                 ),
               ),
               PennaButton(
-                label: '采纳至成稿',
+                label: tr('采纳至成稿'),
                 background: v.recommended
                     ? PennaColors.primary
                     : PennaColors.slate100,
@@ -694,7 +695,7 @@ class _VariantCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               v.notes.join('  •  '),
-              style: const TextStyle(fontSize: 11, color: PennaColors.slate400),
+              style: TextStyle(fontSize: 11, color: PennaColors.slate400),
             ),
           ],
         ],

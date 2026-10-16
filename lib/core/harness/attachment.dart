@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../l10n/l10n.dart';
+
 /// 一条消息最多带几个附件。
 const maxAttachments = 6;
 
@@ -67,15 +69,15 @@ Future<Attachment> readAttachment(File file) async {
   try {
     final size = await file.length();
     if (mime != null && size > maxImageBytes) {
-      throw AttachmentException('「$name」超过 $maxImageLabel');
+      throw AttachmentException(tr('「{0}」超过 {1}', [name, maxImageLabel]));
     }
     // UTF-8 一个字符最多 4 字节,超过这个数一定超长,不用读进来再数。
     if (mime == null && size > maxFileChars * 4) {
-      throw AttachmentException('「$name」太长');
+      throw AttachmentException(tr('「{0}」太长', [name]));
     }
     bytes = await file.readAsBytes();
   } on FileSystemException {
-    throw AttachmentException('读不了「$name」');
+    throw AttachmentException(tr('读不了「{0}」', [name]));
   }
   if (mime != null) {
     return Attachment.image(name: name, mime: mime, bytes: bytes);
@@ -84,12 +86,14 @@ Future<Attachment> readAttachment(File file) async {
   try {
     text = utf8.decode(bytes);
   } on FormatException {
-    throw AttachmentException('「$name」不是图片或文本');
+    throw AttachmentException(tr('「{0}」不是图片或文本', [name]));
   }
   // 二进制文件碰巧能按 UTF-8 解开时,里面通常有 NUL。
   if (text.contains('\u0000')) {
-    throw AttachmentException('「$name」不是图片或文本');
+    throw AttachmentException(tr('「{0}」不是图片或文本', [name]));
   }
-  if (text.length > maxFileChars) throw AttachmentException('「$name」太长');
+  if (text.length > maxFileChars) {
+    throw AttachmentException(tr('「{0}」太长', [name]));
+  }
   return Attachment.text(name: name, text: text);
 }

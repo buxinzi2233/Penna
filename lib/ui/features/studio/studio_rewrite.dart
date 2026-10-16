@@ -10,8 +10,8 @@ extension StudioRewrite on StudioViewModel {
     final text = sel == null
         ? whole
         : body.substring(sel.$1, sel.$2.clamp(sel.$1, body.length)).trim();
-    if (text.isEmpty) return sel == null ? '成稿为空' : '选中的内容为空';
-    if (_translating) return '正在翻译';
+    if (text.isEmpty) return sel == null ? tr('成稿为空') : tr('选中的内容为空');
+    if (_translating) return tr('正在翻译');
     _translating = true;
     _changed();
     try {
@@ -33,9 +33,9 @@ extension StudioRewrite on StudioViewModel {
   /// [section] 是这段现在的全文(带标注),[text] 是其中的提示词。
   /// 对照只给人看、不进交付的提示词,所以不用走待确认。失败时返回原因。
   Future<String?> translateSection(String section, String text) async {
-    if (text.trim().isEmpty) return '这段是空的';
-    if (_pending != null) return '先处理待确认的改动';
-    if (_translating) return '正在翻译';
+    if (text.trim().isEmpty) return tr('这段是空的');
+    if (_pending != null) return tr('先处理待确认的改动');
+    if (_translating) return tr('正在翻译');
     _translating = true;
     _changed();
     try {
@@ -46,7 +46,7 @@ extension StudioRewrite on StudioViewModel {
       final cut = at < 0 || _pending != null
           ? null
           : _isolate(at, at + section.length);
-      if (cut == null) return '这段已经变了';
+      if (cut == null) return tr('这段已经变了');
       final (blocks, i) = cut;
       final zh = result.text.replaceAll(RegExp(r'\s*\n\s*'), ' ').trim();
       // 从后往前找:提示词和标注有相同的字时(【光影】光),不会找到标注上去。
@@ -89,17 +89,17 @@ extension StudioRewrite on StudioViewModel {
   /// [instruction] 为空表示单纯润色。失败时返回给用户看的原因,成功返回 null。
   Future<String?> polish(String instruction) async {
     final text = body;
-    if (text.trim().isEmpty) return '成稿为空';
-    if (_pending != null) return '先处理待确认的改动';
-    if (_polishing) return '正在润色';
+    if (text.trim().isEmpty) return tr('成稿为空');
+    if (_pending != null) return tr('先处理待确认的改动');
+    if (_polishing) return tr('正在润色');
     final cfg = config.config;
     final chain = _usable(cfg.polishChain);
-    if (chain.isEmpty) return '请先在设置里添加模型并填写模型名称';
+    if (chain.isEmpty) return tr('请先在设置里添加模型并填写模型名称');
 
     final (start, end) = polishRange;
     final target = text.substring(start, end);
-    if (target.trim().isEmpty) return '选中的内容为空';
-    if (_isolate(start, end) == null) return '固定区不能改写';
+    if (target.trim().isEmpty) return tr('选中的内容为空');
+    if (_isolate(start, end) == null) return tr('固定区不能改写');
     final ask = instruction.trim();
     _polishing = true;
     _changed();
@@ -116,13 +116,13 @@ extension StudioRewrite on StudioViewModel {
         ]),
         this.streamChat,
       ).join()).trim();
-      if (out.isEmpty) return '模型没有返回内容';
+      if (out.isEmpty) return tr('模型没有返回内容');
       if (_disposed) return null;
-      if (body != text) return '成稿在润色期间被改动了,请重试';
-      if (_pending != null) return '先处理待确认的改动';
+      if (body != text) return tr('成稿在润色期间被改动了,请重试');
+      if (_pending != null) return tr('先处理待确认的改动');
       // 等回复的这段时间里用户可能把目标固定了,所以这里再切一次、再查一次。
       final cut = _isolate(start, end);
-      if (cut == null) return '固定区不能改写';
+      if (cut == null) return tr('固定区不能改写');
       // 原文首尾的空白不交给模型决定,原样保留。
       final lead = target.substring(
         0,
@@ -131,7 +131,7 @@ extension StudioRewrite on StudioViewModel {
       final tail = target.substring(target.trimRight().length);
       _blocks = List.unmodifiable(cut.$1);
       _pending = DiffProposal(
-        title: ask.isEmpty ? '润色' : '修改:$ask',
+        title: ask.isEmpty ? tr('润色') : tr('修改:{0}', [ask]),
         segmentIndex: cut.$2,
         removed: target,
         added: '$lead$out$tail',

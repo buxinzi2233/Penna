@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../../../l10n/l10n.dart';
+
 // Florence-2 的纯逻辑部分:指令、分词器(BART 的字节级 BPE)、防重复、喂给模型的像素。
 // 跑模型在 data/services/florence_engine.dart。照 NLapt 的 nlapt/local/florence.py 移植。
 
@@ -18,14 +20,14 @@ const florenceOnnx = [
 ];
 
 /// 指令和界面上的名字,按显示的先后。
-const florenceTaskLabels = {
-  '<GENERATE_TAGS>': '标签',
-  '<CAPTION>': '一句话',
-  '<DETAILED_CAPTION>': '详细',
-  '<MORE_DETAILED_CAPTION>': '很详细',
-  '<ANALYZE>': '构图分析',
-  '<MIXED_CAPTION>': '描述 + 标签',
-  '<MIXED_CAPTION_PLUS>': '描述 + 标签 + 构图',
+Map<String, String> get florenceTaskLabels => {
+  '<GENERATE_TAGS>': tr('标签'),
+  '<CAPTION>': tr('一句话'),
+  '<DETAILED_CAPTION>': tr('详细'),
+  '<MORE_DETAILED_CAPTION>': tr('很详细'),
+  '<ANALYZE>': tr('构图分析'),
+  '<MIXED_CAPTION>': tr('描述 + 标签'),
+  '<MIXED_CAPTION_PLUS>': tr('描述 + 标签 + 构图'),
 };
 
 /// 官方的几个指令要换成固定的英文问句再分词(照官方 processing_florence2.py);
@@ -116,7 +118,7 @@ class FlorenceTokenizer {
         },
       );
     } on Object {
-      throw const FlorenceException('分词器文件坏了');
+      throw FlorenceException(tr('分词器文件坏了'));
     }
   }
 

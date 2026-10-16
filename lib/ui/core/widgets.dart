@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'theme.dart';
+import '../../l10n/l10n.dart';
 
 /// 底部的小提示。[warn] 用于"没法这么做"的提醒,图标不同。
 void showToast(BuildContext context, String message, {bool warn = false}) {
@@ -158,10 +159,37 @@ Future<void> copyWithToast(
   try {
     await Clipboard.setData(ClipboardData(text: text));
   } on PlatformException catch (e) {
-    if (context.mounted) showToast(context, '复制失败:${e.message ?? e.code}');
+    if (context.mounted) {
+      showToast(context, tr('复制失败:{0}', [e.message ?? e.code]));
+    }
     return;
   }
   if (context.mounted) showToast(context, message);
+}
+
+const pennaButtonText = TextStyle(fontSize: 12, fontWeight: FontWeight.w600);
+
+/// 一排 [PennaButton](都带图标,间隔 [gap])完整显示要多宽;放不下时可以改成只显示图标。
+double pennaButtonsWidth(
+  BuildContext context,
+  Iterable<String> labels, {
+  double gap = 6,
+}) {
+  var width = 0.0;
+  for (final label in labels) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: DefaultTextStyle.of(context).style.merge(pennaButtonText),
+      ),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    // 左右内边距 10 + 10,图标 14,图标和字之间 4。
+    width += painter.width + 38 + gap;
+    painter.dispose();
+  }
+  return width;
 }
 
 /// 原型里的小号圆角按钮;[onPressed] 为 null 时显示为禁用。
@@ -171,8 +199,8 @@ class PennaButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.icon,
-    this.background = PennaColors.card,
-    this.foreground = PennaColors.slate700,
+    this.background,
+    this.foreground,
     this.borderColor,
     this.tooltip,
   });
@@ -180,8 +208,10 @@ class PennaButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
-  final Color background;
-  final Color foreground;
+
+  /// 默认是卡片底色 / 深灰字(随配色变)。
+  final Color? background;
+  final Color? foreground;
   final Color? borderColor;
   final String? tooltip;
 
@@ -191,8 +221,8 @@ class PennaButton extends StatelessWidget {
       child: TextButton(
         onPressed: onPressed,
         style: TextButton.styleFrom(
-          backgroundColor: background,
-          foregroundColor: foreground,
+          backgroundColor: background ?? PennaColors.card,
+          foregroundColor: foreground ?? PennaColors.slate700,
           disabledBackgroundColor: PennaColors.slate100,
           minimumSize: Size.zero,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -207,14 +237,10 @@ class PennaButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
+            if (icon != null) Icon(icon, size: 14),
+            // label 为空时只有图标(放不下时的紧凑样子)。
+            if (icon != null && label.isNotEmpty) const SizedBox(width: 4),
+            if (label.isNotEmpty) Text(label, style: pennaButtonText),
           ],
         ),
       ),
@@ -228,24 +254,22 @@ class PennaBar extends StatelessWidget {
   const PennaBar({
     super.key,
     required this.children,
-    this.color = PennaColors.slate50,
+    this.color,
     this.borderOnTop = false,
   });
 
   final List<Widget> children;
-  final Color color;
+  final Color? color;
   final bool borderOnTop;
 
   @override
   Widget build(BuildContext context) {
-    const side = BorderSide(color: PennaColors.border);
+    final side = BorderSide(color: PennaColors.border);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
       decoration: BoxDecoration(
-        color: color,
-        border: borderOnTop
-            ? const Border(top: side)
-            : const Border(bottom: side),
+        color: color ?? PennaColors.slate50,
+        border: borderOnTop ? Border(top: side) : Border(bottom: side),
       ),
       child: Row(children: children),
     );
@@ -256,15 +280,15 @@ class PennaCard extends StatelessWidget {
   const PennaCard({
     super.key,
     required this.child,
-    this.color = PennaColors.card,
-    this.borderColor = PennaColors.border,
+    this.color,
+    this.borderColor,
     this.radius = 8,
     this.padding = const EdgeInsets.all(10),
   });
 
   final Widget child;
-  final Color color;
-  final Color borderColor;
+  final Color? color;
+  final Color? borderColor;
   final double radius;
   final EdgeInsets padding;
 
@@ -273,9 +297,9 @@ class PennaCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: color,
+        color: color ?? PennaColors.card,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: borderColor),
+        border: Border.all(color: borderColor ?? PennaColors.border),
       ),
       child: child,
     );
@@ -322,14 +346,14 @@ class _PennaFieldState extends State<PennaField> {
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(6),
-      borderSide: const BorderSide(color: PennaColors.border),
+      borderSide: BorderSide(color: PennaColors.border),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w600,
             color: PennaColors.slate500,
@@ -348,13 +372,13 @@ class _PennaFieldState extends State<PennaField> {
             filled: true,
             fillColor: PennaColors.card,
             hintText: widget.hint,
-            hintStyle: const TextStyle(color: PennaColors.slate400),
+            hintStyle: TextStyle(color: PennaColors.slate400),
             contentPadding: const EdgeInsets.all(10),
             border: border,
             enabledBorder: border,
             suffixIcon: widget.obscure
                 ? IconButton(
-                    tooltip: _hidden ? '显示' : '隐藏',
+                    tooltip: _hidden ? tr('显示') : tr('隐藏'),
                     iconSize: 16,
                     icon: Icon(
                       _hidden
@@ -418,12 +442,12 @@ class PennaAvatar extends StatelessWidget {
   }
 }
 
-const _menuItems = {
-  ContextMenuButtonType.cut: ('剪切', Icons.content_cut),
-  ContextMenuButtonType.copy: ('复制', Icons.content_copy),
-  ContextMenuButtonType.paste: ('粘贴', Icons.content_paste),
-  ContextMenuButtonType.selectAll: ('全选', Icons.select_all),
-  ContextMenuButtonType.delete: ('删除', Icons.delete_outline),
+Map<ContextMenuButtonType, (String, IconData)> get _menuItems => {
+  ContextMenuButtonType.cut: (tr('剪切'), Icons.content_cut),
+  ContextMenuButtonType.copy: (tr('复制'), Icons.content_copy),
+  ContextMenuButtonType.paste: (tr('粘贴'), Icons.content_paste),
+  ContextMenuButtonType.selectAll: (tr('全选'), Icons.select_all),
+  ContextMenuButtonType.delete: (tr('删除'), Icons.delete_outline),
 };
 
 /// 文字上的右键菜单:系统那几项换成中文,样子和别处的弹出菜单一致。
@@ -442,10 +466,7 @@ Widget pennaTextMenu(
         children: [
           Icon(icon, size: 15, color: PennaColors.slate500),
           const SizedBox(width: 10),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 13, color: PennaColors.text),
-          ),
+          Text(label, style: TextStyle(fontSize: 13, color: PennaColors.text)),
         ],
       ),
     ),
@@ -475,7 +496,7 @@ Widget pennaTextMenu(
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: PennaColors.border),
+        side: BorderSide(color: PennaColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(4),
@@ -488,7 +509,7 @@ Widget pennaTextMenu(
               children: [
                 ...system,
                 if (system.isNotEmpty && more.isNotEmpty)
-                  const Divider(height: 9, color: PennaColors.border),
+                  Divider(height: 9, color: PennaColors.border),
                 ...more,
               ],
             ),
@@ -504,7 +525,7 @@ Future<String?> askName(
   BuildContext context,
   String title,
   String initial, {
-  String hint = '留空就用默认的',
+  String? hint,
 }) {
   var text = initial;
   return showDialog<String>(
@@ -514,8 +535,8 @@ Future<String?> askName(
       content: SizedBox(
         width: 320,
         child: PennaField(
-          label: '名字',
-          hint: hint,
+          label: tr('名字'),
+          hint: hint ?? tr('留空就用默认的'),
           value: initial,
           onChanged: (v) => text = v,
         ),
@@ -523,11 +544,11 @@ Future<String?> askName(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(tr('取消')),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, text),
-          child: const Text('确定'),
+          child: Text(tr('确定')),
         ),
       ],
     ),

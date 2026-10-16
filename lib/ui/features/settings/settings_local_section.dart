@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../local/local_model.dart';
 import 'settings_sections.dart';
+import '../../../l10n/l10n.dart';
 
 /// 本地反推的设置:模型文件夹、下载来源、HuggingFace Token、llama.cpp 运行时与参数、看图要求。
 class LocalSection extends StatelessWidget {
@@ -23,19 +24,19 @@ class LocalSection extends StatelessWidget {
       builder: (context, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SectionHeading('本地反推', '模型存放、下载与本地运行'),
+          SectionHeading(tr('本地反推'), tr('模型存放、下载与本地运行')),
           _Folders(local: local),
           gap,
           _card(
-            '下载',
+            tr('下载'),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Wrap(
                   spacing: 6,
                   children: [
-                    for (final (id, label) in const [
-                      ('mirror', '国内镜像'),
+                    for (final (id, label) in [
+                      ('mirror', tr('国内镜像')),
                       ('huggingface', 'HuggingFace'),
                     ])
                       PennaChip(
@@ -48,7 +49,7 @@ class LocalSection extends StatelessWidget {
                 gap,
                 PennaField(
                   label: 'HuggingFace Token',
-                  hint: '下载要申请访问的模型时用',
+                  hint: tr('下载要申请访问的模型时用'),
                   obscure: true,
                   value: service.config.secrets[hfTokenSecret] ?? '',
                   onChanged: (v) => service.update(
@@ -61,7 +62,7 @@ class LocalSection extends StatelessWidget {
           gap,
           _Runtime(local: local),
           gap,
-          _card('llama-server 参数', _Params(local: local)),
+          _card(tr('llama-server 参数'), _Params(local: local)),
           gap,
           _Prompts(local: local),
         ],
@@ -112,19 +113,19 @@ class _Folders extends StatelessWidget {
   Widget build(BuildContext context) {
     final f = local.found;
     final counts = [
-      if (f.taggers.isNotEmpty) '${f.taggers.length} 个打标模型',
-      if (f.ggufs.isNotEmpty) '${f.ggufs.length} 个 GGUF 模型',
-      if (f.florences.isNotEmpty) '${f.florences.length} 个 Florence-2',
+      if (f.taggers.isNotEmpty) tr('{0} 个打标模型', [f.taggers.length]),
+      if (f.ggufs.isNotEmpty) tr('{0} 个 GGUF 模型', [f.ggufs.length]),
+      if (f.florences.isNotEmpty) tr('{0} 个 Florence-2', [f.florences.length]),
       if (f.servers.isNotEmpty) 'llama-server',
     ];
     return _card(
-      '模型文件夹',
+      tr('模型文件夹'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (local.modelFolders.isNotEmpty)
             IconButton(
-              tooltip: '重新扫描',
+              tooltip: tr('重新扫描'),
               iconSize: 16,
               visualDensity: VisualDensity.compact,
               color: PennaColors.slate500,
@@ -132,7 +133,7 @@ class _Folders extends StatelessWidget {
               onPressed: local.scanning ? null : local.rescan,
             ),
           PennaButton(
-            label: '添加文件夹',
+            label: tr('添加文件夹'),
             icon: Icons.create_new_folder_outlined,
             borderColor: PennaColors.border,
             onPressed: _add,
@@ -145,7 +146,7 @@ class _Folders extends StatelessWidget {
           for (final folder in local.modelFolders)
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.folder_outlined,
                   size: 15,
                   color: PennaColors.slate500,
@@ -153,7 +154,7 @@ class _Folders extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(child: _path(folder)),
                 IconButton(
-                  tooltip: '移除',
+                  tooltip: tr('移除'),
                   iconSize: 14,
                   visualDensity: VisualDensity.compact,
                   color: PennaColors.slate400,
@@ -164,14 +165,20 @@ class _Folders extends StatelessWidget {
             ),
           Text(
             local.scanning
-                ? '扫描中…'
+                ? tr('扫描中…')
                 : local.modelFolders.isEmpty
-                ? '添加已有模型的文件夹,子文件夹一起查找'
+                ? tr('添加已有模型的文件夹,子文件夹一起查找')
                 : counts.isEmpty
-                ? '没有找到可用的模型'
-                : '找到 ${counts.join('、')}'
-                      '${f.truncated ? '(文件太多,只查了一部分)' : ''}',
-            style: const TextStyle(fontSize: 11.5, color: PennaColors.slate500),
+                ? tr('没有找到可用的模型')
+                : tr(
+                    '找到 {0}'
+                    '{1}',
+                    [
+                      counts.join(tr('、')),
+                      f.truncated ? tr('(文件太多,只查了一部分)') : '',
+                    ],
+                  ),
+            style: TextStyle(fontSize: 11.5, color: PennaColors.slate500),
           ),
         ],
       ),
@@ -206,9 +213,9 @@ class _Runtime extends StatelessWidget {
     final exe = local.serverExe;
     final progress = local.progressOf('runtime');
     return _card(
-      'llama.cpp 运行时',
+      tr('llama.cpp 运行时'),
       trailing: PennaButton(
-        label: '选择 llama-server.exe',
+        label: tr('选择 llama-server.exe'),
         icon: Icons.folder_open,
         borderColor: PennaColors.border,
         onPressed: _pick,
@@ -216,16 +223,12 @@ class _Runtime extends StatelessWidget {
       exe != null
           ? Row(
               children: [
-                const Icon(
-                  Icons.check_circle,
-                  size: 15,
-                  color: PennaColors.accent,
-                ),
+                Icon(Icons.check_circle, size: 15, color: PennaColors.accent),
                 const SizedBox(width: 6),
                 Expanded(child: _path(exe)),
                 if (local.exePath.isNotEmpty)
                   PennaButton(
-                    label: '不用这个',
+                    label: tr('不用这个'),
                     icon: Icons.close,
                     background: PennaColors.slate100,
                     onPressed: () => local.update(() => local.exePath = ''),
@@ -239,8 +242,14 @@ class _Runtime extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'llama.cpp $llamaCppTag · Vulkan 版 · '
-                        '${(llamaRuntimeSize / (1 << 20)).toStringAsFixed(1)} MB',
+                        tr(
+                          'llama.cpp {0} · Vulkan 版 · '
+                          '{1} MB',
+                          [
+                            llamaCppTag,
+                            (llamaRuntimeSize / (1 << 20)).toStringAsFixed(1),
+                          ],
+                        ),
                         style: const TextStyle(fontSize: 12),
                       ),
                       if (progress != null) ...[
@@ -256,14 +265,14 @@ class _Runtime extends StatelessWidget {
                 const SizedBox(width: 8),
                 if (progress != null)
                   PennaButton(
-                    label: '停止',
+                    label: tr('停止'),
                     icon: Icons.stop_circle_outlined,
                     background: PennaColors.slate100,
                     onPressed: () => local.cancelDownload('runtime'),
                   )
                 else
                   PennaButton(
-                    label: '下载',
+                    label: tr('下载'),
                     icon: Icons.download,
                     background: PennaColors.primaryBg,
                     foreground: PennaColors.primary,
@@ -286,8 +295,8 @@ class _Prompts extends StatelessWidget {
   Future<void> _remove(BuildContext context) async {
     final ok = await confirmDelete(
       context,
-      '删除「${local.currentPrompt.name}」?',
-      '此操作不可撤销。',
+      tr('删除「{0}」?', [local.currentPrompt.name]),
+      tr('此操作不可撤销。'),
     );
     if (ok) local.removePrompt();
   }
@@ -298,12 +307,12 @@ class _Prompts extends StatelessWidget {
     // 换了一条(或加、删)时输入框重建,显示那一条的文字。
     final key = '${local.promptIndex}-${local.captionPrompts.length}';
     return _card(
-      '看图描述的要求',
+      tr('看图描述的要求'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           PennaButton(
-            label: '新建(复制当前)',
+            label: tr('新建(复制当前)'),
             icon: Icons.add,
             borderColor: PennaColors.border,
             onPressed: local.addPrompt,
@@ -311,7 +320,7 @@ class _Prompts extends StatelessWidget {
           if (local.captionPrompts.length > 1) ...[
             const SizedBox(width: 6),
             PennaButton(
-              label: '删除',
+              label: tr('删除'),
               icon: Icons.delete_outline,
               borderColor: PennaColors.border,
               onPressed: () => _remove(context),
@@ -328,7 +337,7 @@ class _Prompts extends StatelessWidget {
             children: [
               for (final (i, p) in local.captionPrompts.indexed)
                 PennaChip(
-                  label: p.name.trim().isEmpty ? '未命名' : p.name,
+                  label: p.name.trim().isEmpty ? tr('未命名') : p.name,
                   selected: i == local.promptIndex,
                   onTap: () => local.pickPrompt(i),
                 ),
@@ -337,14 +346,14 @@ class _Prompts extends StatelessWidget {
           gap,
           PennaField(
             key: ValueKey('prompt-name-$key'),
-            label: '名称',
+            label: tr('名称'),
             value: prompt.name,
             onChanged: (v) => local.editPrompt(name: v),
           ),
           gap,
           PennaField(
             key: ValueKey('prompt-text-$key'),
-            label: '要求',
+            label: tr('要求'),
             value: prompt.text,
             maxLines: 5,
             onChanged: (v) => local.editPrompt(text: v),
@@ -383,17 +392,17 @@ class _Params extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _field('端口', local.port, (
+        _field(tr('端口'), local.port, (
           min: 1024,
           max: 65535,
         ), (n) => local.port = n),
         const SizedBox(width: 10),
-        _field('上下文长度', local.context, (
+        _field(tr('上下文长度'), local.context, (
           min: 512,
           max: 262144,
         ), (n) => local.context = n),
         const SizedBox(width: 10),
-        _field('GPU 层数(-1 全部)', local.gpuLayers, (
+        _field(tr('GPU 层数(-1 全部)'), local.gpuLayers, (
           min: -1,
           max: 999,
         ), (n) => local.gpuLayers = n),

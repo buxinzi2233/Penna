@@ -105,13 +105,13 @@ class _SectionCardState extends State<_SectionCard> {
     final rename = widget.onRename;
     if (rename == null) return header;
     return Tooltip(
-      message: '右键改名',
+      message: tr('右键改名'),
       waitDuration: const Duration(milliseconds: 600),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onSecondaryTapDown: (d) async {
-          final picked = await popMenu(context, d.globalPosition, const ['改名']);
-          if (picked == '改名') rename();
+          final picked = await popMenu(context, d.globalPosition, [tr('改名')]);
+          if (picked == tr('改名')) rename();
         },
         child: header,
       ),
@@ -134,7 +134,7 @@ class _SectionCardState extends State<_SectionCard> {
         ],
         Flexible(
           child: Text(
-            widget.label.isEmpty ? '未标注' : widget.label,
+            widget.label.isEmpty ? tr('未标注') : widget.label,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 11,
@@ -150,7 +150,7 @@ class _SectionCardState extends State<_SectionCard> {
             duration: const Duration(milliseconds: 160),
             child: Icon(Icons.chevron_right, size: 14, color: tint.text),
           ),
-          Text('中文', style: TextStyle(fontSize: 10.5, color: tint.text)),
+          Text(tr('中文'), style: TextStyle(fontSize: 10.5, color: tint.text)),
         ],
       ],
     );
@@ -193,30 +193,30 @@ class _SectionCardState extends State<_SectionCard> {
                 ),
                 ...widget.actions,
                 if (widget.copyText case final text?) ...[
-                  _action(Icons.content_copy, '复制这段', () {
-                    copyWithToast(context, text, '已复制');
+                  _action(Icons.content_copy, tr('复制这段'), () {
+                    copyWithToast(context, text, tr('已复制'));
                     widget.onCopied?.call();
                   }),
                   const SizedBox(width: 2),
                 ],
                 if (widget.onUnpin != null)
-                  _action(Icons.push_pin, '取消固定', widget.onUnpin),
+                  _action(Icons.push_pin, tr('取消固定'), widget.onUnpin),
                 if (widget.onRemove != null) ...[
-                  _action(Icons.call_split, '脱离分段', widget.onDetach),
+                  _action(Icons.call_split, tr('脱离分段'), widget.onDetach),
                   const SizedBox(width: 2),
-                  _action(Icons.push_pin_outlined, '固定这段', widget.onPin),
+                  _action(Icons.push_pin_outlined, tr('固定这段'), widget.onPin),
                   const SizedBox(width: 2),
-                  _action(Icons.auto_fix_high, '润色这段', widget.onPolish),
+                  _action(Icons.auto_fix_high, tr('润色这段'), widget.onPolish),
                   const SizedBox(width: 2),
-                  _action(Icons.translate, '翻译这段', widget.onTranslate),
+                  _action(Icons.translate, tr('翻译这段'), widget.onTranslate),
                   const SizedBox(width: 2),
                   _action(
                     Icons.forum_outlined,
-                    '和 Agent 讨论这段',
+                    tr('和 Agent 讨论这段'),
                     widget.onDiscuss,
                   ),
                   const SizedBox(width: 2),
-                  _action(Icons.close, '删除这段', widget.onRemove),
+                  _action(Icons.close, tr('删除这段'), widget.onRemove),
                 ],
               ],
             ),
@@ -233,7 +233,7 @@ class _SectionCardState extends State<_SectionCard> {
                     child: SelectableText(
                       contextMenuBuilder: pennaTextMenu,
                       widget.zh,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         height: 1.5,
                         color: PennaColors.slate500,

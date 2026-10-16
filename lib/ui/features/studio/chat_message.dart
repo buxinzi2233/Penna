@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/harness/attachment.dart';
+import '../../../l10n/l10n.dart';
 
 /// Agent 给出的候选改法。
 @immutable
@@ -146,7 +147,7 @@ String chatTitle(List<ChatMessage> messages) {
   final first = messages
       .where((m) => m.fromUser && !m.tool && m.text.trim().isNotEmpty)
       .firstOrNull;
-  if (first == null) return messages.isEmpty ? '新对话' : '未命名';
+  if (first == null) return messages.isEmpty ? tr('新对话') : tr('未命名');
   return first.text.trim().split('\n').first;
 }
 

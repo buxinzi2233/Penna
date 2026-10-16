@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/harness/skills/builtin_skills.dart';
 import '../models/app_config.dart';
+import '../../l10n/l10n.dart';
 
 /// 一个 Skill(内置的或用户导入的)。
 @immutable
@@ -39,8 +40,8 @@ const maxSkillBytes = 256 * 1024;
 const maxZipBytes = 20 * 1024 * 1024;
 const maxUnpackedBytes = 10 * 1024 * 1024;
 const maxZipFiles = 500;
-const _unnamed = '未命名';
-const _tooBig = '压缩包解开后太大(上限 10 MB、500 个文件)';
+String get _unnamed => tr('未命名');
+String get _tooBig => tr('压缩包解开后太大(上限 10 MB、500 个文件)');
 
 /// 内置的 Skill,带上正文。
 final List<UserSkill> builtinSkillList = List.unmodifiable([
@@ -100,7 +101,7 @@ UserSkill parseSkill(String text, {required String fallbackName}) {
     }
   }
   final body = lines.sublist(bodyStart).join('\n').trim();
-  if (body.isEmpty) throw const SkillException('SKILL.md 里没有正文');
+  if (body.isEmpty) throw SkillException(tr('SKILL.md 里没有正文'));
   final heading = lines
       .skip(bodyStart)
       .map((l) => l.trim())
@@ -253,7 +254,7 @@ class SkillStore extends ChangeNotifier {
           ? await _importZip(source)
           : [await _importMarkdown(source)];
     } on FileSystemException {
-      throw const SkillException('读写文件失败');
+      throw SkillException(tr('读写文件失败'));
     }
     await load();
     return imported;
@@ -265,10 +266,10 @@ class SkillStore extends ChangeNotifier {
   Future<UserSkill> addText(String text) async {
     final bytes = utf8.encode(text);
     if (bytes.length > maxSkillBytes) {
-      throw const SkillException('Skill 太长(上限 256 KB)');
+      throw SkillException(tr('Skill 太长(上限 256 KB)'));
     }
     final skill = parseSkill(text, fallbackName: '');
-    if (skill.name == _unnamed) throw const SkillException('Skill 没有名字');
+    if (skill.name == _unnamed) throw SkillException(tr('Skill 没有名字'));
     try {
       final file = _fileOf(skill.id);
       if (await file.parent.exists()) {
@@ -281,20 +282,20 @@ class SkillStore extends ChangeNotifier {
       }
       await load();
     } on FileSystemException {
-      throw const SkillException('读写文件失败');
+      throw SkillException(tr('读写文件失败'));
     }
     return skill;
   }
 
   Future<UserSkill> _importMarkdown(File source) async {
     if (await source.length() > maxSkillBytes) {
-      throw const SkillException('文件太大(上限 256 KB)');
+      throw SkillException(tr('文件太大(上限 256 KB)'));
     }
     final String text;
     try {
       text = await source.readAsString();
     } on FormatException {
-      throw const SkillException('不是 UTF-8 文本文件');
+      throw SkillException(tr('不是 UTF-8 文本文件'));
     }
     final fileName = _baseName(source);
     final skill = parseSkill(
@@ -308,13 +309,13 @@ class SkillStore extends ChangeNotifier {
 
   Future<List<UserSkill>> _importZip(File source) async {
     if (await source.length() > maxZipBytes) {
-      throw const SkillException('压缩包太大(上限 20 MB)');
+      throw SkillException(tr('压缩包太大(上限 20 MB)'));
     }
     final Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(await source.readAsBytes());
     } on Object {
-      throw const SkillException('不是有效的 ZIP 压缩包');
+      throw SkillException(tr('不是有效的 ZIP 压缩包'));
     }
 
     // 第一步:只看清单。路径不安全、太大、有大小写撞名的,整个包拒收。
@@ -325,15 +326,15 @@ class SkillStore extends ChangeNotifier {
       // 符号链接(指向别处的"快捷方式")不要。
       if (!entry.isFile || entry.isSymbolicLink) continue;
       final path = safeZipPath(entry.name);
-      if (path == null) throw const SkillException('压缩包里有不安全的路径,已拒绝导入');
+      if (path == null) throw SkillException(tr('压缩包里有不安全的路径,已拒绝导入'));
       if (path.isEmpty) continue;
       // Windows 不分大小写,A.txt 和 a.txt 会互相覆盖。
       if (!seen.add(path.toLowerCase())) {
-        throw SkillException('压缩包里有重名的文件:$path');
+        throw SkillException(tr('压缩包里有重名的文件:{0}', [path]));
       }
       declared += entry.size;
       if (declared > maxUnpackedBytes || entries.length >= maxZipFiles) {
-        throw const SkillException(_tooBig);
+        throw SkillException(_tooBig);
       }
       entries[path] = entry;
     }
@@ -344,7 +345,7 @@ class SkillStore extends ChangeNotifier {
       for (final path in entries.keys)
         if (path.split('/').last.toLowerCase() == 'skill.md') _folderOf(path),
     ]..sort((a, b) => b.length.compareTo(a.length));
-    if (roots.isEmpty) throw const SkillException('压缩包里没有 SKILL.md');
+    if (roots.isEmpty) throw SkillException(tr('压缩包里没有 SKILL.md'));
 
     // 第二步:全部解开、全部解析。这一步出任何问题都还没有动磁盘。
     final packages = <String, Map<String, List<int>>>{
@@ -358,15 +359,15 @@ class SkillStore extends ChangeNotifier {
       try {
         bytes = entry.content;
       } on Object {
-        throw SkillException('压缩包里的文件损坏:$path');
+        throw SkillException(tr('压缩包里的文件损坏:{0}', [path]));
       }
       // 条目头里写的大小可以造假,按真正解出来的字节数再卡一次。
       unpacked += bytes.length;
-      if (unpacked > maxUnpackedBytes) throw const SkillException(_tooBig);
+      if (unpacked > maxUnpackedBytes) throw SkillException(_tooBig);
       final relative = path.substring(root.length);
       final isSkillFile = relative.toLowerCase() == 'skill.md';
       if (isSkillFile && bytes.length > maxSkillBytes) {
-        throw SkillException('$path 太大(上限 256 KB)');
+        throw SkillException(tr('{0} 太大(上限 256 KB)', [path]));
       }
       packages[root]![isSkillFile ? 'SKILL.md' : relative] = bytes;
     }
@@ -377,7 +378,7 @@ class SkillStore extends ChangeNotifier {
       try {
         text = utf8.decode(files['SKILL.md']!);
       } on FormatException {
-        throw SkillException('${root}SKILL.md 不是 UTF-8 文本');
+        throw SkillException(tr('{0}SKILL.md 不是 UTF-8 文本', [root]));
       }
       // 没写名字时用它所在的文件夹名;在包的根目录就用压缩包的文件名。
       final folder = root.isEmpty
@@ -385,7 +386,7 @@ class SkillStore extends ChangeNotifier {
           : root.substring(0, root.length - 1).split('/').last;
       final skill = parseSkill(text, fallbackName: folder);
       if (parsed.keys.any((s) => s.id == skill.id)) {
-        throw SkillException('压缩包里有两个同名的 Skill:${skill.name}');
+        throw SkillException(tr('压缩包里有两个同名的 Skill:{0}', [skill.name]));
       }
       parsed[skill] = files;
     }

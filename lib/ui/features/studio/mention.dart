@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../data/services/skill_store.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../../../l10n/l10n.dart';
 
 /// 输入框里正在打的「@关键词」:@ 所在的位置,和它后面已经打出的字。
 typedef MentionQuery = ({int start, String query});
@@ -22,7 +23,11 @@ List<UserSkill> matchSkills(Iterable<UserSkill> skills, String query) {
   final q = query.toLowerCase();
   return [
     for (final s in skills)
-      if (q.isEmpty || s.name.toLowerCase().contains(q) || s.id.contains(q)) s,
+      if (q.isEmpty ||
+          s.name.toLowerCase().contains(q) ||
+          tr(s.name).toLowerCase().contains(q) ||
+          s.id.contains(q))
+        s,
   ];
 }
 
@@ -47,10 +52,10 @@ class MentionList extends StatelessWidget {
       radius: 10,
       padding: const EdgeInsets.all(4),
       child: skills.isEmpty
-          ? const Padding(
+          ? Padding(
               padding: EdgeInsets.all(8),
               child: Text(
-                '没有匹配的 Skill',
+                tr('没有匹配的 Skill'),
                 style: TextStyle(fontSize: 12, color: PennaColors.slate400),
               ),
             )
@@ -97,7 +102,7 @@ class _MentionRow extends StatelessWidget {
           child: Row(
             children: [
               Text(
-                skill.name,
+                tr(skill.name),
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
@@ -107,13 +112,10 @@ class _MentionRow extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  skill.description,
+                  tr(skill.description),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: PennaColors.slate400,
-                  ),
+                  style: TextStyle(fontSize: 11.5, color: PennaColors.slate400),
                 ),
               ),
             ],
@@ -153,7 +155,7 @@ class MentionChip extends StatelessWidget {
             child: Text(
               '$prefix$name',
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
                 color: PennaColors.primary,
@@ -166,11 +168,7 @@ class MentionChip extends StatelessWidget {
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: onRemove,
-                child: const Icon(
-                  Icons.close,
-                  size: 12,
-                  color: PennaColors.primary,
-                ),
+                child: Icon(Icons.close, size: 12, color: PennaColors.primary),
               ),
             ),
           ],

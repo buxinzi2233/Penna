@@ -9,12 +9,12 @@ extension StudioStorage on StudioViewModel {
     try {
       restore(jsonDecode(await file.readAsString()) as Map<String, dynamic>);
     } on Object catch (e) {
-      debugPrint('读取工作台失败:${e.runtimeType}');
+      debugPrint(tr('读取工作台失败:{0}', [e.runtimeType]));
       try {
         final stamp = DateTime.now().millisecondsSinceEpoch;
         await file.rename('${file.path}.bad-$stamp');
       } on FileSystemException catch (e) {
-        debugPrint('给工作台文件留底失败:${e.message}');
+        debugPrint(tr('给工作台文件留底失败:{0}', [e.message]));
       }
     }
   }
@@ -177,7 +177,7 @@ extension StudioStorage on StudioViewModel {
       _archive = List.unmodifiable(_archive.where((c) => c.id != id));
     }
     _closedTabs = Set.unmodifiable({..._closedTabs}..remove(id));
-    _log('删除一场对话', before: before);
+    _log(tr('删除一场对话'), before: before);
     _changed();
     return true;
   }
@@ -207,11 +207,14 @@ extension StudioStorage on StudioViewModel {
   /// 不能放时返回给用户看的原因。
   // ponytail: 记录里含当时的固定区文字;现在还有固定区时放回来会重复,
   // 要处理的话得把记录按块存而不是存成一整段。
-  String? restorePrompt(PromptRecord record, {String title = '历史提示词'}) {
+  String? restorePrompt(PromptRecord record, {String? title}) {
+    title ??= tr('历史提示词');
     final wasEmpty = body.trim().isEmpty;
     final before = _snapshot();
     final problem = proposeDraft(record.text, merge: false, title: title);
-    if (problem == null) _log('把「$title」放回 $_here', before: before);
+    if (problem == null) {
+      _log(tr('把「{0}」放回 {1}', [title, _here]), before: before);
+    }
     if (problem == null && wasEmpty) acceptDiff();
     return problem;
   }

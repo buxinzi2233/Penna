@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../../l10n/l10n.dart';
+
 /// MCP 服务提供的一个工具。
 class McpTool {
   const McpTool(this.name, this.description);
@@ -45,7 +47,7 @@ Map<String, Object?> _result(Map<String, Object?> reply) {
     final text = '$message';
     // 服务端的原文可能很长,也可能回显令牌,只留开头。
     throw McpException(
-      '服务报错:${text.length > 120 ? text.substring(0, 120) : text}',
+      tr('服务报错:{0}', [text.length > 120 ? text.substring(0, 120) : text]),
     );
   }
   final result = reply['result'];
@@ -115,7 +117,7 @@ Future<String> callHttpMcpTool(
   ].join('\n');
   if (result['isError'] == true) {
     throw McpException(
-      '工具报错:${text.length > 120 ? text.substring(0, 120) : text}',
+      tr('工具报错:{0}', [text.length > 120 ? text.substring(0, 120) : text]),
     );
   }
   return text;
@@ -133,7 +135,7 @@ Future<T> _httpSession<T>(
 ) async {
   final uri = Uri.tryParse(url.trim());
   if (uri == null || !uri.isScheme('http') && !uri.isScheme('https')) {
-    throw const McpException('地址要以 http:// 或 https:// 开头');
+    throw McpException(tr('地址要以 http:// 或 https:// 开头'));
   }
   final client = HttpClient()..connectionTimeout = timeout;
   String? session;
@@ -187,7 +189,7 @@ Future<T> _httpSession<T>(
       }
       if (_isReplyTo(reply, id)) return reply!;
     }
-    throw const McpException('服务没有按 MCP 协议回复');
+    throw McpException(tr('服务没有按 MCP 协议回复'));
   }
 
   try {
@@ -205,15 +207,15 @@ Future<T> _httpSession<T>(
       );
     }().timeout(timeout);
   } on TimeoutException {
-    throw const McpException('连接超时');
+    throw McpException(tr('连接超时'));
   } on SocketException {
-    throw const McpException('连不上这个地址');
+    throw McpException(tr('连不上这个地址'));
   } on HandshakeException {
-    throw const McpException('HTTPS 握手失败');
+    throw McpException(tr('HTTPS 握手失败'));
   } on HttpException {
-    throw const McpException('连接中断');
+    throw McpException(tr('连接中断'));
   } on FormatException {
-    throw const McpException('地址或令牌里有非法字符');
+    throw McpException(tr('地址或令牌里有非法字符'));
   } finally {
     client.close(force: true);
   }
@@ -255,7 +257,7 @@ Future<List<McpTool>> listStdioMcpTools(
   Duration timeout = const Duration(seconds: 20),
 }) async {
   final parts = splitCommand(command);
-  if (parts.isEmpty) throw const McpException('没有填启动命令');
+  if (parts.isEmpty) throw McpException(tr('没有填启动命令'));
   final Process process;
   try {
     // runInShell:Windows 上 npx、uvx 这类其实是 .cmd 脚本,要经过命令行才能启动。
@@ -266,7 +268,7 @@ Future<List<McpTool>> listStdioMcpTools(
       runInShell: true,
     );
   } on ProcessException {
-    throw McpException('启动不了:${parts.first}');
+    throw McpException(tr('启动不了:{0}', [parts.first]));
   }
   // 不读走错误输出的话,程序写满缓冲区会卡住。
   unawaited(process.stderr.drain<void>());
@@ -282,7 +284,7 @@ Future<List<McpTool>> listStdioMcpTools(
       final reply = _tryJson(lines.current);
       if (_isReplyTo(reply, id)) return reply!;
     }
-    throw const McpException('程序没有按 MCP 协议回复就退出了');
+    throw McpException(tr('程序没有按 MCP 协议回复就退出了'));
   }
 
   try {
@@ -292,9 +294,9 @@ Future<List<McpTool>> listStdioMcpTools(
       return _tools(_result(await ask(_request(2, 'tools/list'), 2)));
     }().timeout(timeout);
   } on TimeoutException {
-    throw const McpException('等待程序回复超时');
+    throw McpException(tr('等待程序回复超时'));
   } on IOException {
-    throw const McpException('和程序的通信中断');
+    throw McpException(tr('和程序的通信中断'));
   } finally {
     unawaited(lines.cancel());
     await _stop(process);

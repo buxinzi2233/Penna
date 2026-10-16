@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'reverse_model.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 /// 图像反推:左边放参考图(点选或拖进来),右边是从它反推出的原始提示词。
 class ReversePane extends StatelessWidget {
@@ -26,7 +27,7 @@ class ReversePane extends StatelessWidget {
     final problem = model.vm.restorePrompt((
       time: DateTime.now(),
       text: model.prompt,
-    ), title: '图像反推');
+    ), title: tr('图像反推'));
     if (problem != null) showToast(context, problem, warn: true);
   }
 
@@ -55,9 +56,9 @@ class ReversePane extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              '原始反推提示词',
+                              tr('原始反推提示词'),
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 11.5,
@@ -66,7 +67,7 @@ class ReversePane extends StatelessWidget {
                             ),
                           ),
                           PennaButton(
-                            label: '发送给 Agent',
+                            label: tr('发送给 Agent'),
                             icon: Icons.send_outlined,
                             borderColor: PennaColors.border,
                             onPressed: prompt.isEmpty || onSend == null
@@ -75,7 +76,7 @@ class ReversePane extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           PennaButton(
-                            label: prompt.isEmpty ? '反推' : '重新反推',
+                            label: prompt.isEmpty ? tr('反推') : tr('重新反推'),
                             icon: Icons.image_search,
                             background: PennaColors.primaryBg,
                             foreground: PennaColors.primary,
@@ -101,9 +102,9 @@ class ReversePane extends StatelessWidget {
                                   ),
                                 )
                               : prompt.isEmpty
-                              ? const Center(
+                              ? Center(
                                   child: Text(
-                                    '暂无内容',
+                                    tr('暂无内容'),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: PennaColors.slate400,
@@ -125,14 +126,14 @@ class ReversePane extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             PennaButton(
-                              label: '复制',
+                              label: tr('复制'),
                               icon: Icons.content_copy,
                               onPressed: () =>
-                                  copyWithToast(context, prompt, '已复制'),
+                                  copyWithToast(context, prompt, tr('已复制')),
                             ),
                             const SizedBox(width: 6),
                             PennaButton(
-                              label: '放到成稿',
+                              label: tr('放到成稿'),
                               icon: Icons.keyboard_double_arrow_up,
                               background: PennaColors.accent,
                               foreground: Colors.white,

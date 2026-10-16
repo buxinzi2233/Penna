@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../settings/settings_sections.dart';
 import '../studio/studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 /// 问用户这份成稿叫什么、归到哪一类;取消返回 null。
 Future<({String title, String category})?> showSaveDialog(
@@ -21,7 +22,7 @@ Future<({String title, String category})?> showSaveDialog(
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Text('保存到档案库', style: TextStyle(fontSize: 16)),
+        title: Text(tr('保存到档案库'), style: TextStyle(fontSize: 16)),
         content: SizedBox(
           width: 360,
           child: Column(
@@ -29,16 +30,16 @@ Future<({String title, String category})?> showSaveDialog(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               PennaField(
-                label: '名称',
-                hint: '可留空',
+                label: tr('名称'),
+                hint: tr('可留空'),
                 value: title,
                 onChanged: (v) => title = v,
               ),
               const SizedBox(height: 12),
               PennaField(
                 key: ValueKey(picks),
-                label: '分类',
-                hint: uncategorized,
+                label: tr('分类'),
+                hint: tr(uncategorized),
                 value: category,
                 onChanged: (v) => setState(() => category = v),
               ),
@@ -50,7 +51,7 @@ Future<({String title, String category})?> showSaveDialog(
                   children: [
                     for (final c in categories)
                       PennaChip(
-                        label: c,
+                        label: tr(c), // 「未分类」要翻译,自己起的分类原样
                         selected: c == category.trim(),
                         onTap: () => setState(() {
                           category = c;
@@ -66,12 +67,12 @@ Future<({String title, String category})?> showSaveDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(tr('取消')),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.pop(context, (title: title, category: category)),
-            child: const Text('保存'),
+            child: Text(tr('保存')),
           ),
         ],
       ),
@@ -106,14 +107,14 @@ class _ArchivePageState extends State<ArchivePage> {
     final problem = widget.vm.restorePrompt((
       time: entry.time,
       text: entry.text,
-    ), title: '档案库');
+    ), title: tr('档案库'));
     if (problem != null) return showToast(context, problem, warn: true);
     widget.onOpenStudio();
   }
 
   Future<void> _delete(ArchiveEntry entry) async {
-    final name = entry.title.isEmpty ? '这条记录' : '「${entry.title}」';
-    if (await confirmDelete(context, '删除$name?', '删掉后找不回来。')) {
+    final name = entry.title.isEmpty ? tr('这条记录') : tr('「{0}」', [entry.title]);
+    if (await confirmDelete(context, tr('删除{0}?', [name]), tr('删掉后找不回来。'))) {
       widget.archive.remove(entry.id);
     }
   }
@@ -138,31 +139,28 @@ class _ArchivePageState extends State<ArchivePage> {
               PennaBar(
                 color: PennaColors.card,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.inventory_2_outlined,
                     size: 15,
                     color: PennaColors.primary,
                   ),
                   const SizedBox(width: 6),
-                  const Text(
-                    '档案库',
+                  Text(
+                    tr('档案库'),
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    '${all.length} 条',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: PennaColors.slate500,
-                    ),
+                    tr('{0} 条', [all.length]),
+                    style: TextStyle(fontSize: 11, color: PennaColors.slate500),
                   ),
                 ],
               ),
               if (all.isEmpty)
-                const Expanded(
+                Expanded(
                   child: Center(
                     child: Text(
-                      '还没有存档 · 在工作区点「保存」',
+                      tr('还没有存档 · 在工作区点「保存」'),
                       style: TextStyle(
                         fontSize: 12,
                         color: PennaColors.slate400,
@@ -182,13 +180,13 @@ class _ArchivePageState extends State<ArchivePage> {
                           runSpacing: 6,
                           children: [
                             PennaChip(
-                              label: '全部',
+                              label: tr('全部'),
                               selected: category == null,
                               onTap: () => setState(() => _category = null),
                             ),
                             for (final c in categories)
                               PennaChip(
-                                label: c,
+                                label: tr(c),
                                 selected: c == category,
                                 onTap: () => setState(() => _category = c),
                               ),
@@ -244,8 +242,8 @@ class _EntryCard extends StatelessWidget {
                 radius: 99,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
                 child: Text(
-                  entry.category,
-                  style: const TextStyle(
+                  tr(entry.category),
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: PennaColors.primary,
@@ -255,7 +253,7 @@ class _EntryCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  entry.title.isEmpty ? '未命名' : entry.title,
+                  entry.title.isEmpty ? tr('未命名') : entry.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -269,24 +267,21 @@ class _EntryCard extends StatelessWidget {
               ),
               Text(
                 shortTime(entry.time),
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: PennaColors.slate400,
-                ),
+                style: TextStyle(fontSize: 11, color: PennaColors.slate400),
               ),
               const SizedBox(width: 8),
               PennaButton(
-                label: '放回成稿',
+                label: tr('放回成稿'),
                 icon: Icons.keyboard_double_arrow_up,
                 onPressed: onRestore,
               ),
               PennaButton(
-                label: '复制',
+                label: tr('复制'),
                 icon: Icons.content_copy,
-                onPressed: () => copyWithToast(context, clean, '已复制'),
+                onPressed: () => copyWithToast(context, clean, tr('已复制')),
               ),
               IconButton(
-                tooltip: '删除',
+                tooltip: tr('删除'),
                 iconSize: 15,
                 visualDensity: VisualDensity.compact,
                 color: PennaColors.slate400,

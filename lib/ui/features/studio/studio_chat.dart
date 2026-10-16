@@ -12,7 +12,7 @@ extension StudioChat on StudioViewModel {
     List<Attachment> attachments = const [],
   }) {
     final text = raw.trim();
-    if (text.isEmpty && attachments.isEmpty) return '请输入内容后再发送';
+    if (text.isEmpty && attachments.isEmpty) return tr('请输入内容后再发送');
     final message = (
       text: text,
       skillIds: List<String>.unmodifiable(skillIds),
@@ -125,9 +125,9 @@ extension StudioChat on StudioViewModel {
   /// 重新运行:丢掉最后一条回复,把最后一条用户消息原样再发一次。
   /// 不能运行时返回给用户看的原因,成功返回 null。
   String? regenerate({DateTime? now}) {
-    if (isStreaming) return '正在生成,请先停止当前回复';
+    if (isStreaming) return tr('正在生成,请先停止当前回复');
     final at = _messages.lastIndexWhere((m) => m.fromUser);
-    if (at < 0) return '还没有可以重新运行的消息';
+    if (at < 0) return tr('还没有可以重新运行的消息');
     _toolRounds = 0;
     _foundTags.clear();
     return _startReply(_messages.sublist(0, at + 1), now ?? DateTime.now());
@@ -137,7 +137,7 @@ extension StudioChat on StudioViewModel {
   String? _startReply(List<ChatMessage> history, DateTime time) {
     final cfg = config.config;
     final chain = _usable(cfg.agentChain);
-    if (chain.isEmpty) return '请先在设置里添加模型并填写模型名称';
+    if (chain.isEmpty) return tr('请先在设置里添加模型并填写模型名称');
 
     _messages = List.unmodifiable([
       ...history,
@@ -211,7 +211,10 @@ extension StudioChat on StudioViewModel {
           (delta) => _updateReply((m) => m.copyWith(text: m.text + delta)),
           onError: (Object e) {
             _updateReply(
-              (m) => m.copyWith(text: '${m.text}\n[出错] $e', failed: true),
+              (m) => m.copyWith(
+                text: tr('{0}\n[出错] {1}', [m.text, e]),
+                failed: true,
+              ),
             );
             _finishReply();
             _sendNext();
@@ -255,7 +258,7 @@ extension StudioChat on StudioViewModel {
   }) {
     final cfg = config.config;
     final chain = _usable(cfg.agentChain);
-    if (chain.isEmpty) throw const LlmException('请先在设置里添加模型并填写模型名称');
+    if (chain.isEmpty) throw LlmException(tr('请先在设置里添加模型并填写模型名称'));
     return streamWithFailover(
       _requests(cfg, chain, cfg.activePreset, messages, images: images),
       this.streamChat,

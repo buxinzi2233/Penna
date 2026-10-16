@@ -58,13 +58,13 @@ class _DiffHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.auto_awesome, size: 13, color: PennaColors.primary),
+        Icon(Icons.auto_awesome, size: 13, color: PennaColors.primary),
         const SizedBox(width: 4),
         Expanded(
           child: Text(
             diff.title,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: PennaColors.primary,
@@ -72,14 +72,14 @@ class _DiffHeader extends StatelessWidget {
           ),
         ),
         PennaButton(
-          label: all ? '全部采纳' : '采纳',
+          label: all ? tr('全部采纳') : tr('采纳'),
           background: PennaColors.diffAdd,
           foreground: PennaColors.diffAddText,
           onPressed: onAccept,
         ),
         const SizedBox(width: 4),
         PennaButton(
-          label: all ? '全部驳回' : '驳回',
+          label: all ? tr('全部驳回') : tr('驳回'),
           background: PennaColors.diffDel,
           foreground: PennaColors.diffDelText,
           onPressed: onReject,

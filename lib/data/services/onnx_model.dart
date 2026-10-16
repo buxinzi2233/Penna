@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 
+import '../../l10n/l10n.dart';
+
 class OnnxException implements Exception {
   const OnnxException(this.message);
 
@@ -57,9 +59,9 @@ class OnnxModel {
             outputs.first,
       );
     } on PlatformException catch (e) {
-      throw OnnxException('模型加载失败:${_brief(e.message)}');
+      throw OnnxException(tr('模型加载失败:{0}', [_brief(e.message)]));
     } on MissingPluginException {
-      throw const OnnxException('这个版本没有带 ONNX 运行库');
+      throw OnnxException(tr('这个版本没有带 ONNX 运行库'));
     }
   }
 
@@ -81,7 +83,7 @@ class OnnxModel {
           .asFlattenedList();
       return [for (final v in values) (v as num).toDouble()];
     } on PlatformException catch (e) {
-      throw OnnxException('推理失败:${_brief(e.message)}');
+      throw OnnxException(tr('推理失败:{0}', [_brief(e.message)]));
     } finally {
       for (final v in made) {
         await v.dispose();
@@ -94,6 +96,6 @@ class OnnxModel {
 
 /// 运行库的报错可能很长,截一截。
 String _brief(String? message) {
-  final text = (message ?? '未知错误').trim();
+  final text = (message ?? tr('未知错误')).trim();
   return text.length > 200 ? '${text.substring(0, 200)}…' : text;
 }

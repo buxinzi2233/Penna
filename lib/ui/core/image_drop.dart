@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/harness/attachment.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// 一张图的位置:点一下选图或直接拖进来;有图时显示它,右上角可以换图、移除。
 class ImageDrop extends StatefulWidget {
@@ -14,13 +15,13 @@ class ImageDrop extends StatefulWidget {
     super.key,
     required this.image,
     required this.onChanged,
-    this.hint = '点击或拖入参考图',
+    this.hint,
   });
 
   final Attachment? image;
 
-  /// 没有图时中间的那句话。
-  final String hint;
+  /// 没有图时中间的那句话;不给就是「点击或拖入参考图」。
+  final String? hint;
 
   /// 换了图(移除时是 null)。
   final ValueChanged<Attachment?> onChanged;
@@ -40,7 +41,7 @@ class _ImageDropState extends State<ImageDrop> {
   Future<void> _use(BuildContext context, String path) async {
     try {
       final picked = await readAttachment(File(path));
-      if (!picked.isImage) throw const AttachmentException('这不是图片');
+      if (!picked.isImage) throw AttachmentException(tr('这不是图片'));
       widget.onChanged(picked);
     } on AttachmentException catch (e) {
       if (context.mounted) showToast(context, e.message, warn: true);
@@ -50,7 +51,7 @@ class _ImageDropState extends State<ImageDrop> {
   Future<void> _pick(BuildContext context) async {
     final picked = await openFile(
       acceptedTypeGroups: [
-        XTypeGroup(label: '图片', extensions: imageMimes.keys.toList()),
+        XTypeGroup(label: tr('图片'), extensions: imageMimes.keys.toList()),
       ],
     );
     if (picked != null && context.mounted) await _use(context, picked.path);
@@ -71,7 +72,10 @@ class _ImageDropState extends State<ImageDrop> {
         fit: StackFit.passthrough,
         children: [
           image == null
-              ? _EmptyImage(hint: widget.hint, onTap: () => _pick(context))
+              ? _EmptyImage(
+                  hint: widget.hint ?? tr('点击或拖入参考图'),
+                  onTap: () => _pick(context),
+                )
               : _ImageBox(
                   image: image,
                   onReplace: () => _pick(context),
@@ -104,7 +108,7 @@ class _DropHint extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: PennaColors.primary, width: 2),
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -115,7 +119,7 @@ class _DropHint extends StatelessWidget {
             ),
             SizedBox(height: 6),
             Text(
-              '松开放入图片',
+              tr('松开放入图片'),
               style: TextStyle(fontSize: 13, color: PennaColors.primary),
             ),
           ],
@@ -143,7 +147,7 @@ class _EmptyImage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.add_photo_alternate_outlined,
                   size: 26,
                   color: PennaColors.slate400,
@@ -151,10 +155,7 @@ class _EmptyImage extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   hint,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: PennaColors.slate500,
-                  ),
+                  style: TextStyle(fontSize: 12, color: PennaColors.slate500),
                 ),
               ],
             ),
@@ -187,7 +188,7 @@ class _ImageBox extends StatelessWidget {
             child: Image.memory(
               image.bytes!,
               fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const Center(
+              errorBuilder: (_, _, _) => Center(
                 child: Icon(
                   Icons.broken_image_outlined,
                   color: PennaColors.slate400,
@@ -201,14 +202,14 @@ class _ImageBox extends StatelessWidget {
             child: Row(
               children: [
                 PennaButton(
-                  label: '换图',
+                  label: tr('换图'),
                   icon: Icons.swap_horiz,
                   borderColor: PennaColors.border,
                   onPressed: onReplace,
                 ),
                 const SizedBox(width: 4),
                 PennaButton(
-                  label: '移除',
+                  label: tr('移除'),
                   icon: Icons.close,
                   borderColor: PennaColors.border,
                   onPressed: onClear,

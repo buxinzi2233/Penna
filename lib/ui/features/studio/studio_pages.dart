@@ -62,7 +62,7 @@ extension StudioPages on StudioViewModel {
     for (final p in _pages) {
       if (!order.contains(p.series)) order.add(p.series);
     }
-    return '系列 ${order.indexOf(s) + 1}';
+    return tr('系列 {0}', [order.indexOf(s) + 1]);
   }
 
   /// 眼前这个系列有几页。
@@ -110,7 +110,7 @@ extension StudioPages on StudioViewModel {
   /// 换到第 [i] 页。不能换时返回给用户看的原因。
   String? openPage(int i) {
     if (i == _page || i < 0 || i >= _pages.length) return null;
-    if (isStreaming) return '正在生成,稍后再换页';
+    if (isStreaming) return tr('正在生成,稍后再换页');
     _show(i);
     _leftPage();
     return null;
@@ -119,16 +119,19 @@ extension StudioPages on StudioViewModel {
   /// 新开一页并换过去:默认加在眼前这个系列的最后;[toSeries] 指定加到哪个系列,
   /// [newSeries] 为真则另起一个系列(它有自己的对话)。
   String? addPage({int? toSeries, bool newSeries = false}) {
-    if (isStreaming) return '正在生成,稍后再加页';
+    if (isStreaming) return tr('正在生成,稍后再加页');
     final before = _snapshot();
     final at = _insertPage(
       newSeries
           ? _pages.map((p) => p.series).reduce((a, b) => a > b ? a : b) + 1
           : toSeries ?? series,
     );
-    if (at == null) return '最多 ${StudioPages.maxPages} 页';
+    if (at == null) return tr('最多 {0} 页', [StudioPages.maxPages]);
     _show(at);
-    _log(newSeries ? '新建「${seriesName(series)}」' : '新增 $_here', before: before);
+    _log(
+      newSeries ? tr('新建「{0}」', [seriesName(series)]) : tr('新增 {0}', [_here]),
+      before: before,
+    );
     _leftPage();
     return null;
   }
@@ -152,9 +155,9 @@ extension StudioPages on StudioViewModel {
   /// 删掉第 [i] 页。一个系列的最后一页没了,它的对话收进对话历史。
   String? removePage(int i) {
     if (i < 0 || i >= _pages.length) return null;
-    if (isStreaming) return '正在生成,稍后再删';
-    if (_pages.length == 1) return '只剩这一页了';
-    _log('删除 ${seriesName(_pages[i].series)} · 第 ${pageNumber(i)} 页');
+    if (isStreaming) return tr('正在生成,稍后再删');
+    if (_pages.length == 1) return tr('只剩这一页了');
+    _log(tr('删除 {0} · 第 {1} 页', [seriesName(_pages[i].series), pageNumber(i)]));
     // 先换到留下来的邻居上,再把这一页拿掉。
     if (i == _page) _show(i > 0 ? i - 1 : 1);
     final gone = _pages[i].series;
@@ -168,9 +171,9 @@ extension StudioPages on StudioViewModel {
 
   /// 删掉整个系列:它的每一页都删,对话收进对话历史。
   String? removeSeries(int s) {
-    if (isStreaming) return '正在生成,稍后再删';
+    if (isStreaming) return tr('正在生成,稍后再删');
     final stay = _pages.indexWhere((p) => p.series != s);
-    _log('删除「${seriesName(s)}」');
+    _log(tr('删除「{0}」', [seriesName(s)]));
     if (stay < 0) {
       // 这是最后一个系列:删完留一张空白页,对话收进历史,从头开始。
       if (_messages.isNotEmpty) {
@@ -204,14 +207,14 @@ extension StudioPages on StudioViewModel {
   /// 眼前就是这一页的话,人跟着它过去。
   String? detachPage(int i) {
     if (i < 0 || i >= _pages.length) return null;
-    if (isStreaming) return '正在生成,稍后再试';
+    if (isStreaming) return tr('正在生成,稍后再试');
     final from = _pages[i].series;
     final mates = [
       for (final (k, p) in _pages.indexed)
         if (p.series == from && k != i) k,
     ];
-    if (mates.isEmpty) return '这一页已经自成一个系列了';
-    _log('${seriesName(from)} · 第 ${pageNumber(i)} 页脱离系列');
+    if (mates.isEmpty) return tr('这一页已经自成一个系列了');
+    _log(tr('{0} · 第 {1} 页脱离系列', [seriesName(from), pageNumber(i)]));
     final follow = i == _page;
     // 先站到同系列的邻居上,这一页才好拿走。
     if (follow) _show(mates.first);
@@ -255,11 +258,14 @@ extension StudioPages on StudioViewModel {
   String? movePage(int from, int to) {
     if (from == to || from < 0 || to < 0) return null;
     if (from >= _pages.length || to >= _pages.length) return null;
-    if (isStreaming) return '正在生成,稍后再挪';
-    if (_pages[from].series != _pages[to].series) return '只能在同一个系列里调顺序';
+    if (isStreaming) return tr('正在生成,稍后再挪');
+    if (_pages[from].series != _pages[to].series) return tr('只能在同一个系列里调顺序');
     _log(
-      '拖动 ${seriesName(_pages[from].series)}:'
-      '第 ${pageNumber(from)} 页 → 第 ${pageNumber(to)} 页',
+      tr(
+        '拖动 {0}:'
+        '第 {1} 页 → 第 {2} 页',
+        [seriesName(_pages[from].series), pageNumber(from), pageNumber(to)],
+      ),
     );
     final moved = pages;
     moved.insert(to, moved.removeAt(from));
@@ -280,7 +286,9 @@ extension StudioPages on StudioViewModel {
   void renameSeries(int s, String name) {
     final clean = name.trim();
     if (clean == (_seriesNames[s] ?? '')) return;
-    _log('系列改名:${seriesName(s)} → ${clean.isEmpty ? '默认' : clean}');
+    _log(
+      tr('系列改名:{0} → {1}', [seriesName(s), clean.isEmpty ? tr('默认') : clean]),
+    );
     _seriesNames = Map.unmodifiable({
       for (final e in _seriesNames.entries)
         if (e.key != s) e.key: e.value,
@@ -296,8 +304,15 @@ extension StudioPages on StudioViewModel {
     final p = current[i];
     if (name.trim() == p.name) return;
     _log(
-      '${seriesName(p.series)} · 第 ${pageNumber(i)} 页改名:'
-      '${name.trim().isEmpty ? '去掉名字' : name.trim()}',
+      tr(
+        '{0} · 第 {1} 页改名:'
+        '{2}',
+        [
+          seriesName(p.series),
+          pageNumber(i),
+          name.trim().isEmpty ? tr('去掉名字') : name.trim(),
+        ],
+      ),
     );
     _pages = List.unmodifiable([
       ...current.take(i),
@@ -318,7 +333,10 @@ extension StudioPages on StudioViewModel {
     for (final (i, p) in pages.indexed)
       if (p.series == series && p.blocks.any((b) => b.text.trim().isNotEmpty))
         (
-          title: '第 ${pageNumber(i)} 页${p.name.isEmpty ? '' : ' · ${p.name}'}',
+          title: tr('第 {0} 页{1}', [
+            pageNumber(i),
+            p.name.isEmpty ? '' : ' · ${p.name}',
+          ]),
           text: _onPage(i, () => labeledPrompt),
         ),
   ];
@@ -356,7 +374,9 @@ extension StudioPages on StudioViewModel {
       return (_page, null);
     }
     final at = _insertPage(series);
-    return at == null ? (null, '最多 ${StudioPages.maxPages} 页') : (at, null);
+    return at == null
+        ? (null, tr('最多 {0} 页', [StudioPages.maxPages]))
+        : (at, null);
   }
 
   /// 这份成稿是不是要另起一个系列:标签上写了 `page="新系列"`(换了主题)。
@@ -379,7 +399,7 @@ extension StudioPages on StudioViewModel {
     final fresh =
         _pages.map((p) => p.series).reduce((a, b) => a > b ? a : b) + 1;
     final at = _insertPage(fresh);
-    if (at == null) return '最多 ${StudioPages.maxPages} 页';
+    if (at == null) return tr('最多 {0} 页', [StudioPages.maxPages]);
     // 不走 _show:它会把对话换成新系列的(空的),这里要的是带着走。
     _pages = List.unmodifiable(pages);
     _page = at;
@@ -389,7 +409,7 @@ extension StudioPages on StudioViewModel {
     if (title.isNotEmpty) {
       _seriesNames = Map.unmodifiable({..._seriesNames, fresh: title});
     }
-    _log('新建「${seriesName(fresh)}」', before: before);
+    _log(tr('新建「{0}」', [seriesName(fresh)]), before: before);
     _leftPage();
     return null;
   }
@@ -423,7 +443,7 @@ extension StudioPages on StudioViewModel {
     }
     return _onPage(at, () {
       // 已经是这份了(比如重新运行得到一样的结果)就不用再提。
-      if (containsLines(body, text)) return '成稿已经是这样了';
+      if (containsLines(body, text)) return tr('成稿已经是这样了');
       final wasEmpty = body.trim().isEmpty;
       final failed = proposeDraft(
         text,

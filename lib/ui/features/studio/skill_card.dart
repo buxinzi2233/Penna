@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../data/services/skill_store.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../../../l10n/l10n.dart';
 
 /// 回复里新写的 Skill:名字、简介、正文预览,和它在用户 Skills 里的状态。
 /// 新名字的在回复结束时已经自动加进去了;同名的要用户点一下才替换。
@@ -39,14 +40,18 @@ class NewSkillCard extends StatelessWidget {
         ? null
         : userSkills.where((s) => s.id == skill!.id).firstOrNull;
     final (label, icon, ready) = switch (null) {
-      _ when writing => ('正在写', Icons.edit_outlined, false),
-      _ when !complete || skill == null => ('不完整', Icons.error_outline, false),
-      _ when existing == null => ('加入 Skills', Icons.add, true),
+      _ when writing => (tr('正在写'), Icons.edit_outlined, false),
+      _ when !complete || skill == null => (
+        tr('不完整'),
+        Icons.error_outline,
+        false,
+      ),
+      _ when existing == null => (tr('加入 Skills'), Icons.add, true),
       _
           when existing.body == skill.body &&
               existing.description == skill.description =>
-        ('已加入 Skills', Icons.check, false),
-      _ => ('替换同名 Skill', Icons.sync, true),
+        (tr('已加入 Skills'), Icons.check, false),
+      _ => (tr('替换同名 Skill'), Icons.sync, true),
     };
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -63,18 +68,16 @@ class NewSkillCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.school_outlined,
-                size: 14,
-                color: PennaColors.primary,
-              ),
+              Icon(Icons.school_outlined, size: 14, color: PennaColors.primary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  skill == null ? '新 Skill' : '新 Skill · ${skill.name}',
+                  skill == null
+                      ? tr('新 Skill')
+                      : tr('新 Skill · {0}', [skill.name]),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: PennaColors.primary,
@@ -95,7 +98,7 @@ class NewSkillCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               skill.description,
-              style: const TextStyle(fontSize: 12, color: PennaColors.slate700),
+              style: TextStyle(fontSize: 12, color: PennaColors.slate700),
             ),
             const SizedBox(height: 8),
             PennaCard(

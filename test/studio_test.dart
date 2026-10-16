@@ -230,8 +230,15 @@ void main() {
     expect(config.config.mcpServers, hasLength(1));
     expect(find.text('测试连接'), findsOneWidget);
 
-    await tester.tap(find.text('外观'));
+    await tester.tap(find.text('软件设置'));
     await tester.pump();
+    await tester.tap(find.text('English'));
+    await tester.pump();
+    expect(config.config.language, 'en');
+    await tester.tap(find.byType(Switch).first);
+    await tester.pump();
+    expect(config.config.darkMode, isTrue);
+    await tester.ensureVisible(find.text('微软雅黑'));
     await tester.tap(find.text('微软雅黑'));
     await tester.pump();
     expect(config.config.fontCjk, 'Microsoft YaHei UI');

@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../l10n/l10n.dart';
+
 /// 角色库里用户自己存的一个角色:名字、提示词,和一张图([image] 是文件路径,没有就是空串)。
 typedef CharacterCard = ({
   String id,
@@ -108,7 +110,7 @@ class CharacterStore extends ChangeNotifier {
       _deleteImage(replacing);
       return file.path;
     } on FileSystemException catch (e) {
-      debugPrint('角色的图没存上:${e.message}');
+      debugPrint(tr('角色的图没存上:{0}', [e.message]));
       return replacing;
     }
   }
@@ -152,7 +154,7 @@ class CharacterStore extends ChangeNotifier {
         )
         ..renameSync(file.path);
     } on FileSystemException catch (e) {
-      debugPrint('角色库没存上:${e.message}');
+      debugPrint(tr('角色库没存上:{0}', [e.message]));
     }
   }
 

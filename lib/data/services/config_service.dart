@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/app_config.dart';
 import 'dpapi.dart';
+import '../../l10n/l10n.dart';
 
 /// 读写用户设置,都放在 [dir](「文档\Penna」)下:
 /// - `config.json`:普通设置,明文,可以直接打开看;
@@ -51,14 +52,16 @@ class ConfigService extends ChangeNotifier {
         loaded = AppConfig.fromJson(jsonDecode(await file.readAsString()));
       }
     } on Object catch (e) {
-      _loadError = '读取设置失败,已改用默认设置:$e';
+      _loadError = tr('读取设置失败,已改用默认设置:{0}', [e]);
       await _setAside(file);
     }
     // 机密单独读:Key 文件出问题时,不能连带丢掉读好的普通设置。
     try {
       _savedSecrets = await _readSecrets();
     } on Object {
-      _loadError = '${_loadError ?? ''}已保存的 Key 读不出来(可能不是在这台电脑上保存的),请重新填写';
+      _loadError = tr('{0}已保存的 Key 读不出来(可能不是在这台电脑上保存的),请重新填写', [
+        _loadError ?? '',
+      ]);
       // 留底:否则下次填 Key 时会把这份读不了的文件直接覆盖掉。
       await _setAside(keysFile);
     }
@@ -81,7 +84,7 @@ class ConfigService extends ChangeNotifier {
       await old.rename('${old.path}.migrated');
       await storage.deleteAll();
     } on Object catch (e) {
-      _loadError = '搬迁旧设置时出错:${e.runtimeType}。';
+      _loadError = tr('搬迁旧设置时出错:{0}。', [e.runtimeType]);
     }
   }
 
@@ -113,7 +116,7 @@ class ConfigService extends ChangeNotifier {
         await broken.rename('${broken.path}.bad-$stamp');
       }
     } on FileSystemException catch (e) {
-      _loadError = '$_loadError(给原文件留底也失败:${e.message})';
+      _loadError = tr('{0}(给原文件留底也失败:{1})', [_loadError, e.message]);
     }
   }
 
@@ -125,7 +128,8 @@ class ConfigService extends ChangeNotifier {
         .then((_) => _persist(next))
         .then(
           (_) => _setSaveError(null),
-          onError: (Object e) => _setSaveError('保存设置失败:${e.runtimeType}'),
+          onError: (Object e) =>
+              _setSaveError(tr('保存设置失败:{0}', [e.runtimeType])),
         );
   }
 

@@ -16,6 +16,7 @@ import 'features/studio/reverse_model.dart';
 import 'features/studio/studio_page.dart';
 import 'features/studio/studio_view_model.dart';
 import 'features/update/update_flow.dart';
+import '../l10n/l10n.dart';
 
 export 'core/version.dart';
 
@@ -151,7 +152,7 @@ class _AppShellState extends State<AppShell> {
                             local: _local,
                           ),
                         ),
-                        const Positioned(
+                        Positioned(
                           right: 8,
                           bottom: 3,
                           child: IgnorePointer(
@@ -221,7 +222,7 @@ class _ErrorBanner extends StatelessWidget {
       child: SelectableText(
         contextMenuBuilder: pennaTextMenu,
         message,
-        style: const TextStyle(fontSize: 12, color: PennaColors.diffDelText),
+        style: TextStyle(fontSize: 12, color: PennaColors.diffDelText),
       ),
     );
   }
@@ -239,7 +240,7 @@ class _NavRail extends StatelessWidget {
       width: 48,
       // 顶部留白让第一个按钮和右边 PennaBar 那一行垂直居中对齐。
       padding: const EdgeInsets.only(top: 1, bottom: 12),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: PennaColors.sidebar,
         border: Border(right: BorderSide(color: PennaColors.border)),
       ),
@@ -247,35 +248,35 @@ class _NavRail extends StatelessWidget {
         children: [
           _RailButton(
             icon: Icons.space_dashboard_outlined,
-            tooltip: '工作台',
+            tooltip: tr('工作台'),
             selected: page == _studio,
             onTap: () => onSelect(_studio),
           ),
           const SizedBox(height: 6),
           _RailButton(
             icon: Icons.inventory_2_outlined,
-            tooltip: '档案库',
+            tooltip: tr('档案库'),
             selected: page == _archivePage,
             onTap: () => onSelect(_archivePage),
           ),
           const SizedBox(height: 6),
           _RailButton(
             icon: Icons.face_retouching_natural_outlined,
-            tooltip: '角色库',
+            tooltip: tr('角色库'),
             selected: page == _charactersPage,
             onTap: () => onSelect(_charactersPage),
           ),
           const SizedBox(height: 6),
           _RailButton(
             icon: Icons.memory_outlined,
-            tooltip: '本地反推',
+            tooltip: tr('本地反推'),
             selected: page == _localPage,
             onTap: () => onSelect(_localPage),
           ),
           const Spacer(),
           _RailButton(
             icon: Icons.settings_outlined,
-            tooltip: '设置',
+            tooltip: tr('设置'),
             selected: page == _settings,
             onTap: () => onSelect(_settings),
           ),

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../../l10n/l10n.dart';
+
 // 本地自然语言反推:在本机起一个 llama.cpp 的 llama-server,加载 GGUF 视觉模型,
 // 之后和联网的模型一样走 OpenAI 兼容接口。做法照 NLapt 的 nlapt/local/server.py。
 
@@ -137,11 +139,11 @@ class LlamaServer {
   }) async {
     for (final (path, what) in [
       (spec.exe, 'llama-server'),
-      (spec.model, '模型文件'),
-      if (spec.mmproj.isNotEmpty) (spec.mmproj, '视觉组件'),
+      (spec.model, tr('模型文件')),
+      if (spec.mmproj.isNotEmpty) (spec.mmproj, tr('视觉组件')),
     ]) {
       if (!File(path).existsSync()) {
-        throw LocalServerException('找不到$what:$path');
+        throw LocalServerException(tr('找不到{0}:{1}', [what, path]));
       }
     }
     await stop();
@@ -153,14 +155,16 @@ class LlamaServer {
         spec.port,
       )).close();
     } on SocketException {
-      throw LocalServerException('端口 ${spec.port} 被占用了,换一个端口,或先关掉占着它的程序');
+      throw LocalServerException(
+        tr('端口 {0} 被占用了,换一个端口,或先关掉占着它的程序', [spec.port]),
+      );
     }
     _tail.clear();
     final Process process;
     try {
       process = await _start(spec.exe, serverArgs(spec));
     } on ProcessException {
-      throw const LocalServerException('启动不了 llama-server');
+      throw LocalServerException(tr('启动不了 llama-server'));
     }
     _process = process;
     _spec = spec;
@@ -192,21 +196,24 @@ class LlamaServer {
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
       if (_stopped == process) {
-        throw const LocalServerException('已停止');
+        throw LocalServerException(tr('已停止'));
       }
       if (exited) {
         final why = _tail.where((l) => l.trim().isNotEmpty).lastOrNull;
         throw LocalServerException(
-          'llama-server 启动后退出了'
-          '${why == null ? '' : ':${_short(why)}'}。'
-          '常见原因是显存不够,可以调低 GPU 层数或上下文长度',
+          tr(
+            'llama-server 启动后退出了'
+            '{0}。'
+            '常见原因是显存不够,可以调低 GPU 层数或上下文长度',
+            [why == null ? '' : ':${_short(why)}'],
+          ),
         );
       }
       if (await _isHealthy(health) && _process == process) return baseUrl!;
       await Future<void>.delayed(poll);
     }
     await stop();
-    throw const LocalServerException('等了很久还没准备好,已停下');
+    throw LocalServerException(tr('等了很久还没准备好,已停下'));
   }
 
   void _clear(Process process) {

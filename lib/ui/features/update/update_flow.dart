@@ -10,6 +10,7 @@ import '../../core/version.dart';
 import '../../core/widgets.dart';
 import '../settings/settings_sections.dart';
 import '../studio/markdown_text.dart';
+import '../../../l10n/l10n.dart';
 
 typedef FetchRelease = Future<Release?> Function();
 
@@ -30,7 +31,7 @@ Future<void> checkForUpdate(
   }
   if (!context.mounted) return;
   if (release == null || compareVersions(release.version, current) <= 0) {
-    if (!quiet) showToast(context, '已是最新版本');
+    if (!quiet) showToast(context, tr('已是最新版本'));
     return;
   }
   final found = release;
@@ -65,7 +66,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
     setState(() {
       _busy = true;
       _progress = 0;
-      _status = '下载中…';
+      _status = tr('下载中…');
     });
     try {
       final temp = await Directory.systemTemp.createTemp('penna-update-');
@@ -85,12 +86,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
         },
       );
       if (!mounted) return;
-      setState(() => _status = '正在解压…');
+      setState(() => _status = tr('正在解压…'));
       final from = await unpackUpdate(
         zip,
         '${temp.path}${Platform.pathSeparator}new',
       );
-      setState(() => _status = '即将重启…');
+      setState(() => _status = tr('即将重启…'));
       await launchUpdater(
         updateScript(
           pid: pid,
@@ -107,7 +108,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
     } on UpdateException catch (e) {
       _fail(e.message);
     } on Object catch (e) {
-      _fail('更新失败(${e.runtimeType})');
+      _fail(tr('更新失败({0})', [e.runtimeType]));
     }
   }
 
@@ -129,10 +130,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
   @override
   Widget build(BuildContext context) {
     final release = widget.release;
-    const body = TextStyle(fontSize: 13, height: 1.6, color: PennaColors.text);
+    final body = TextStyle(fontSize: 13, height: 1.6, color: PennaColors.text);
     return AlertDialog(
       title: Text(
-        '发现新版本 v${release.version}',
+        tr('发现新版本 v{0}', [release.version]),
         style: const TextStyle(fontSize: 16),
       ),
       content: SizedBox(
@@ -142,8 +143,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '当前版本 v${widget.current}',
-              style: const TextStyle(fontSize: 12, color: PennaColors.slate500),
+              tr('当前版本 v{0}', [widget.current]),
+              style: TextStyle(fontSize: 12, color: PennaColors.slate500),
             ),
             const SizedBox(height: 10),
             ConstrainedBox(
@@ -153,7 +154,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 radius: 6,
                 child: SingleChildScrollView(
                   child: release.notes.isEmpty
-                      ? const Text('暂无更新说明', style: body)
+                      ? Text(tr('暂无更新说明'), style: body)
                       : SelectableText.rich(
                           markdownSpan(release.notes, body),
                           contextMenuBuilder: pennaTextMenu,
@@ -187,12 +188,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
             _cancel.cancel();
             Navigator.pop(context);
           },
-          child: Text(_busy ? '取消' : '稍后'),
+          child: Text(_busy ? tr('取消') : tr('稍后')),
         ),
-        TextButton(
-          onPressed: _busy ? null : _update,
-          child: const Text('更新并重启'),
-        ),
+        TextButton(onPressed: _busy ? null : _update, child: Text(tr('更新并重启'))),
       ],
     );
   }
@@ -223,21 +221,21 @@ class _UpdateCardState extends State<UpdateCard> {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('版本与更新', style: titleStyle),
+                Text(tr('版本与更新'), style: titleStyle),
                 SizedBox(height: 2),
                 Text(
-                  '当前版本 v$appVersion · 每次启动自动检查',
+                  tr('当前版本 v{0} · 每次启动自动检查', [appVersion]),
                   style: TextStyle(fontSize: 12, color: PennaColors.slate500),
                 ),
               ],
             ),
           ),
           PennaButton(
-            label: _checking ? '检查中…' : '检查更新',
+            label: _checking ? tr('检查中…') : tr('检查更新'),
             icon: Icons.system_update_alt,
             borderColor: PennaColors.border,
             onPressed: _checking ? null : _check,

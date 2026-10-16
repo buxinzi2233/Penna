@@ -24,7 +24,7 @@ class AttachmentChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (bytes == null)
-            const Icon(
+            Icon(
               Icons.description_outlined,
               size: 14,
               color: PennaColors.slate500,
@@ -38,7 +38,7 @@ class AttachmentChip extends StatelessWidget {
                 height: _thumbSize,
                 cacheWidth: 64,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const Icon(
+                errorBuilder: (_, _, _) => Icon(
                   Icons.broken_image_outlined,
                   size: 14,
                   color: PennaColors.slate500,
@@ -53,7 +53,7 @@ class AttachmentChip extends StatelessWidget {
                 attachment.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   color: PennaColors.slate700,
@@ -67,11 +67,7 @@ class AttachmentChip extends StatelessWidget {
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: onRemove,
-                child: const Icon(
-                  Icons.close,
-                  size: 12,
-                  color: PennaColors.slate500,
-                ),
+                child: Icon(Icons.close, size: 12, color: PennaColors.slate500),
               ),
             ),
           ],

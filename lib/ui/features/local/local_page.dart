@@ -15,6 +15,7 @@ import '../../core/widgets.dart';
 import '../settings/settings_sections.dart';
 import '../studio/studio_view_model.dart';
 import 'local_model.dart';
+import '../../../l10n/l10n.dart';
 
 part 'local_nl_tab.dart';
 part 'local_tag_tab.dart';
@@ -67,12 +68,15 @@ class _LocalPageState extends State<LocalPage> {
           children: [
             Row(
               children: [
-                const Text(
-                  '本地反推',
+                Text(
+                  tr('本地反推'),
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 16),
-                for (final (i, label) in const ['Tag 反推', 'NL 反推'].indexed) ...[
+                for (final (i, label) in [
+                  tr('Tag 反推'),
+                  tr('NL 反推'),
+                ].indexed) ...[
                   PennaChip(
                     label: label,
                     selected: _tab == i,
@@ -92,7 +96,7 @@ class _LocalPageState extends State<LocalPage> {
                     child: ImageDrop(
                       image: model.image,
                       onChanged: model.setImage,
-                      hint: '点击或拖入要反推的图片',
+                      hint: tr('点击或拖入要反推的图片'),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -131,7 +135,7 @@ class _LocalPageState extends State<LocalPage> {
     final problem = widget.vm.restorePrompt((
       time: DateTime.now(),
       text: text,
-    ), title: '本地反推');
+    ), title: tr('本地反推'));
     if (problem != null) return showToast(context, problem, warn: true);
     widget.onOpenStudio();
   }
@@ -219,7 +223,11 @@ class _DownloadRow extends StatelessWidget {
   }
 
   Future<void> _remove(BuildContext context) async {
-    if (!await confirmDelete(context, '删除「$name」?', '下载好的文件会从本机删掉。')) {
+    if (!await confirmDelete(
+      context,
+      tr('删除「{0}」?', [name]),
+      tr('下载好的文件会从本机删掉。'),
+    )) {
       return;
     }
     final problem = await (onRemove ?? () => model.remove(files))();
@@ -274,7 +282,7 @@ class _DownloadRow extends StatelessWidget {
                       note,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: PennaColors.slate500,
                       ),
@@ -298,7 +306,7 @@ class _DownloadRow extends StatelessWidget {
                           ? _size(progress.received)
                           : '${_size(progress.received)} / '
                                 '${_size(progress.total!)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10.5,
                         color: PennaColors.slate500,
                       ),
@@ -309,17 +317,17 @@ class _DownloadRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             if (progress == null && foundAt != null)
-              Tooltip(message: foundAt!, child: const _Badge('本机'))
+              Tooltip(message: foundAt!, child: _Badge(tr('本机')))
             else if (progress != null)
               PennaButton(
-                label: '停止',
+                label: tr('停止'),
                 icon: Icons.stop_circle_outlined,
                 background: PennaColors.slate100,
                 onPressed: () => model.cancelDownload(keyName),
               )
             else if (ready)
               IconButton(
-                tooltip: '删除',
+                tooltip: tr('删除'),
                 iconSize: 16,
                 visualDensity: VisualDensity.compact,
                 color: PennaColors.slate500,
@@ -328,7 +336,7 @@ class _DownloadRow extends StatelessWidget {
               )
             else
               PennaButton(
-                label: '下载',
+                label: tr('下载'),
                 icon: Icons.download,
                 background: PennaColors.primaryBg,
                 foreground: PennaColors.primary,
@@ -375,7 +383,7 @@ class _GroupedModelListState extends State<_GroupedModelList> {
       cursor: SystemMouseCursors.grab,
       child: Padding(
         padding: EdgeInsets.fromLTRB(0, top, 4, 0),
-        child: const Icon(
+        child: Icon(
           Icons.drag_indicator,
           size: 16,
           color: PennaColors.slate400,
@@ -399,7 +407,7 @@ class _GroupedModelListState extends State<_GroupedModelList> {
             AnimatedRotation(
               turns: open ? 0.25 : 0,
               duration: const Duration(milliseconds: 160),
-              child: const Icon(
+              child: Icon(
                 Icons.chevron_right,
                 size: 18,
                 color: PennaColors.slate500,
@@ -407,7 +415,7 @@ class _GroupedModelListState extends State<_GroupedModelList> {
             ),
             const SizedBox(width: 4),
             Text(
-              g.series,
+              tr(g.series), // 「本机」要翻译,WD14 这类查不到就原样
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -417,7 +425,7 @@ class _GroupedModelListState extends State<_GroupedModelList> {
             const SizedBox(width: 8),
             Text(
               '${g.rows.length}',
-              style: const TextStyle(fontSize: 11, color: PennaColors.slate400),
+              style: TextStyle(fontSize: 11, color: PennaColors.slate400),
             ),
           ],
         ),
@@ -490,7 +498,7 @@ class _Badge extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 11, color: PennaColors.diffAddText),
+        style: TextStyle(fontSize: 11, color: PennaColors.diffAddText),
       ),
     );
   }
@@ -518,21 +526,21 @@ class _ResultActions extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         PennaButton(
-          label: '复制',
+          label: tr('复制'),
           icon: Icons.content_copy,
           borderColor: PennaColors.border,
-          onPressed: () => copyWithToast(context, text, '已复制'),
+          onPressed: () => copyWithToast(context, text, tr('已复制')),
         ),
         const SizedBox(width: 6),
         PennaButton(
-          label: '发送给 Agent',
+          label: tr('发送给 Agent'),
           icon: Icons.send_outlined,
           borderColor: PennaColors.border,
           onPressed: () => onSend(text),
         ),
         const SizedBox(width: 6),
         PennaButton(
-          label: '放到成稿',
+          label: tr('放到成稿'),
           icon: Icons.keyboard_double_arrow_up,
           background: PennaColors.accent,
           foreground: Colors.white,

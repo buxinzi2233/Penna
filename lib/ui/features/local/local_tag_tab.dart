@@ -22,8 +22,8 @@ class _TagTab extends StatelessWidget {
       keyName: m.id,
       name: m.name,
       note: [
-        if (m.size > 0) '约 ${_size(m.size)}',
-        if (m.note.isNotEmpty) m.note,
+        if (m.size > 0) tr('约 {0}', [_size(m.size)]),
+        if (m.note.isNotEmpty) tr(m.note),
       ].join(' · '),
       files: files,
       onDownload: () => model.downloadTagger(m),
@@ -42,7 +42,7 @@ class _TagTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Block(
-          title: '模型',
+          title: tr('模型'),
           child: _GroupedModelList(
             current: current.series,
             groups: [
@@ -60,18 +60,18 @@ class _TagTab extends StatelessWidget {
           ),
         ),
         _Block(
-          title: '阈值',
+          title: tr('阈值'),
           child: Column(
             children: [
               _Threshold(
-                label: '通用',
+                label: tr('通用'),
                 value: model.general,
                 onChanged: (v) => model.setThresholds(general: v),
               ),
               // OppaiOracle 只有一个阈值。
               if (current.kind != TaggerKind.oppai)
                 _Threshold(
-                  label: '角色',
+                  label: tr('角色'),
                   value: model.character,
                   onChanged: (v) => model.setThresholds(character: v),
                 ),
@@ -79,9 +79,9 @@ class _TagTab extends StatelessWidget {
           ),
         ),
         _Block(
-          title: '结果',
+          title: tr('结果'),
           trailing: PennaButton(
-            label: model.tagging ? '推理中…' : '推理',
+            label: model.tagging ? tr('推理中…') : tr('推理'),
             icon: Icons.sell_outlined,
             background: PennaColors.primary,
             foreground: Colors.white,
@@ -92,16 +92,13 @@ class _TagTab extends StatelessWidget {
           child: tags == null
               ? Text(
                   model.tagging
-                      ? '推理中…'
+                      ? tr('推理中…')
                       : !ready
-                      ? '先下载选中的模型'
+                      ? tr('先下载选中的模型')
                       : model.image == null
-                      ? '先在左边放一张图'
-                      : '暂无结果',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: PennaColors.slate400,
-                  ),
+                      ? tr('先在左边放一张图')
+                      : tr('暂无结果'),
+                  style: TextStyle(fontSize: 12, color: PennaColors.slate400),
                 )
               : _TagResultView(
                   // 换了图就从全选开始;只调阈值时取消勾选的照旧不要。
@@ -249,16 +246,13 @@ class _TagResultViewState extends State<_TagResultView> {
               children: [
                 Expanded(
                   child: Text(
-                    result.rating == null ? '' : '分级:${result.rating}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: PennaColors.slate500,
-                    ),
+                    result.rating == null ? '' : tr('分级:{0}', [result.rating]),
+                    style: TextStyle(fontSize: 11, color: PennaColors.slate500),
                   ),
                 ),
                 if (all.isNotEmpty)
                   PennaButton(
-                    label: '全选 $picked/${all.length}',
+                    label: tr('全选 {0}/{1}', [picked, all.length]),
                     icon: everything
                         ? Icons.check_box_outlined
                         : picked == 0
@@ -283,15 +277,15 @@ class _TagResultViewState extends State<_TagResultView> {
           ],
         ),
         if (all.isEmpty)
-          const Text(
-            '没有超过阈值的标签',
+          Text(
+            tr('没有超过阈值的标签'),
             style: TextStyle(fontSize: 12, color: PennaColors.slate400),
           )
         else if (prompt.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 10),
             child: Text(
-              '没有选中的标签',
+              tr('没有选中的标签'),
               style: TextStyle(fontSize: 12, color: PennaColors.slate400),
             ),
           )

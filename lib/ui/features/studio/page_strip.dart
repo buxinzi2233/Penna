@@ -5,16 +5,28 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../settings/settings_sections.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 typedef _Tint = ({Color bg, Color border, Color text});
 
 /// 系列外框的配色,按系列出现的先后轮着用。
-const _seriesTints = <_Tint>[
+List<_Tint> get _seriesTints =>
+    PennaColors.isDark ? _darkSeriesTints : _lightSeriesTints;
+
+const _lightSeriesTints = <_Tint>[
   (bg: Color(0xFFEEF2FF), border: Color(0xFFC7D2FE), text: Color(0xFF4338CA)),
   (bg: Color(0xFFF0FDFA), border: Color(0xFF99F6E4), text: Color(0xFF0F766E)),
   (bg: Color(0xFFFFF1F2), border: Color(0xFFFECDD3), text: Color(0xFFBE123C)),
   (bg: Color(0xFFF0F9FF), border: Color(0xFFBAE6FD), text: Color(0xFF0369A1)),
   (bg: Color(0xFFFAF5FF), border: Color(0xFFE9D5FF), text: Color(0xFF7E22CE)),
+];
+
+const _darkSeriesTints = <_Tint>[
+  (bg: Color(0xFF1B1D3A), border: Color(0xFF363A78), text: Color(0xFFA5B4FC)),
+  (bg: Color(0xFF0F2826), border: Color(0xFF1F5A54), text: Color(0xFF5EEAD4)),
+  (bg: Color(0xFF2C171C), border: Color(0xFF64303A), text: Color(0xFFFDA4AF)),
+  (bg: Color(0xFF10233A), border: Color(0xFF1F4A70), text: Color(0xFF7DD3FC)),
+  (bg: Color(0xFF261835), border: Color(0xFF4F3370), text: Color(0xFFD8B4FE)),
 ];
 
 /// 成稿正文上方的页签:每个系列一个彩色框,框里先是系列的名字,再是它的各页
@@ -29,26 +41,26 @@ class PageStrip extends StatelessWidget {
   }
 
   Future<void> _pageMenu(BuildContext context, Offset at, int i) async {
-    final picked = await popMenu(context, at, const [
-      '改名',
-      '脱离系列',
-      '建立系列',
-      '删除这一页',
-      '删除整个系列',
+    final picked = await popMenu(context, at, [
+      tr('改名'),
+      tr('脱离系列'),
+      tr('建立系列'),
+      tr('删除这一页'),
+      tr('删除整个系列'),
     ]);
     if (!context.mounted || picked == null) return;
     final page = vm.pages[i];
-    if (picked == '脱离系列') return _do(context, vm.detachPage(i));
-    if (picked == '建立系列') return _do(context, vm.addPage(newSeries: true));
-    if (picked == '删除整个系列') return _removeSeries(context, page.series);
-    if (picked == '改名') return _renamePage(context, i);
+    if (picked == tr('脱离系列')) return _do(context, vm.detachPage(i));
+    if (picked == tr('建立系列')) return _do(context, vm.addPage(newSeries: true));
+    if (picked == tr('删除整个系列')) return _removeSeries(context, page.series);
+    if (picked == tr('改名')) return _renamePage(context, i);
     final empty =
         page.pending == null && page.blocks.every((b) => b.text.trim().isEmpty);
     if (!empty &&
         !await confirmDelete(
           context,
-          '删除第 ${vm.pageNumber(i)} 页?',
-          '这一页的成稿会一起删掉。',
+          tr('删除第 {0} 页?', [vm.pageNumber(i)]),
+          tr('这一页的成稿会一起删掉。'),
         )) {
       return;
     }
@@ -56,30 +68,34 @@ class PageStrip extends StatelessWidget {
   }
 
   Future<void> _seriesMenu(BuildContext context, Offset at, int series) async {
-    final picked = await popMenu(context, at, const ['改名', '删除整个系列']);
+    final picked = await popMenu(context, at, [tr('改名'), tr('删除整个系列')]);
     if (!context.mounted || picked == null) return;
-    if (picked == '改名') return _renameSeries(context, series);
+    if (picked == tr('改名')) return _renameSeries(context, series);
     await _removeSeries(context, series);
   }
 
   Future<void> _renamePage(BuildContext context, int i) async {
     final name = await askName(
       context,
-      '第 ${vm.pageNumber(i)} 页的名字',
+      tr('第 {0} 页的名字', [vm.pageNumber(i)]),
       vm.pages[i].name,
     );
     if (name != null) vm.renamePage(i, name);
   }
 
   Future<void> _renameSeries(BuildContext context, int series) async {
-    final next = await askName(context, '系列的名字', vm.seriesName(series));
+    final next = await askName(context, tr('系列的名字'), vm.seriesName(series));
     if (next != null) vm.renameSeries(series, next);
   }
 
   /// 删掉整个系列,先问一句。
   Future<void> _removeSeries(BuildContext context, int series) async {
     final name = vm.seriesName(series);
-    if (!await confirmDelete(context, '删除「$name」?', '这个系列的每一页都会删掉,对话收进历史。')) {
+    if (!await confirmDelete(
+      context,
+      tr('删除「{0}」?', [name]),
+      tr('这个系列的每一页都会删掉,对话收进历史。'),
+    )) {
       return;
     }
     if (context.mounted) _do(context, vm.removeSeries(series));
@@ -101,13 +117,13 @@ class PageStrip extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(top: 7, right: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '成稿正文',
+                tr('成稿正文'),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -166,7 +182,7 @@ class PageStrip extends StatelessWidget {
                       ),
                     _IconChip(
                       icon: Icons.add,
-                      tip: '在这个系列里加一页',
+                      tip: tr('在这个系列里加一页'),
                       color: _seriesTints[g % _seriesTints.length].text,
                       onTap: full
                           ? null
@@ -178,9 +194,9 @@ class PageStrip extends StatelessWidget {
                   ],
                 ),
               Tooltip(
-                message: '另起一个系列,对话和别的系列分开',
+                message: tr('另起一个系列,对话和别的系列分开'),
                 child: PennaButton(
-                  label: '新系列',
+                  label: tr('新系列'),
                   icon: Icons.add,
                   borderColor: PennaColors.border,
                   onPressed: full
@@ -330,7 +346,10 @@ class _PageChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : tint.text,
+            // 选中的页签底色是 tint.text:浅色配色下它深,深色配色下它浅。
+            color: selected
+                ? (PennaColors.isDark ? PennaColors.bg : Colors.white)
+                : tint.text,
           ),
         ),
       ),
@@ -354,9 +373,9 @@ class _PageChip extends StatelessWidget {
         childWhenDragging: Opacity(opacity: 0.35, child: _face(hovered: false)),
         child: Tooltip(
           message: [
-            '第 $number 页',
+            tr('第 {0} 页', [number]),
             if (name.isNotEmpty) name,
-            if (waiting) '有待确认的改动',
+            if (waiting) tr('有待确认的改动'),
             _gestureTip,
           ].join(' · '),
           waitDuration: _tipWait,
@@ -371,7 +390,7 @@ class _PageChip extends StatelessWidget {
                 children: [
                   _face(hovered: incoming.isNotEmpty),
                   if (waiting)
-                    const Positioned(
+                    Positioned(
                       top: -2,
                       right: -2,
                       child: CircleAvatar(
@@ -390,13 +409,14 @@ class _PageChip extends StatelessWidget {
 }
 
 /// 「成稿正文」旁边的问号:这一块藏着的操作。
-const _bodyTips =
-    '页签、系列名:双击改名 · 右键更多 · 按住拖动换顺序\n'
-    '分段:右键标注改名 · 拖左上角把手换位置\n'
-    '选中文字后右键:固定、润色、翻译、建立分段';
+String get _bodyTips => tr(
+  '页签、系列名:双击改名 · 右键更多 · 按住拖动换顺序\n'
+  '分段:右键标注改名 · 拖左上角把手换位置\n'
+  '选中文字后右键:固定、润色、翻译、建立分段',
+);
 
 /// 页签和系列名上能做什么;悬停一会儿就显示。
-const _gestureTip = '双击改名 · 右键更多';
+String get _gestureTip => tr('双击改名 · 右键更多');
 const _tipWait = Duration(milliseconds: 350);
 
 /// 单击马上生效,紧接着再点一下算双击。

@@ -15,7 +15,7 @@ extension StudioDraft on StudioViewModel {
   /// 清之前先记进历史提示词,点错了能从那里放回来。对话不动。
   void clearDraft() {
     recordPrompt();
-    _log('清空 $_here');
+    _log(tr('清空 {0}', [_here]));
     _blocks = const [];
     _pending = null;
     _queued = const [];
@@ -129,7 +129,7 @@ extension StudioDraft on StudioViewModel {
     final sections = [for (final s in spans) text.substring(s.start, s.end)];
     final moved = sections.removeAt(from);
     sections.insert(to, moved);
-    _log('拖动「${sectionTitle(moved)}」($_here)');
+    _log(tr('拖动「{0}」({1})', [sectionTitle(moved), _here]));
     // 第一段前面、最后一段后面的空白(比如挨着固定区的那个换行)原样留着。
     setText(
       index,
@@ -150,7 +150,7 @@ extension StudioDraft on StudioViewModel {
     if (span < 0 || span >= spans.length) return;
     final s = spans[span];
     if (s.label.isEmpty) return;
-    _log('「${s.label}」脱离分段($_here)');
+    _log(tr('「{0}」脱离分段({1})', [s.label, _here]));
     bodySelection = null;
     setText(
       index,
@@ -185,7 +185,7 @@ extension StudioDraft on StudioViewModel {
           detachSection(p.index, i);
           return true;
         }
-        _log('「${s.label}」里选中的文字脱离分段($_here)');
+        _log(tr('「{0}」里选中的文字脱离分段({1})', [s.label, _here]));
         bodySelection = null;
         setText(
           p.index,
@@ -232,7 +232,7 @@ extension StudioDraft on StudioViewModel {
     if (s.label.isEmpty) return false;
     if (s.label == name) return true;
     if (sectionNameTaken(name)) return false;
-    _log('「${s.label}」改名为「$name」($_here)');
+    _log(tr('「{0}」改名为「{1}」({2})', [s.label, name, _here]));
     setText(index, part.text.replaceRange(s.start, s.textStart, '【$name】'));
     return true;
   }
@@ -270,7 +270,7 @@ extension StudioDraft on StudioViewModel {
       if (picked.isEmpty) return false;
       final before = p.text.substring(free.textStart, a).trim();
       final after = p.text.substring(b, free.textEnd).trim();
-      _log('选中的文字建成「$name」($_here)');
+      _log(tr('选中的文字建成「{0}」({1})', [name, _here]));
       bodySelection = null;
       setText(
         p.index,
@@ -303,7 +303,7 @@ extension StudioDraft on StudioViewModel {
       return false;
     }
     recordPrompt();
-    _log('取消分段($_here)');
+    _log(tr('取消分段({0})', [_here]));
     _restructure(next);
     return true;
   }
@@ -316,7 +316,7 @@ extension StudioDraft on StudioViewModel {
     if (cut == null) return false;
     final (blocks, at) = cut;
     if (blocks[at].text.trim().isEmpty) return false;
-    _log('固定选中的文字($_here)');
+    _log(tr('固定选中的文字({0})', [_here]));
     _restructure([
       for (final (i, b) in blocks.indexed)
         i == at ? (text: b.text, pinned: true) : b,
@@ -342,7 +342,7 @@ extension StudioDraft on StudioViewModel {
         _isolate(start, end);
     if (cut == null) return false;
     final (blocks, at) = cut;
-    _log('固定「${sectionTitle(pin)}」($_here)');
+    _log(tr('固定「{0}」({1})', [sectionTitle(pin), _here]));
     _restructure([
       for (final (i, b) in blocks.indexed)
         i == at ? (text: pin, pinned: true) : b,
@@ -354,7 +354,7 @@ extension StudioDraft on StudioViewModel {
   void addPin(String text) {
     final pin = text.trim();
     if (_pending != null || pin.isEmpty) return;
-    _log('新增固定区($_here)');
+    _log(tr('新增固定区({0})', [_here]));
     _restructure([(text: pin, pinned: true), ..._blocks]);
   }
 
@@ -372,7 +372,7 @@ extension StudioDraft on StudioViewModel {
     // 否则会和邻居粘在一起。
     final gap = _isSection(_blocks[index]) ? _lineGap : _gap;
     final freed = '${gap(before, text)}$text${gap(text, after)}';
-    _log('取消固定($_here)');
+    _log(tr('取消固定({0})', [_here]));
     _restructure([
       for (final (i, b) in _blocks.indexed)
         i == index ? (text: freed, pinned: false) : b,
@@ -386,7 +386,7 @@ extension StudioDraft on StudioViewModel {
     final (cut, at) = _cut(_blocks, offset);
     // 切开一块文字后,它后面各块的下标都后移一位。
     final old = cut.length > _blocks.length && index >= at ? index + 1 : index;
-    _log('拖动固定区($_here)');
+    _log(tr('拖动固定区({0})', [_here]));
     _restructure([
       for (var i = 0; i <= cut.length; i++) ...[
         if (i == at) pin,
@@ -403,7 +403,7 @@ extension StudioDraft on StudioViewModel {
       for (final (i, b) in _blocks.indexed)
         i == p.segmentIndex ? (text: p.added, pinned: false) : b,
     ]);
-    _log('采纳「${p.title}」($_here)', before: before);
+    _log(tr('采纳「{0}」({1})', [p.title, _here]), before: before);
     _nextDiff();
     _changed();
     recordPrompt();
@@ -420,7 +420,7 @@ extension StudioDraft on StudioViewModel {
         i == p.segmentIndex ? (text: text, pinned: false) : b,
     ]);
     _pending = _remaining(p, removed: text, added: p.added);
-    _log('采纳「$label」这一段($_here)', before: before);
+    _log(tr('采纳「{0}」这一段({1})', [label, _here]), before: before);
     if (_pending == null) _nextDiff();
     _changed();
     recordPrompt();
@@ -436,14 +436,14 @@ extension StudioDraft on StudioViewModel {
       removed: p.removed,
       added: applySection(p.added, p.removed, label),
     );
-    _log('驳回「$label」这一段($_here)', before: before);
+    _log(tr('驳回「{0}」这一段({1})', [label, _here]), before: before);
     if (_pending == null) _nextDiff();
     _changed();
   }
 
   void rejectDiff() {
     if (_pending == null) return;
-    _log('驳回「${_pending!.title}」($_here)');
+    _log(tr('驳回「{0}」({1})', [_pending!.title, _here]));
     _nextDiff();
     _changed();
   }
@@ -452,7 +452,7 @@ extension StudioDraft on StudioViewModel {
   void proposeVariant(PromptVariant variant) {
     final target =
         _blocks[RangeError.checkValidIndex(variant.segmentIndex, _blocks)];
-    if (target.pinned) throw ArgumentError('固定区不能改');
+    if (target.pinned) throw ArgumentError(tr('固定区不能改'));
     // 候选方案会顶掉眼前这处改动,后面排着的也一起作废,免得接着冒出来对不上号。
     _queued = const [];
     _pending = DiffProposal(
@@ -476,17 +476,18 @@ extension StudioDraft on StudioViewModel {
     String text, {
     String? replacing,
     bool merge = true,
-    String title = 'Agent 新成稿',
+    String? title,
   }) {
-    if (_pending != null) return '先处理待确认的改动';
-    if (text.trim().isEmpty) return '新成稿是空的';
+    title ??= tr('Agent 新成稿');
+    if (_pending != null) return tr('先处理待确认的改动');
+    if (text.trim().isEmpty) return tr('新成稿是空的');
     if (replacing != null) {
       final at = body.indexOf(replacing);
       final cut = at < 0 ? null : _isolate(at, at + replacing.length);
-      if (cut == null) return '选中的那段已经变了';
+      if (cut == null) return tr('选中的那段已经变了');
       _blocks = List.unmodifiable(cut.$1);
       _pending = DiffProposal(
-        title: 'Agent 改「${sectionTitle(replacing)}」',
+        title: tr('Agent 改「{0}」', [sectionTitle(replacing)]),
         segmentIndex: cut.$2,
         removed: replacing,
         added: text,
@@ -515,7 +516,7 @@ extension StudioDraft on StudioViewModel {
             added: next[k++],
           ),
     ].where((d) => d.removed != d.added).toList();
-    if (diffs.isEmpty) return '成稿已经是这样了';
+    if (diffs.isEmpty) return tr('成稿已经是这样了');
     _blocks = List.unmodifiable([
       for (final p in columns) (text: p.text, pinned: p.pinned),
     ]);

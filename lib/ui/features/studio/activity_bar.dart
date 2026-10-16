@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 const _closedWidth = 30.0;
 const _openWidth = 210.0;
@@ -34,7 +35,7 @@ class _ActivityBarState extends State<ActivityBar> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       width: ActivityBar.widthOf(open: _open),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: PennaColors.slate50,
         border: Border(right: BorderSide(color: PennaColors.border)),
       ),
@@ -48,7 +49,7 @@ class _ActivityBarState extends State<ActivityBar> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Tooltip(
-                message: _open ? '收起操作记录' : '操作记录',
+                message: _open ? tr('收起操作记录') : tr('操作记录'),
                 child: InkWell(
                   onTap: () => setState(() => _open = !_open),
                   child: SizedBox(
@@ -56,23 +57,23 @@ class _ActivityBarState extends State<ActivityBar> {
                     child: Row(
                       children: [
                         const SizedBox(width: 7),
-                        const Icon(
+                        Icon(
                           Icons.history,
                           size: 16,
                           color: PennaColors.slate500,
                         ),
                         if (_open) ...[
                           const SizedBox(width: 6),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              '操作记录',
+                              tr('操作记录'),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                          const Icon(
+                          Icon(
                             Icons.chevron_left,
                             size: 16,
                             color: PennaColors.slate400,
@@ -88,9 +89,9 @@ class _ActivityBarState extends State<ActivityBar> {
               if (_open)
                 Expanded(
                   child: actions.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            '还没有操作',
+                            tr('还没有操作'),
                             style: TextStyle(
                               fontSize: 12,
                               color: PennaColors.slate400,
@@ -109,14 +110,14 @@ class _ActivityBarState extends State<ActivityBar> {
                                   Expanded(
                                     child: Text(
                                       _clock(actions[i].time),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 10.5,
                                         color: PennaColors.slate400,
                                       ),
                                     ),
                                   ),
                                   Tooltip(
-                                    message: '回滚到这一步之前',
+                                    message: tr('回滚到这一步之前'),
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(4),
                                       onTap: () {
@@ -129,7 +130,7 @@ class _ActivityBarState extends State<ActivityBar> {
                                           );
                                         }
                                       },
-                                      child: const Padding(
+                                      child: Padding(
                                         padding: EdgeInsets.all(2),
                                         child: Icon(
                                           Icons.undo,
@@ -143,7 +144,7 @@ class _ActivityBarState extends State<ActivityBar> {
                               ),
                               Text(
                                 actions[i].text,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
                                   height: 1.4,
                                   color: PennaColors.slate700,

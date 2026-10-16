@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/harness/attachment.dart';
 import '../../../core/harness/providers/openai_provider.dart';
 import 'studio_view_model.dart';
+import '../../../l10n/l10n.dart';
 
 const _reversePrompt =
     '你是图像反推助手。看这张图,写出能让文生图模型画出同样画面的英文正面提示词:'
@@ -56,8 +57,8 @@ class ReverseModel extends ChangeNotifier {
   /// 反推当前这张图。失败时返回给用户看的原因,成功返回 null。
   Future<String?> run() async {
     final image = _image;
-    if (image == null) return '先放一张图';
-    if (_busy) return '正在反推';
+    if (image == null) return tr('先放一张图');
+    if (_busy) return tr('正在反推');
     final round = ++_round;
     _busy = true;
     notifyListeners();
@@ -79,12 +80,12 @@ class ReverseModel extends ChangeNotifier {
           1: [(mime: image.mime!, bytes: image.bytes!)],
         },
       )).trim();
-      if (out.isEmpty) problem = '模型没有返回内容';
+      if (out.isEmpty) problem = tr('模型没有返回内容');
     } on LlmException catch (e) {
       problem = e.message;
     } on Object catch (e) {
       // 只报类型,原文可能带着 Key。
-      problem = '反推失败(${e.runtimeType})';
+      problem = tr('反推失败({0})', [e.runtimeType]);
     }
     // 等结果的时候图已经换了:这次的结果不要了。
     if (round != _round) return null;
@@ -120,7 +121,7 @@ class ReverseModel extends ChangeNotifier {
         jsonEncode({'name': image.name, 'mime': image.mime, 'prompt': _prompt}),
       );
     } on FileSystemException catch (e) {
-      debugPrint('参考图没存上:${e.message}');
+      debugPrint(tr('参考图没存上:{0}', [e.message]));
     }
   }
 

@@ -5,6 +5,8 @@ import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
 
+import '../../../l10n/l10n.dart';
+
 // 检查更新与自更新:看 GitHub 上最新的发行版,比版本号;要更新时下载 zip、解开,
 // 交给一个独立的 PowerShell 脚本等 Penna 退出后把新文件盖上去,再重新打开。
 
@@ -89,18 +91,18 @@ Future<Release?> fetchLatestRelease({
     final body = await utf8.decodeStream(response).timeout(timeout);
     if (response.statusCode == HttpStatus.notFound) return null;
     if (response.statusCode != HttpStatus.ok) {
-      throw UpdateException('检查更新失败(HTTP ${response.statusCode})');
+      throw UpdateException(tr('检查更新失败(HTTP {0})', [response.statusCode]));
     }
     return parseRelease(jsonDecode(body) as Map<String, dynamic>);
   } on UpdateException {
     rethrow;
   } on TimeoutException {
-    throw const UpdateException('检查更新超时');
+    throw UpdateException(tr('检查更新超时'));
   } on SocketException {
-    throw const UpdateException('连不上 GitHub');
+    throw UpdateException(tr('连不上 GitHub'));
   } on Object catch (e) {
     // 只报类型,不转述原文。
-    throw UpdateException('检查更新失败(${e.runtimeType})');
+    throw UpdateException(tr('检查更新失败({0})', [e.runtimeType]));
   } finally {
     client.close(force: true);
   }
@@ -116,7 +118,7 @@ Future<String> unpackUpdate(String zip, String into) async {
           .where((f) => f.uri.pathSegments.last.toLowerCase() == 'penna.exe')
           .toList()
         ..sort((a, b) => a.path.length - b.path.length);
-  if (exe.isEmpty) throw const UpdateException('安装包里没有 penna.exe');
+  if (exe.isEmpty) throw UpdateException(tr('安装包里没有 penna.exe'));
   return exe.first.parent.path;
 }
 

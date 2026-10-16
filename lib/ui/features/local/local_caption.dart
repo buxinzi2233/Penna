@@ -68,7 +68,7 @@ extension LocalCaption on LocalModel {
     final p = currentPrompt;
     captionPrompts = List.unmodifiable([
       ...captionPrompts,
-      (name: '${p.name} 副本', text: p.text),
+      (name: tr('{0} 副本', [p.name]), text: p.text),
     ]);
     promptIndex = captionPrompts.length - 1;
   });
@@ -187,8 +187,8 @@ extension LocalCaption on LocalModel {
   /// 起 llama-server。失败时返回给用户看的原因。
   Future<String?> startServer() async {
     final exe = serverExe;
-    if (exe == null) return '先下载运行时,或选一个 llama-server.exe';
-    if (modelPath.isEmpty) return '先选一个模型';
+    if (exe == null) return tr('先下载运行时,或选一个 llama-server.exe');
+    if (modelPath.isEmpty) return tr('先选一个模型');
     _starting = true;
     _changed();
     String? problem;
@@ -221,11 +221,11 @@ extension LocalCaption on LocalModel {
   /// 失败时返回给用户看的原因。
   Future<String?> runCaption() async {
     final image = _image;
-    if (image == null) return '先放一张图';
-    if (_captioning) return '正在生成';
+    if (image == null) return tr('先放一张图');
+    if (_captioning) return tr('正在生成');
     final florence = florenceMode ? pickedCaption : null;
     final url = server.baseUrl;
-    if (florence == null && url == null) return '先启动模型';
+    if (florence == null && url == null) return tr('先启动模型');
     _captioning = true;
     _caption = '';
     final round = _round;
@@ -256,12 +256,12 @@ extension LocalCaption on LocalModel {
         }
       }
       if (problem == null && round == _round && _caption.trim().isEmpty) {
-        problem = '模型没有返回内容';
+        problem = tr('模型没有返回内容');
       }
     } on LlmException catch (e) {
       problem = e.message;
     } on Object catch (e) {
-      problem = '生成失败(${e.runtimeType})';
+      problem = tr('生成失败({0})', [e.runtimeType]);
     }
     if (round == _round) {
       _caption = _caption.trim();
@@ -280,7 +280,7 @@ extension LocalCaption on LocalModel {
     int round,
   ) async {
     final paths = captionPaths(m);
-    if (paths == null) return '先下载这个模型';
+    if (paths == null) return tr('先下载这个模型');
     try {
       if (_florenceFor != paths.model) {
         _dropFlorence();

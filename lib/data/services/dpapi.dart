@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import '../../l10n/l10n.dart';
+
 // Windows 自带的"数据保护"(DPAPI):用当前登录用户的身份加密。
 // 加密后的内容只有这台电脑上的这个用户能解开,文件被拷走或被网盘同步也读不出来。
 
@@ -71,7 +73,7 @@ Uint8List _run(_CryptDart crypt, Uint8List input) {
       _noUi,
       outBlob,
     );
-    if (ok == 0) throw StateError('Windows 数据保护调用失败');
+    if (ok == 0) throw StateError(tr('Windows 数据保护调用失败'));
     final out = Uint8List.fromList(
       outBlob.ref.data.asTypedList(outBlob.ref.size),
     );

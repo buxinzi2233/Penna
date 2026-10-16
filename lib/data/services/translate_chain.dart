@@ -1,5 +1,6 @@
 import '../models/app_config.dart';
 import 'translate_engines.dart';
+import '../../l10n/l10n.dart';
 
 typedef ConfigTranslator = Future<TranslateResult> Function(
   AppConfig config,
@@ -33,6 +34,6 @@ Translator _engine(AppConfig config, String id) {
     'google' => googleCloud(value('key')),
     'ali' => ali(value('id'), value('secret')),
     'baidu' => baidu(value('appid'), value('secret')),
-    _ => throw StateError('未知翻译引擎:$id'),
+    _ => throw StateError(tr('未知翻译引擎:{0}', [id])),
   };
 }

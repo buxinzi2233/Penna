@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'llm_http.dart';
+import '../../../l10n/l10n.dart';
 
 export 'llm_http.dart';
 
@@ -11,7 +12,9 @@ String? parseSseLine(String line) {
   if (json is! Map) return null;
   final error = json['error'];
   if (error != null) {
-    throw LlmException('模型返回错误:${error is Map ? error['message'] : error}');
+    throw LlmException(
+      tr('模型返回错误:{0}', [error is Map ? error['message'] : error]),
+    );
   }
   final choices = json['choices'];
   if (choices is! List || choices.isEmpty) return null;
@@ -99,7 +102,7 @@ Stream<String> _chat(HttpClient client, LlmRequest req) async* {
   if (yielded) return;
   // 有的接口无视 stream:true,直接回一整个 JSON。
   final whole = _wholeReply(plain.toString());
-  if (whole == null) throw const LlmException('模型没有返回可识别的内容');
+  if (whole == null) throw LlmException(tr('模型没有返回可识别的内容'));
   yield whole;
 }
 

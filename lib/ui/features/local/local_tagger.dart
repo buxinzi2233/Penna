@@ -72,7 +72,7 @@ extension LocalTagger on LocalModel {
           (
             id: '$_local$d',
             series: '本机',
-            name: '[本机] ${folderTitle(d)}',
+            name: tr('[本机] {0}', [folderTitle(d)]),
             repo: '',
             note: d,
             kind: kind,
@@ -147,7 +147,7 @@ extension LocalTagger on LocalModel {
   Future<String?> downloadTagger(TaggerModel m) {
     final token = hfToken().trim();
     if (m.gated && token.isEmpty) {
-      return Future.value('这个模型要先在 HuggingFace 申请访问,并在「设置 → 本地反推」填 Token');
+      return Future.value(tr('这个模型要先在 HuggingFace 申请访问,并在「设置 → 本地反推」填 Token'));
     }
     return download(
       m.id,
@@ -204,11 +204,11 @@ extension LocalTagger on LocalModel {
   /// 用选中的打标模型给当前的图打标。失败时返回给用户看的原因。
   Future<String?> runTagger() async {
     final image = _image;
-    if (image == null) return '先放一张图';
-    if (_tagging) return '正在推理';
+    if (image == null) return tr('先放一张图');
+    if (_tagging) return tr('正在推理');
     final m = tagger;
     final paths = taggerPaths(m);
-    if (paths == null) return '先下载模型';
+    if (paths == null) return tr('先下载模型');
     _tagging = true;
     final round = _round;
     _changed();
@@ -263,12 +263,12 @@ extension LocalTagger on LocalModel {
       problem = e.message;
       _dropTagger();
     } on FormatException {
-      problem = '标签表读不了';
+      problem = tr('标签表读不了');
       _dropTagger();
     } on FileSystemException catch (e) {
-      problem = '读不了模型文件:${e.osError?.message ?? e.message}';
+      problem = tr('读不了模型文件:{0}', [e.osError?.message ?? e.message]);
     } on Object catch (e) {
-      problem = '推理失败(${e.runtimeType})';
+      problem = tr('推理失败({0})', [e.runtimeType]);
     }
     _tagging = false;
     _changed();

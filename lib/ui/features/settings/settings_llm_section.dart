@@ -10,6 +10,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../studio/mention.dart';
 import 'settings_sections.dart';
+import '../../../l10n/l10n.dart';
 
 const _protocolLabels = {protocolOpenAi: 'OpenAI', protocolGoogle: 'Google'};
 
@@ -24,7 +25,7 @@ class LlmSection extends StatelessWidget {
       service.config.putLlm(
         LlmProfile(
           id: '${DateTime.now().microsecondsSinceEpoch}',
-          name: '新模型',
+          name: tr('新模型'),
           baseUrl: defaultBaseUrls[protocolOpenAi]!,
           model: '',
         ),
@@ -38,7 +39,7 @@ class LlmSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('API 管理', '按顺序使用,失败自动换下一个 · Key 仅存本机'),
+        SectionHeading(tr('API 管理'), tr('按顺序使用,失败自动换下一个 · Key 仅存本机')),
         if (cfg.llms.isNotEmpty) ...[
           PennaCard(
             padding: const EdgeInsets.all(14),
@@ -46,7 +47,7 @@ class LlmSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 LlmRolePicker(
-                  title: 'Agent 对话',
+                  title: tr('Agent 对话'),
                   service: service,
                   pinnedId: cfg.activeLlmId,
                   onPick: (id) =>
@@ -54,7 +55,7 @@ class LlmSection extends StatelessWidget {
                 ),
                 gap,
                 LlmRolePicker(
-                  title: '润色',
+                  title: tr('润色'),
                   service: service,
                   pinnedId: cfg.polishLlmId,
                   onPick: (id) =>
@@ -85,7 +86,7 @@ class LlmSection extends StatelessWidget {
         Align(
           alignment: Alignment.centerLeft,
           child: PennaButton(
-            label: '添加模型',
+            label: tr('添加模型'),
             icon: Icons.add,
             background: PennaColors.primary,
             foreground: Colors.white,
@@ -129,13 +130,13 @@ class LlmRolePicker extends StatelessWidget {
           runSpacing: 8,
           children: [
             PennaChip(
-              label: '按顺序',
+              label: tr('按顺序'),
               selected: pinned == null,
               onTap: () => service.update(onPick(null)),
             ),
             for (final llm in usable)
               PennaChip(
-                label: llm.name.trim().isEmpty ? '未命名' : llm.name,
+                label: llm.name.trim().isEmpty ? tr('未命名') : llm.name,
                 selected: pinned == llm.id,
                 onTap: () => service.update(onPick(llm.id)),
               ),
@@ -253,7 +254,7 @@ class _LlmCardState extends State<_LlmCard> {
     if (!mounted) return;
     setState(() => _saving = false);
     final error = service.lastError;
-    showToast(context, error ?? '已保存', warn: error != null);
+    showToast(context, error ?? tr('已保存'), warn: error != null);
   }
 
   void _revert() => setState(() {
@@ -276,12 +277,12 @@ class _LlmCardState extends State<_LlmCard> {
         baseUrl: llm.baseUrl,
         apiKey: _key,
       );
-      if (models.isEmpty) error = '接口没有返回模型';
+      if (models.isEmpty) error = tr('接口没有返回模型');
     } on LlmException catch (e) {
       error = e.message;
     } on Object catch (e) {
       // 没料到的错误也要让按钮恢复可用;只报类型,原文可能带着 Key。
-      error = '拉取失败(${e.runtimeType})';
+      error = tr('拉取失败({0})', [e.runtimeType]);
     }
     if (!mounted) return;
     setState(() {
@@ -296,7 +297,7 @@ class _LlmCardState extends State<_LlmCard> {
     final models = llm.models;
     setState(() {
       _pulling = true;
-      _pullError = models.isEmpty ? '先填模型名称' : null;
+      _pullError = models.isEmpty ? tr('先填模型名称') : null;
       _testOk = null;
     });
     String? error = _pullError;
@@ -318,7 +319,7 @@ class _LlmCardState extends State<_LlmCard> {
       } on LlmException catch (e) {
         error = '$where${e.message}';
       } on TimeoutException {
-        error = '${where}30 秒没有回应';
+        error = tr('{0}30 秒没有回应', [where]);
       } on Object catch (e) {
         // 只报类型,原文可能带着 Key。
         error = '$where测试失败(${e.runtimeType})';
@@ -329,7 +330,7 @@ class _LlmCardState extends State<_LlmCard> {
     setState(() {
       _pulling = false;
       _pullError = error;
-      _testOk = error == null ? '连接正常' : null;
+      _testOk = error == null ? tr('连接正常') : null;
     });
   }
 
@@ -365,8 +366,8 @@ class _LlmCardState extends State<_LlmCard> {
   Future<void> _confirmDelete(BuildContext context) async {
     final ok = await confirmDelete(
       context,
-      '删除「${llm.name}」?',
-      'API Key 会一并删除。',
+      tr('删除「{0}」?', [llm.name]),
+      tr('API Key 会一并删除。'),
     );
     if (ok) service.update(service.config.removeLlm(llm.id));
   }
@@ -386,7 +387,7 @@ class _LlmCardState extends State<_LlmCard> {
             children: [
               ReorderableDragStartListener(
                 index: index,
-                child: const MouseRegion(
+                child: MouseRegion(
                   cursor: SystemMouseCursors.grab,
                   child: Padding(
                     padding: EdgeInsets.all(8),
@@ -417,7 +418,7 @@ class _LlmCardState extends State<_LlmCard> {
               ],
               const Spacer(),
               IconButton(
-                tooltip: '删除',
+                tooltip: tr('删除'),
                 iconSize: 18,
                 icon: const Icon(Icons.delete_outline),
                 color: PennaColors.slate500,
@@ -445,7 +446,7 @@ class _LlmCardState extends State<_LlmCard> {
                     Expanded(
                       child: PennaField(
                         key: ValueKey('name-$_reverts'),
-                        label: '显示名称',
+                        label: tr('显示名称'),
                         value: llm.name,
                         onChanged: (v) => _put(llm.copyWith(name: v)),
                       ),
@@ -454,10 +455,10 @@ class _LlmCardState extends State<_LlmCard> {
                     Expanded(
                       child: PennaField(
                         key: ValueKey('model-$_picks-$_reverts'),
-                        label: '模型名称',
+                        label: tr('模型名称'),
                         hint: llm.protocol == protocolGoogle
-                            ? 'gemini-2.5-flash,可填多个'
-                            : 'gpt-4o-mini,可填多个',
+                            ? tr('gemini-2.5-flash,可填多个')
+                            : tr('gpt-4o-mini,可填多个'),
                         value: llm.model,
                         onChanged: (v) => _put(llm.copyWith(model: v)),
                       ),
@@ -477,7 +478,7 @@ class _LlmCardState extends State<_LlmCard> {
                 PennaField(
                   key: ValueKey('key-$_reverts'),
                   label: 'API Key',
-                  hint: '可留空',
+                  hint: tr('可留空'),
                   obscure: true,
                   value: _key,
                   onChanged: (v) => setState(() => _key = v),
@@ -486,14 +487,14 @@ class _LlmCardState extends State<_LlmCard> {
                 Row(
                   children: [
                     PennaButton(
-                      label: '拉取模型',
+                      label: tr('拉取模型'),
                       icon: Icons.cloud_download_outlined,
                       background: PennaColors.slate100,
                       onPressed: _pulling ? null : _pull,
                     ),
                     const SizedBox(width: 6),
                     PennaButton(
-                      label: '测试连接',
+                      label: tr('测试连接'),
                       icon: Icons.bolt_outlined,
                       background: PennaColors.slate100,
                       onPressed: _pulling ? null : _test,
@@ -501,7 +502,7 @@ class _LlmCardState extends State<_LlmCard> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        (_pullError ?? _testOk) ?? (dirty ? '未保存' : ''),
+                        (_pullError ?? _testOk) ?? (dirty ? tr('未保存') : ''),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -516,7 +517,7 @@ class _LlmCardState extends State<_LlmCard> {
                     ),
                     if (dirty) ...[
                       PennaButton(
-                        label: '放弃',
+                        label: tr('放弃'),
                         icon: Icons.undo,
                         background: PennaColors.slate100,
                         onPressed: _saving ? null : _revert,
@@ -524,7 +525,7 @@ class _LlmCardState extends State<_LlmCard> {
                       const SizedBox(width: 6),
                     ],
                     PennaButton(
-                      label: '保存',
+                      label: tr('保存'),
                       icon: Icons.check,
                       background: PennaColors.primary,
                       foreground: Colors.white,
@@ -541,7 +542,7 @@ class _LlmCardState extends State<_LlmCard> {
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Text('已选', style: titleStyle),
+                      Text(tr('已选'), style: titleStyle),
                       for (final (i, model) in llm.models.indexed)
                         MentionChip(
                           name: model,
@@ -562,7 +563,7 @@ class _LlmCardState extends State<_LlmCard> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: PennaButton(
-                      label: '收起列表',
+                      label: tr('收起列表'),
                       icon: Icons.expand_less,
                       background: PennaColors.slate100,
                       onPressed: () => setState(() => _models = null),
@@ -622,15 +623,15 @@ class _ModelListState extends State<_ModelList> {
               style: const TextStyle(fontSize: 12.5),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: '筛选 ${widget.models.length} 个模型',
-                hintStyle: const TextStyle(color: PennaColors.slate400),
+                hintText: tr('筛选 {0} 个模型', [widget.models.length]),
+                hintStyle: TextStyle(color: PennaColors.slate400),
                 prefixIcon: const Icon(Icons.search, size: 16),
                 prefixIconConstraints: const BoxConstraints(minWidth: 34),
                 contentPadding: const EdgeInsets.symmetric(vertical: 9),
-                border: const UnderlineInputBorder(
+                border: UnderlineInputBorder(
                   borderSide: BorderSide(color: PennaColors.border),
                 ),
-                enabledBorder: const UnderlineInputBorder(
+                enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: PennaColors.border),
                 ),
               ),

@@ -1,12 +1,11 @@
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../../../data/models/app_config.dart';
 import '../../../data/services/config_service.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
-import '../update/update_flow.dart';
 import 'settings_sections.dart';
+import '../../../l10n/l10n.dart';
 
 /// 一排 Preset 药丸;选中的就是当前使用的 Preset。
 class PresetPicker extends StatelessWidget {
@@ -57,7 +56,7 @@ class _PresetSectionState extends State<PresetSection> {
       _service.config.addPreset(
         source.copyWith(
           id: 'custom-${DateTime.now().microsecondsSinceEpoch}',
-          name: '${source.name} 副本',
+          name: tr('{0} 副本', [source.name]),
         ),
       ),
     );
@@ -66,8 +65,8 @@ class _PresetSectionState extends State<PresetSection> {
   Future<void> _delete(AgentPreset preset) async {
     final ok = await confirmDelete(
       context,
-      '删除 Preset「${preset.name}」?',
-      '此操作不可撤销。',
+      tr('删除 Preset「{0}」?', [preset.name]),
+      tr('此操作不可撤销。'),
     );
     if (ok) _service.update(_service.config.removePreset(preset.id));
   }
@@ -84,13 +83,13 @@ class _PresetSectionState extends State<PresetSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('Preset', '选中的即当前使用'),
+        SectionHeading('Preset', tr('选中的即当前使用')),
         PresetPicker(service: _service),
         gap,
         Align(
           alignment: Alignment.centerLeft,
           child: PennaButton(
-            label: '新建 Preset(复制当前)',
+            label: tr('新建 Preset(复制当前)'),
             icon: Icons.add,
             background: PennaColors.primary,
             foreground: Colors.white,
@@ -106,7 +105,7 @@ class _PresetSectionState extends State<PresetSection> {
               if (!builtin) ...[
                 PennaField(
                   key: ValueKey('name-${preset.id}'),
-                  label: '名称',
+                  label: tr('名称'),
                   value: preset.name,
                   onChanged: (v) => _put(preset.copyWith(name: v)),
                 ),
@@ -115,7 +114,7 @@ class _PresetSectionState extends State<PresetSection> {
               PennaField(
                 // 换 Preset 或恢复出厂时重建输入框,否则会留着旧文字。
                 key: ValueKey('prompt-${preset.id}-$_resets'),
-                label: '系统提示',
+                label: tr('系统提示'),
                 maxLines: 10,
                 value: preset.systemPrompt,
                 onChanged: (v) => _put(preset.copyWith(systemPrompt: v)),
@@ -125,13 +124,13 @@ class _PresetSectionState extends State<PresetSection> {
                 alignment: Alignment.centerLeft,
                 child: builtin
                     ? PennaButton(
-                        label: '恢复出厂设置',
+                        label: tr('恢复出厂设置'),
                         icon: Icons.restart_alt,
                         background: PennaColors.slate100,
                         onPressed: () => _restore(preset),
                       )
                     : PennaButton(
-                        label: '删除这个 Preset',
+                        label: tr('删除这个 Preset'),
                         icon: Icons.delete_outline,
                         background: PennaColors.diffDel,
                         foreground: PennaColors.diffDelText,
@@ -173,7 +172,7 @@ class AbilitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('技能与工具', '按 Preset 分别设置'),
+        SectionHeading(tr('技能与工具'), tr('按 Preset 分别设置')),
         PresetPicker(service: service),
         gap,
         PennaCard(
@@ -182,8 +181,8 @@ class AbilitySection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ..._knob(
-                '温度',
-                '选词有多大胆:低了每次都差不多,高了更有变化也更容易跑偏',
+                tr('温度'),
+                tr('选词有多大胆:低了每次都差不多,高了更有变化也更容易跑偏'),
                 preset.temperature.toStringAsFixed(1),
                 Slider(
                   value: preset.temperature,
@@ -195,7 +194,7 @@ class AbilitySection extends StatelessWidget {
               const SizedBox(height: 6),
               ..._knob(
                 'Top P',
-                '候选词留多少:1 不限制,调低就只在最有把握的那些词里选',
+                tr('候选词留多少:1 不限制,调低就只在最有把握的那些词里选'),
                 preset.topP.toStringAsFixed(2),
                 Slider(
                   value: preset.topP,
@@ -205,19 +204,17 @@ class AbilitySection extends StatelessWidget {
                   onChanged: (v) => put(preset.copyWith(topP: v)),
                 ),
               ),
-              const Text('两个都管随机,一般只调一个', style: hintStyle),
+              Text(tr('两个都管随机,一般只调一个'), style: hintStyle),
             ],
           ),
         ),
         gap,
         OptionCard(
-          title: '工具',
+          title: tr('工具'),
           options: builtinTools,
           selected: preset.tools,
           onChanged: (s) => put(preset.copyWith(tools: s)),
         ),
-        gap,
-        const UpdateCard(),
       ],
     );
   }
@@ -251,7 +248,7 @@ class _QuickActionSectionState extends State<QuickActionSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('快捷操作', '点一下接在聊天框末尾'),
+        SectionHeading(tr('快捷操作'), tr('点一下接在聊天框末尾')),
         for (final (i, action) in actions.indexed) ...[
           PennaCard(
             padding: const EdgeInsets.all(14),
@@ -260,7 +257,7 @@ class _QuickActionSectionState extends State<QuickActionSection> {
               children: [
                 PennaField(
                   key: ValueKey('label-$_edits-$i'),
-                  label: '名称',
+                  label: tr('名称'),
                   value: action.label,
                   onChanged: (v) => _save([
                     ...actions.take(i),
@@ -271,7 +268,7 @@ class _QuickActionSectionState extends State<QuickActionSection> {
                 gap,
                 PennaField(
                   key: ValueKey('prompt-$_edits-$i'),
-                  label: '提示词',
+                  label: tr('提示词'),
                   maxLines: 3,
                   value: action.prompt,
                   onChanged: (v) => _save([
@@ -284,7 +281,7 @@ class _QuickActionSectionState extends State<QuickActionSection> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: PennaButton(
-                    label: '删除',
+                    label: tr('删除'),
                     icon: Icons.delete_outline,
                     background: PennaColors.diffDel,
                     foreground: PennaColors.diffDelText,
@@ -302,12 +299,14 @@ class _QuickActionSectionState extends State<QuickActionSection> {
         Align(
           alignment: Alignment.centerLeft,
           child: PennaButton(
-            label: '添加快捷操作',
+            label: tr('添加快捷操作'),
             icon: Icons.add,
             background: PennaColors.primary,
             foreground: Colors.white,
-            onPressed: () =>
-                _save([...actions, (label: '新操作', prompt: '')], rebuild: true),
+            onPressed: () => _save([
+              ...actions,
+              (label: tr('新操作'), prompt: ''),
+            ], rebuild: true),
           ),
         ),
       ],
@@ -315,7 +314,7 @@ class _QuickActionSectionState extends State<QuickActionSection> {
   }
 }
 
-const hintStyle = TextStyle(fontSize: 12, color: PennaColors.slate500);
+TextStyle get hintStyle => TextStyle(fontSize: 12, color: PennaColors.slate500);
 
 /// 一组带说明的开关。
 class OptionCard extends StatelessWidget {
@@ -344,7 +343,7 @@ class OptionCard extends StatelessWidget {
               Text(title, style: titleStyle),
               const SizedBox(width: 8),
               Text(
-                '已开 ${selected.length} / ${options.length}',
+                tr('已开 {0} / {1}', [selected.length, options.length]),
                 style: hintStyle,
               ),
             ],
@@ -357,8 +356,8 @@ class OptionCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(o.label, style: const TextStyle(fontSize: 13)),
-                      Text(o.hint, style: hintStyle),
+                      Text(tr(o.label), style: const TextStyle(fontSize: 13)),
+                      Text(tr(o.hint), style: hintStyle),
                     ],
                   ),
                 ),
@@ -373,203 +372,6 @@ class OptionCard extends StatelessWidget {
                 ),
               ],
             ),
-        ],
-      ),
-    );
-  }
-}
-
-typedef _FontChoice = ({String label, String family});
-
-const List<_FontChoice> _latinChoices = [
-  (label: '内置 · Maple Mono', family: ''),
-  (label: 'Segoe UI', family: 'Segoe UI'),
-  (label: 'Consolas', family: 'Consolas'),
-  (label: 'Cascadia Mono', family: 'Cascadia Mono'),
-];
-
-const List<_FontChoice> _cjkChoices = [
-  (label: '内置 · 霞鹜 975 圆体', family: ''),
-  (label: '微软雅黑', family: 'Microsoft YaHei UI'),
-  (label: '等线', family: 'DengXian'),
-  (label: '楷体', family: 'KaiTi'),
-];
-
-/// 外观:英文、中文字体各选各的。
-class AppearanceSection extends StatelessWidget {
-  const AppearanceSection({super.key, required this.service});
-
-  final ConfigService service;
-
-  @override
-  Widget build(BuildContext context) {
-    final cfg = service.config;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SectionHeading('外观', '可填任意已安装的字体名'),
-        _FontPicker(
-          title: '英文字体',
-          value: cfg.fontLatin,
-          choices: _latinChoices,
-          onChanged: (v) =>
-              service.update(service.config.copyWith(fontLatin: v)),
-        ),
-        gap,
-        _FontPicker(
-          title: '中文字体',
-          value: cfg.fontCjk,
-          choices: _cjkChoices,
-          onChanged: (v) => service.update(service.config.copyWith(fontCjk: v)),
-        ),
-        gap,
-        PennaCard(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('头像', style: titleStyle),
-              const SizedBox(height: 10),
-              _AvatarRow(
-                name: 'Penna Agent',
-                fromUser: false,
-                path: cfg.agentAvatar,
-                onChanged: (v) =>
-                    service.update(service.config.copyWith(agentAvatar: v)),
-              ),
-              const SizedBox(height: 10),
-              _AvatarRow(
-                name: '用户',
-                fromUser: true,
-                path: cfg.userAvatar,
-                onChanged: (v) =>
-                    service.update(service.config.copyWith(userAvatar: v)),
-              ),
-            ],
-          ),
-        ),
-        gap,
-        const PennaCard(
-          padding: EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('预览', style: hintStyle),
-              SizedBox(height: 6),
-              Text(
-                'Penna 羽毛笔 · 文生图提示词工作台\n'
-                'A cybernetic android walking in the rain, 35mm, ISO 400.\n'
-                '0123456789 , . ( ) { } -> =>',
-                style: TextStyle(fontSize: 14, height: 1.7),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 一个头像的设置行:预览、换图、恢复默认。
-// ponytail: 只记图片的路径,图片被挪走或删掉就变回默认头像;
-// 要不受影响的话,选图时把它复制进「文档\Penna」。
-class _AvatarRow extends StatelessWidget {
-  const _AvatarRow({
-    required this.name,
-    required this.fromUser,
-    required this.path,
-    required this.onChanged,
-  });
-
-  final String name;
-  final bool fromUser;
-  final String path;
-  final ValueChanged<String> onChanged;
-
-  Future<void> _pick() async {
-    final picked = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp']),
-      ],
-    );
-    if (picked != null) onChanged(picked.path);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        PennaAvatar(fromUser: fromUser, path: path, size: 40),
-        const SizedBox(width: 12),
-        Expanded(child: Text(name, style: const TextStyle(fontSize: 13))),
-        if (path.isNotEmpty) ...[
-          PennaButton(label: '恢复默认', onPressed: () => onChanged('')),
-          const SizedBox(width: 6),
-        ],
-        PennaButton(
-          label: '换图片',
-          icon: Icons.image_outlined,
-          background: PennaColors.slate100,
-          onPressed: _pick,
-        ),
-      ],
-    );
-  }
-}
-
-class _FontPicker extends StatefulWidget {
-  const _FontPicker({
-    required this.title,
-    required this.value,
-    required this.choices,
-    required this.onChanged,
-  });
-
-  final String title;
-  final String value;
-  final List<_FontChoice> choices;
-  final ValueChanged<String> onChanged;
-
-  @override
-  State<_FontPicker> createState() => _FontPickerState();
-}
-
-class _FontPickerState extends State<_FontPicker> {
-  /// 点了药丸后加一,让下面的输入框跟着显示新字体名。
-  int _picks = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return PennaCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(widget.title, style: titleStyle),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final c in widget.choices)
-                PennaChip(
-                  label: c.label,
-                  selected: widget.value == c.family,
-                  onTap: () {
-                    setState(() => _picks++);
-                    widget.onChanged(c.family);
-                  },
-                ),
-            ],
-          ),
-          gap,
-          PennaField(
-            key: ValueKey(_picks),
-            label: '自定义',
-            hint: '字体名',
-            value: widget.value,
-            onChanged: (v) => widget.onChanged(v.trim()),
-          ),
         ],
       ),
     );

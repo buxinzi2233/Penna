@@ -1,0 +1,340 @@
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
+import 'package:flutter/material.dart';
+
+import '../../../data/services/config_service.dart';
+import '../../../l10n/l10n.dart';
+import '../../core/look_switcher.dart';
+import '../../core/theme.dart';
+import '../../core/version.dart';
+import '../../core/widgets.dart';
+import '../update/update_flow.dart';
+import 'settings_agent_sections.dart';
+import 'settings_sections.dart';
+
+/// 「软件设置」:界面语言、深色模式、字体与头像、版本与更新、关于。
+class AppSection extends StatelessWidget {
+  const AppSection({super.key, required this.service});
+
+  final ConfigService service;
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = service.config;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeading(tr('软件设置'), tr('语言、外观与版本')),
+        PennaCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('界面语言'), style: titleStyle),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final l in languages)
+                    PennaButton(
+                      label: l.name,
+                      icon: l.code == cfg.language ? Icons.check : null,
+                      background: l.code == cfg.language
+                          ? PennaColors.primaryBg
+                          : null,
+                      foreground: l.code == cfg.language
+                          ? PennaColors.primary
+                          : null,
+                      borderColor: l.code == cfg.language
+                          ? PennaColors.primaryBorder
+                          : PennaColors.border,
+                      onPressed: () => service.update(
+                        service.config.copyWith(language: l.code),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        gap,
+        PennaCard(
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          child: Row(
+            children: [
+              Expanded(child: Text(tr('深色模式'), style: titleStyle)),
+              Builder(
+                builder: (context) => Switch(
+                  value: cfg.darkMode,
+                  onChanged: (v) {
+                    // 动画从开关这里扩散开。
+                    final box = context.findRenderObject() as RenderBox?;
+                    if (box != null && box.hasSize) {
+                      lookRevealOrigin = box.localToGlobal(
+                        box.size.center(Offset.zero),
+                      );
+                    }
+                    service.update(service.config.copyWith(darkMode: v));
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        gap,
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Text(tr('字体与头像 · 可填任意已安装的字体名'), style: hintStyle),
+        ),
+        _Appearance(service: service),
+        gap,
+        const UpdateCard(),
+        gap,
+        const _About(),
+      ],
+    );
+  }
+}
+
+/// 关于:名字、版本、仓库地址、许可。
+class _About extends StatelessWidget {
+  const _About();
+
+  static const _repo = 'https://github.com/storyAura/Penna';
+
+  @override
+  Widget build(BuildContext context) {
+    return PennaCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset('assets/avatar.png', width: 40, height: 40),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Penna 羽毛笔', style: titleStyle),
+                const SizedBox(height: 2),
+                Text(
+                  tr('文生图提示词工作台 · v{0} · MIT 许可', [appVersion]),
+                  style: hintStyle,
+                ),
+              ],
+            ),
+          ),
+          PennaButton(
+            label: 'GitHub',
+            icon: Icons.open_in_new,
+            borderColor: PennaColors.border,
+            // 交给系统用默认浏览器打开。
+            onPressed: () =>
+                Process.run('rundll32', ['url.dll,FileProtocolHandler', _repo]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+typedef _FontChoice = ({String label, String family});
+
+List<_FontChoice> get _latinChoices => [
+  (label: tr('内置 · Maple Mono'), family: ''),
+  (label: 'Segoe UI', family: 'Segoe UI'),
+  (label: 'Consolas', family: 'Consolas'),
+  (label: 'Cascadia Mono', family: 'Cascadia Mono'),
+];
+
+List<_FontChoice> get _cjkChoices => [
+  (label: tr('内置 · 霞鹜 975 圆体'), family: ''),
+  (label: tr('微软雅黑'), family: 'Microsoft YaHei UI'),
+  (label: tr('等线'), family: 'DengXian'),
+  (label: tr('楷体'), family: 'KaiTi'),
+];
+
+/// 外观:英文、中文字体各选各的。
+/// 外观:字体、头像、预览。
+class _Appearance extends StatelessWidget {
+  const _Appearance({required this.service});
+
+  final ConfigService service;
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = service.config;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _FontPicker(
+          title: tr('英文字体'),
+          value: cfg.fontLatin,
+          choices: _latinChoices,
+          onChanged: (v) =>
+              service.update(service.config.copyWith(fontLatin: v)),
+        ),
+        gap,
+        _FontPicker(
+          title: tr('中文字体'),
+          value: cfg.fontCjk,
+          choices: _cjkChoices,
+          onChanged: (v) => service.update(service.config.copyWith(fontCjk: v)),
+        ),
+        gap,
+        PennaCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(tr('头像'), style: titleStyle),
+              const SizedBox(height: 10),
+              _AvatarRow(
+                name: 'Penna Agent',
+                fromUser: false,
+                path: cfg.agentAvatar,
+                onChanged: (v) =>
+                    service.update(service.config.copyWith(agentAvatar: v)),
+              ),
+              const SizedBox(height: 10),
+              _AvatarRow(
+                name: tr('用户'),
+                fromUser: true,
+                path: cfg.userAvatar,
+                onChanged: (v) =>
+                    service.update(service.config.copyWith(userAvatar: v)),
+              ),
+            ],
+          ),
+        ),
+        gap,
+        PennaCard(
+          padding: EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('预览'), style: hintStyle),
+              SizedBox(height: 6),
+              Text(
+                'Penna 羽毛笔 · 文生图提示词工作台\n'
+                'A cybernetic android walking in the rain, 35mm, ISO 400.\n'
+                '0123456789 , . ( ) { } -> =>',
+                style: TextStyle(fontSize: 14, height: 1.7),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 一个头像的设置行:预览、换图、恢复默认。
+// ponytail: 只记图片的路径,图片被挪走或删掉就变回默认头像;
+// 要不受影响的话,选图时把它复制进「文档\Penna」。
+class _AvatarRow extends StatelessWidget {
+  const _AvatarRow({
+    required this.name,
+    required this.fromUser,
+    required this.path,
+    required this.onChanged,
+  });
+
+  final String name;
+  final bool fromUser;
+  final String path;
+  final ValueChanged<String> onChanged;
+
+  Future<void> _pick() async {
+    final picked = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(label: tr('图片'), extensions: ['png', 'jpg', 'jpeg', 'webp']),
+      ],
+    );
+    if (picked != null) onChanged(picked.path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        PennaAvatar(fromUser: fromUser, path: path, size: 40),
+        const SizedBox(width: 12),
+        Expanded(child: Text(name, style: const TextStyle(fontSize: 13))),
+        if (path.isNotEmpty) ...[
+          PennaButton(label: tr('恢复默认'), onPressed: () => onChanged('')),
+          const SizedBox(width: 6),
+        ],
+        PennaButton(
+          label: tr('换图片'),
+          icon: Icons.image_outlined,
+          background: PennaColors.slate100,
+          onPressed: _pick,
+        ),
+      ],
+    );
+  }
+}
+
+class _FontPicker extends StatefulWidget {
+  const _FontPicker({
+    required this.title,
+    required this.value,
+    required this.choices,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String value;
+  final List<_FontChoice> choices;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_FontPicker> createState() => _FontPickerState();
+}
+
+class _FontPickerState extends State<_FontPicker> {
+  /// 点了药丸后加一,让下面的输入框跟着显示新字体名。
+  int _picks = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return PennaCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.title, style: titleStyle),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final c in widget.choices)
+                PennaChip(
+                  label: c.label,
+                  selected: widget.value == c.family,
+                  onTap: () {
+                    setState(() => _picks++);
+                    widget.onChanged(c.family);
+                  },
+                ),
+            ],
+          ),
+          gap,
+          PennaField(
+            key: ValueKey(_picks),
+            label: tr('自定义'),
+            hint: tr('字体名'),
+            value: widget.value,
+            onChanged: (v) => widget.onChanged(v.trim()),
+          ),
+        ],
+      ),
+    );
+  }
+}

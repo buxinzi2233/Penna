@@ -16,6 +16,7 @@ import 'data/services/archive_store.dart';
 import 'data/services/character_store.dart';
 import 'data/services/config_service.dart';
 import 'data/services/skill_store.dart';
+import 'ui/core/look_switcher.dart';
 import 'ui/core/theme.dart';
 import 'ui/features/local/local_model.dart';
 import 'ui/features/studio/reverse_model.dart';
@@ -42,6 +43,7 @@ Future<void> main() async {
   );
   final skills = SkillStore(Directory('${home.path}${sep}skills'));
   await config.load();
+  applyLook(config.config);
   await skills.load();
   // 内置的 Danbooru 词库(压缩过的文本):在线搜索连不上时用它查,也用它核对标签。
   final tagDictionary = TagDictionary.parse(
@@ -153,13 +155,14 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
     }
   }
 
-  // 主题只在字体设置变了的时候重建,不跟着每次设置改动重算。
-  (String, String)? _fonts;
+  // 主题只在字体或深浅色变了的时候重建,不跟着每次设置改动重算。
+  (String, String, bool)? _look;
   late ThemeData _theme;
 
   ThemeData _themeFor(String latin, String cjk) {
-    if (_fonts != (latin, cjk)) {
-      _fonts = (latin, cjk);
+    final look = (latin, cjk, PennaColors.isDark);
+    if (_look != look) {
+      _look = look;
       _theme = pennaTheme(latin: latin, cjk: cjk);
     }
     return _theme;
@@ -182,6 +185,8 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
           title: 'Penna 羽毛笔',
           debugShowCheckedModeBanner: false,
           theme: _themeFor(cfg.fontLatin, cfg.fontCjk),
+          // 深浅色切换有自己的扩散动画(LookSwitcher),主题不再渐变一遍。
+          themeAnimationDuration: Duration.zero,
           // 触控板和拖动滚到头时有回弹;滚轮的平滑见 smooth_scroll.dart。
           scrollBehavior: const MaterialScrollBehavior().copyWith(
             physics: const BouncingScrollPhysics(),
@@ -191,18 +196,23 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
           // (flutter/flutter#175041,accessibility_bridge.cc:229):有读屏、输入法这类 UIA
           // 程序在读窗口时,切页就会闪退。代价是读屏软件读不到 Penna;引擎修好后去掉这层。
           builder: (context, child) => ExcludeSemantics(
-            child: Column(
-              children: [
-                const SizedBox(
-                  height: kWindowCaptionHeight,
-                  child: WindowCaption(
-                    brightness: Brightness.light,
-                    backgroundColor: PennaColors.sidebar,
-                    title: _Brand(),
+            child: LookSwitcher(
+              config: widget.config,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: kWindowCaptionHeight,
+                    child: WindowCaption(
+                      brightness: PennaColors.isDark
+                          ? Brightness.dark
+                          : Brightness.light,
+                      backgroundColor: PennaColors.sidebar,
+                      title: const _Brand(),
+                    ),
                   ),
-                ),
-                Expanded(child: child!),
-              ],
+                  Expanded(child: child!),
+                ],
+              ),
             ),
           ),
           home: AppShell(

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'mcp_server.dart';
+import '../../l10n/l10n.dart';
 
 export 'mcp_server.dart';
 
@@ -210,7 +211,8 @@ class AgentPreset {
   final double topP;
 
   /// 界面上显示的名字;名字被清空时给个占位,免得出现点不到的空白项。
-  String get displayName => name.trim().isEmpty ? '未命名' : name;
+  /// 界面上显示的名字:内置 Preset 的名字按界面语言翻译,自己起的原样。
+  String get displayName => name.trim().isEmpty ? tr('未命名') : tr(name);
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -373,6 +375,8 @@ class AppConfig {
     this.fontCjk = '',
     this.agentAvatar = '',
     this.userAvatar = '',
+    this.language = 'zh-Hans',
+    this.darkMode = false,
     this.disabledSkills = const {},
     this.tagSearchOnline = true,
     this.quickActions = defaultQuickActions,
@@ -413,6 +417,8 @@ class AppConfig {
       fontCjk: m['fontCjk'] as String? ?? '',
       agentAvatar: m['agentAvatar'] as String? ?? '',
       userAvatar: m['userAvatar'] as String? ?? '',
+      language: m['language'] as String? ?? 'zh-Hans',
+      darkMode: m['darkMode'] as bool? ?? false,
       tagSearchOnline: m['tagSearchOnline'] as bool? ?? true,
       // 旧配置里没有这一项才给默认的;用户删空了就是空的。
       quickActions: m['quickActions'] == null
@@ -487,6 +493,12 @@ class AppConfig {
   final String agentAvatar;
   final String userAvatar;
 
+  /// 界面语言:zh-Hans、zh-Hant、en、ja(见 `l10n/l10n.dart`)。
+  final String language;
+
+  /// 深色模式。
+  final bool darkMode;
+
   /// 被用户关掉的 Skill。不在这里面的都是开着的,对所有 Preset 生效;
   /// 所以新导入、新写出来的 Skill 默认就能用。
   final Set<String> disabledSkills;
@@ -515,6 +527,8 @@ class AppConfig {
     'fontCjk': fontCjk,
     'agentAvatar': agentAvatar,
     'userAvatar': userAvatar,
+    'language': language,
+    'darkMode': darkMode,
     'disabledSkills': disabledSkills.toList(),
     'tagSearchOnline': tagSearchOnline,
     'quickActions': [
@@ -553,6 +567,8 @@ class AppConfig {
     String? fontCjk,
     String? agentAvatar,
     String? userAvatar,
+    String? language,
+    bool? darkMode,
     Set<String>? disabledSkills,
     bool? tagSearchOnline,
     List<QuickAction>? quickActions,
@@ -574,6 +590,8 @@ class AppConfig {
     fontCjk: fontCjk ?? this.fontCjk,
     agentAvatar: agentAvatar ?? this.agentAvatar,
     userAvatar: userAvatar ?? this.userAvatar,
+    language: language ?? this.language,
+    darkMode: darkMode ?? this.darkMode,
     disabledSkills: disabledSkills ?? this.disabledSkills,
     tagSearchOnline: tagSearchOnline ?? this.tagSearchOnline,
     quickActions: quickActions ?? this.quickActions,

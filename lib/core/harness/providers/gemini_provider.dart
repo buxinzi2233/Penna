@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'llm_http.dart';
+import '../../../l10n/l10n.dart';
 
 const _normalFinish = {'STOP', 'MAX_TOKENS', 'FINISH_REASON_UNSPECIFIED'};
 const _defaultBase = 'https://generativelanguage.googleapis.com/v1beta';
@@ -65,11 +66,13 @@ String? parseGeminiLine(String line) {
   if (json is! Map) return null;
   final error = json['error'];
   if (error != null) {
-    throw LlmException('模型返回错误:${error is Map ? error['message'] : error}');
+    throw LlmException(
+      tr('模型返回错误:{0}', [error is Map ? error['message'] : error]),
+    );
   }
   final feedback = json['promptFeedback'];
   final blocked = feedback is Map ? feedback['blockReason'] : null;
-  if (blocked != null) throw LlmException('请求被 Google 拦截:$blocked');
+  if (blocked != null) throw LlmException(tr('请求被 Google 拦截:{0}', [blocked]));
   final candidates = json['candidates'];
   if (candidates is! List || candidates.isEmpty) return null;
   final first = candidates.first;
@@ -83,7 +86,7 @@ String? parseGeminiLine(String line) {
   // 被安全策略等原因中止时往往一个字都没有,把原因报出来而不是只说"没内容"。
   final reason = first is Map ? first['finishReason'] : null;
   if (text.isEmpty && reason is String && !_normalFinish.contains(reason)) {
-    throw LlmException('Google 中止了回复:$reason');
+    throw LlmException(tr('Google 中止了回复:{0}', [reason]));
   }
   return text;
 }
@@ -126,7 +129,7 @@ Future<List<String>> listGeminiModels(String baseUrl, String apiKey) async {
   final plain = llmEndpoint(geminiBase(baseUrl), '/models');
   // Vertex AI 的模型列表不收 API Key(只认 OAuth 登录),问了也是 401。
   if (_isVertex(plain)) {
-    throw const LlmException('Vertex AI 不能拉取模型,请手动填模型名');
+    throw LlmException(tr('Vertex AI 不能拉取模型,请手动填模型名'));
   }
   // ponytail: 只取第一页(上限 1000 个),目前远够用;不够时跟着 nextPageToken 翻页。
   final uri = plain.replace(queryParameters: {'pageSize': '1000'});
@@ -159,5 +162,5 @@ Stream<String> _chat(HttpClient client, LlmRequest req) async* {
       yield delta;
     }
   }
-  if (!yielded) throw const LlmException('模型没有返回内容');
+  if (!yielded) throw LlmException(tr('模型没有返回内容'));
 }

@@ -12,6 +12,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'settings_agent_sections.dart';
 import 'settings_sections.dart';
+import '../../../l10n/l10n.dart';
 
 /// 「添加 Skill」窗口交回来的:拖进来或选中的文件,或者手写的整篇 SKILL.md。
 typedef _NewSkill = ({String? path, String? text});
@@ -46,22 +47,22 @@ class SkillsSection extends StatelessWidget {
         showToast(
           context,
           imported.length == 1
-              ? '已添加「${imported.single.name}」'
-              : '已添加 ${imported.length} 个 Skill',
+              ? tr('已添加「{0}」', [imported.single.name])
+              : tr('已添加 {0} 个 Skill', [imported.length]),
         );
       }
     } on SkillException catch (e) {
       if (context.mounted) showToast(context, e.message, warn: true);
     } on FileSystemException {
-      if (context.mounted) showToast(context, '保存失败', warn: true);
+      if (context.mounted) showToast(context, tr('保存失败'), warn: true);
     }
   }
 
   Future<void> _delete(BuildContext context, UserSkill skill) async {
     final ok = await confirmDelete(
       context,
-      '删除 Skill「${skill.name}」?',
-      '文件会从「文档\\Penna\\skills」里删除。',
+      tr('删除 Skill「{0}」?', [skill.name]),
+      tr('文件会从「文档\\Penna\\skills」里删除。'),
     );
     if (ok) await skills.remove(skill.id);
   }
@@ -70,7 +71,7 @@ class SkillsSection extends StatelessWidget {
   void _preview(BuildContext context, UserSkill skill) => showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(skill.name, style: const TextStyle(fontSize: 16)),
+      title: Text(tr(skill.name), style: const TextStyle(fontSize: 16)),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -79,7 +80,7 @@ class SkillsSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (skill.description.isNotEmpty) ...[
-                Text(skill.description, style: hintStyle),
+                Text(tr(skill.description), style: hintStyle),
                 const SizedBox(height: 10),
               ],
               SelectableText(
@@ -94,7 +95,7 @@ class SkillsSection extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('关闭'),
+          child: Text(tr('关闭')),
         ),
       ],
     ),
@@ -113,10 +114,10 @@ class SkillsSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(skill.name, style: const TextStyle(fontSize: 13)),
+                  Text(tr(skill.name), style: const TextStyle(fontSize: 13)),
                   if (skill.description.isNotEmpty)
                     Text(
-                      skill.description,
+                      tr(skill.description),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: hintStyle,
@@ -127,7 +128,7 @@ class SkillsSection extends StatelessWidget {
           ),
         ),
         IconButton(
-          tooltip: '查看',
+          tooltip: tr('查看'),
           iconSize: 18,
           icon: const Icon(Icons.visibility_outlined),
           color: PennaColors.slate500,
@@ -135,7 +136,7 @@ class SkillsSection extends StatelessWidget {
         ),
         if (custom)
           IconButton(
-            tooltip: '删除',
+            tooltip: tr('删除'),
             iconSize: 18,
             icon: const Icon(Icons.delete_outline),
             color: PennaColors.slate500,
@@ -163,7 +164,7 @@ class SkillsSection extends StatelessWidget {
       builder: (context, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SectionHeading('Skills', '对所有 Preset 生效'),
+          SectionHeading('Skills', tr('对所有 Preset 生效')),
           PennaCard(
             padding: const EdgeInsets.fromLTRB(14, 14, 6, 6),
             child: Column(
@@ -171,10 +172,10 @@ class SkillsSection extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Text('内置', style: titleStyle),
+                    Text(tr('内置'), style: titleStyle),
                     const SizedBox(width: 8),
                     Text(
-                      '已开 $on / ${builtinSkillList.length}',
+                      tr('已开 {0} / {1}', [on, builtinSkillList.length]),
                       style: hintStyle,
                     ),
                   ],
@@ -192,14 +193,14 @@ class SkillsSection extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Text('自定义', style: titleStyle),
+                    Text(tr('自定义'), style: titleStyle),
                     const SizedBox(width: 8),
-                    Text('${skills.skills.length} 个', style: hintStyle),
+                    Text(tr('{0} 个', [skills.skills.length]), style: hintStyle),
                     const Spacer(),
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: PennaButton(
-                        label: '添加 Skill',
+                        label: tr('添加 Skill'),
                         icon: Icons.add,
                         background: PennaColors.primary,
                         foreground: Colors.white,
@@ -264,7 +265,7 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
         if (d.files.isNotEmpty) _useFile(d.files.first.path);
       },
       child: AlertDialog(
-        title: const Text('添加 Skill', style: TextStyle(fontSize: 16)),
+        title: Text(tr('添加 Skill'), style: TextStyle(fontSize: 16)),
         content: SizedBox(
           width: 480,
           child: SingleChildScrollView(
@@ -297,30 +298,30 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
                               : PennaColors.slate400,
                         ),
                         const SizedBox(height: 6),
-                        const Text('拖入 .md / .zip,或点击选择', style: hintStyle),
+                        Text(tr('拖入 .md / .zip,或点击选择'), style: hintStyle),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text('或者直接写', style: hintStyle),
+                Text(tr('或者直接写'), style: hintStyle),
                 const SizedBox(height: 8),
                 PennaField(
-                  label: '名称',
+                  label: tr('名称'),
                   value: '',
                   onChanged: (v) => setState(() => _name = v),
                 ),
                 const SizedBox(height: 8),
                 PennaField(
-                  label: '简介',
-                  hint: '什么时候用它',
+                  label: tr('简介'),
+                  hint: tr('什么时候用它'),
                   value: '',
                   onChanged: (v) => _description = v,
                 ),
                 const SizedBox(height: 8),
                 PennaField(
-                  label: '正文',
-                  hint: '给模型看的指令',
+                  label: tr('正文'),
+                  hint: tr('给模型看的指令'),
                   maxLines: 8,
                   value: '',
                   onChanged: (v) => setState(() => _body = v),
@@ -332,7 +333,7 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(tr('取消')),
           ),
           TextButton(
             onPressed: ready
@@ -341,7 +342,7 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
                     text: _text,
                   ))
                 : null,
-            child: const Text('添加'),
+            child: Text(tr('添加')),
           ),
         ],
       ),
@@ -349,7 +350,10 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
   }
 }
 
-const _transportLabels = {mcpHttp: '远程地址', mcpStdio: '本机命令'};
+Map<String, String> get _transportLabels => {
+  mcpHttp: tr('远程地址'),
+  mcpStdio: tr('本机命令'),
+};
 
 /// MCP:添加外部工具服务,可以测试连接并看它提供哪些工具。
 class McpSection extends StatelessWidget {
@@ -360,7 +364,10 @@ class McpSection extends StatelessWidget {
   void _add() {
     service.update(
       service.config.putMcp(
-        McpServer(id: '${DateTime.now().microsecondsSinceEpoch}', name: '新服务'),
+        McpServer(
+          id: '${DateTime.now().microsecondsSinceEpoch}',
+          name: tr('新服务'),
+        ),
       ),
     );
   }
@@ -370,18 +377,18 @@ class McpSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('MCP', '接入外部工具服务'),
+        SectionHeading('MCP', tr('接入外部工具服务')),
         // 内置接好的一个:Agent 转 Danbooru Tag 时用它按意思查标签。
         PennaCard(
           padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('DanbooruSearch', style: titleStyle),
-                    Text('内置 · Danbooru 标签搜索,关掉后只查本机词库', style: hintStyle),
+                    Text(tr('内置 · Danbooru 标签搜索,关掉后只查本机词库'), style: hintStyle),
                   ],
                 ),
               ),
@@ -405,7 +412,7 @@ class McpSection extends StatelessWidget {
         Align(
           alignment: Alignment.centerLeft,
           child: PennaButton(
-            label: '添加服务',
+            label: tr('添加服务'),
             icon: Icons.add,
             background: PennaColors.primary,
             foreground: Colors.white,
@@ -461,14 +468,17 @@ class _McpCardState extends State<_McpCard> {
               token: secrets[mcpTokenKey(_server.id)] ?? '',
             );
       result = tools.isEmpty
-          ? '已连接 · 没有工具'
-          : '已连接 · ${tools.length} 个工具:${tools.map((t) => t.name).join('、')}';
+          ? tr('已连接 · 没有工具')
+          : tr('已连接 · {0} 个工具:{1}', [
+              tools.length,
+              tools.map((t) => t.name).join(tr('、')),
+            ]);
     } on McpException catch (e) {
       result = e.message;
       failed = true;
     } on Object catch (e) {
       // 没料到的错误也要让按钮恢复可用;只报类型,原文可能带着令牌。
-      result = '连接失败(${e.runtimeType})';
+      result = tr('连接失败({0})', [e.runtimeType]);
       failed = true;
     }
     if (!mounted) return;
@@ -480,7 +490,11 @@ class _McpCardState extends State<_McpCard> {
   }
 
   Future<void> _delete() async {
-    final ok = await confirmDelete(context, '删除「${_server.name}」?', '此操作不可撤销。');
+    final ok = await confirmDelete(
+      context,
+      tr('删除「{0}」?', [_server.name]),
+      tr('此操作不可撤销。'),
+    );
     if (ok) _service.update(_service.config.removeMcp(_server.id));
   }
 
@@ -508,7 +522,7 @@ class _McpCardState extends State<_McpCard> {
               ],
               const Spacer(),
               IconButton(
-                tooltip: '删除',
+                tooltip: tr('删除'),
                 iconSize: 18,
                 icon: const Icon(Icons.delete_outline),
                 color: PennaColors.slate500,
@@ -525,7 +539,7 @@ class _McpCardState extends State<_McpCard> {
           ),
           gap,
           PennaField(
-            label: '名称',
+            label: tr('名称'),
             value: _server.name,
             onChanged: (v) => _put(_server.copyWith(name: v)),
           ),
@@ -533,7 +547,7 @@ class _McpCardState extends State<_McpCard> {
           if (stdio) ...[
             PennaField(
               key: const ValueKey('command'),
-              label: '启动命令',
+              label: tr('启动命令'),
               hint: 'npx -y @scope/server',
               value: _server.command,
               onChanged: (v) => _put(_server.copyWith(command: v)),
@@ -542,8 +556,8 @@ class _McpCardState extends State<_McpCard> {
             PennaField(
               key: const ValueKey('env'),
               // 打码的输入框只能单行,会把多行压成一行,所以这里不打码。
-              label: '环境变量(每行 KEY=VALUE)',
-              hint: '可留空',
+              label: tr('环境变量(每行 KEY=VALUE)'),
+              hint: tr('可留空'),
               maxLines: 4,
               value: secrets[mcpEnvKey(_server.id)] ?? '',
               onChanged: (v) => _setSecret(mcpEnvKey(_server.id), v),
@@ -551,7 +565,7 @@ class _McpCardState extends State<_McpCard> {
           ] else ...[
             PennaField(
               key: const ValueKey('url'),
-              label: '地址',
+              label: tr('地址'),
               hint: 'https://example.com/mcp',
               value: _server.url,
               onChanged: (v) => _put(_server.copyWith(url: v)),
@@ -559,8 +573,8 @@ class _McpCardState extends State<_McpCard> {
             gap,
             PennaField(
               key: const ValueKey('token'),
-              label: '令牌',
-              hint: '可留空',
+              label: tr('令牌'),
+              hint: tr('可留空'),
               obscure: true,
               value: secrets[mcpTokenKey(_server.id)] ?? '',
               onChanged: (v) => _setSecret(mcpTokenKey(_server.id), v),
@@ -570,7 +584,7 @@ class _McpCardState extends State<_McpCard> {
           Row(
             children: [
               PennaButton(
-                label: '测试连接',
+                label: tr('测试连接'),
                 icon: Icons.sync_alt,
                 background: PennaColors.slate100,
                 onPressed: _testing ? null : _test,

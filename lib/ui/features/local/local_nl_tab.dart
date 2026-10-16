@@ -33,7 +33,7 @@ class _NlTab extends StatelessWidget {
       cfg.putLlm(
         LlmProfile(
           id: _localLlmId,
-          name: old?.name ?? '本地模型',
+          name: old?.name ?? tr('本地模型'),
           baseUrl: url,
           model: 'local',
           protocol: protocolOpenAi,
@@ -41,7 +41,7 @@ class _NlTab extends StatelessWidget {
         ),
       ),
     );
-    showToast(context, old == null ? '已加入 API 管理' : '已更新 API 管理里的地址');
+    showToast(context, old == null ? tr('已加入 API 管理') : tr('已更新 API 管理里的地址'));
   }
 
   @override
@@ -69,8 +69,9 @@ class _NlTab extends StatelessWidget {
     return _DownloadRow(
       model: model,
       keyName: m.id,
-      name: m.name,
-      note: '${m.params} · ${_size(total)} · ${m.note}',
+      // 清单里的名字和说明是中文原文,显示时再翻译(见 test/l10n_test.dart)。
+      name: tr(m.name),
+      note: '${m.params} · ${_size(total)} · ${tr(m.note)}',
       files: model.captionFiles(m),
       onDownload: () => model.downloadCaption(m),
       onRemove: () => model.removeCaption(m),
@@ -79,7 +80,7 @@ class _NlTab extends StatelessWidget {
       selected: model.captionPick == m.id,
       onSelect: () => model.useCaption(m)
           ? null
-          : showToast(context, '先下载这个模型', warn: true),
+          : showToast(context, tr('先下载这个模型'), warn: true),
       below: m.quants.length < 2
           ? null
           : Wrap(
@@ -104,7 +105,9 @@ class _NlTab extends StatelessWidget {
     model: model,
     keyName: g.model,
     name: fileName(g.model),
-    note: g.mmproj.isEmpty ? '本机 · 仅文本' : '本机 · 视觉组件 ${fileName(g.mmproj)}',
+    note: g.mmproj.isEmpty
+        ? tr('本机 · 仅文本')
+        : tr('本机 · 视觉组件 {0}', [fileName(g.mmproj)]),
     files: const [],
     done: true,
     onDownload: () async => null,
@@ -116,12 +119,12 @@ class _NlTab extends StatelessWidget {
   Widget _models(BuildContext context) {
     final picked = model.pickedCaption;
     return _Block(
-      title: '模型',
+      title: tr('模型'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _GroupedModelList(
-            current: picked?.series ?? '本机',
+            current: picked?.series ?? tr('本机'),
             groups: [
               for (final g in model.captionGroups)
                 (
@@ -141,7 +144,7 @@ class _NlTab extends StatelessWidget {
           if (!model.florenceMode) ...[
             const SizedBox(height: 6),
             _PathPicker(
-              label: '模型',
+              label: tr('模型'),
               path: model.modelPath,
               onPick: () async {
                 final path = await _pickGguf();
@@ -149,7 +152,7 @@ class _NlTab extends StatelessWidget {
               },
             ),
             _PathPicker(
-              label: '视觉组件',
+              label: tr('视觉组件'),
               path: model.mmprojPath,
               onPick: () async {
                 final path = await _pickGguf();
@@ -167,17 +170,17 @@ class _NlTab extends StatelessWidget {
     final url = model.server.baseUrl;
     final running = model.serverRunning && !model.starting;
     return _Block(
-      title: '服务',
+      title: tr('服务'),
       trailing: model.serverRunning || model.starting
           ? PennaButton(
-              label: '停止',
+              label: tr('停止'),
               icon: Icons.stop_circle_outlined,
               background: PennaColors.diffDel,
               foreground: PennaColors.diffDelText,
               onPressed: model.stopServer,
             )
           : PennaButton(
-              label: '启动',
+              label: tr('启动'),
               icon: Icons.play_arrow,
               background: PennaColors.primary,
               foreground: Colors.white,
@@ -187,18 +190,15 @@ class _NlTab extends StatelessWidget {
         children: [
           Expanded(
             child: running
-                ? _PathText('运行中 · $url')
+                ? _PathText(tr('运行中 · {0}', [url]))
                 : Text(
-                    model.starting ? '启动中…' : '未启动',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: PennaColors.slate500,
-                    ),
+                    model.starting ? tr('启动中…') : tr('未启动'),
+                    style: TextStyle(fontSize: 12, color: PennaColors.slate500),
                   ),
           ),
           if (running && url != null)
             PennaButton(
-              label: '加入 API 管理',
+              label: tr('加入 API 管理'),
               icon: Icons.hub_outlined,
               borderColor: PennaColors.border,
               onPressed: () => _addApi(context, url),
@@ -212,9 +212,9 @@ class _NlTab extends StatelessWidget {
     final florence = model.florenceMode ? model.pickedCaption : null;
     final running = florence != null || model.serverRunning && !model.starting;
     return _Block(
-      title: '看图描述',
+      title: tr('看图描述'),
       trailing: PennaButton(
-        label: model.captioning ? '生成中…' : '生成',
+        label: model.captioning ? tr('生成中…') : tr('生成'),
         icon: Icons.notes,
         background: PennaColors.primary,
         foreground: Colors.white,
@@ -243,7 +243,7 @@ class _NlTab extends StatelessWidget {
                     message: p.text,
                     waitDuration: const Duration(milliseconds: 600),
                     child: PennaChip(
-                      label: p.name.trim().isEmpty ? '未命名' : p.name,
+                      label: p.name.trim().isEmpty ? tr('未命名') : p.name,
                       selected: i == model.promptIndex,
                       onTap: () => model.pickPrompt(i),
                     ),
@@ -302,15 +302,15 @@ class _PathPicker extends StatelessWidget {
           ),
           Expanded(
             child: path.isEmpty
-                ? const Text(
-                    '未选择',
+                ? Text(
+                    tr('未选择'),
                     style: TextStyle(fontSize: 12, color: PennaColors.slate400),
                   )
                 : _PathText(path),
           ),
           if (path.isNotEmpty && onClear != null)
             IconButton(
-              tooltip: '清掉',
+              tooltip: tr('清掉'),
               iconSize: 14,
               visualDensity: VisualDensity.compact,
               color: PennaColors.slate400,
@@ -318,7 +318,7 @@ class _PathPicker extends StatelessWidget {
               onPressed: onClear,
             ),
           PennaButton(
-            label: '选择',
+            label: tr('选择'),
             icon: Icons.folder_open,
             borderColor: PennaColors.border,
             onPressed: onPick,

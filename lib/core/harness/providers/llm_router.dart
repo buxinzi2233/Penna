@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'gemini_provider.dart';
 import 'openai_provider.dart';
+import '../../../l10n/l10n.dart';
 
 /// 按请求里的协议选对应的接口。
 Stream<String> streamChat(LlmRequest request) => request.protocol == 'google'
@@ -76,7 +77,7 @@ Stream<String> streamWithFailover(
       failures.add('$name:${error ?? '没有返回内容'}');
     }
     out.addError(
-      LlmException(failures.isEmpty ? '没有可用的模型' : failures.join('\n')),
+      LlmException(failures.isEmpty ? tr('没有可用的模型') : failures.join('\n')),
     );
     return out.close();
   }
