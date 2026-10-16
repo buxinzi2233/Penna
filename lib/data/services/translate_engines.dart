@@ -8,7 +8,7 @@ import 'package:crypto/crypto.dart';
 import '../../l10n/l10n.dart';
 
 /// 一个机翻引擎:用 [client] 把 [text] 从 [from] 译到 [to]。
-/// 语言用 'en' / 'zh';各引擎自己换成它认的代码。
+/// 语言用 'en'、'zh'(简体)、'zh-Hant'、'ja';各引擎自己换成它认的代码。
 typedef Translator = Future<String> Function(
   HttpClient client,
   String text,
@@ -86,7 +86,19 @@ String _brief(Object e) => switch (e) {
 /// 服务端的报错原文可能很长(阿里签名错误会把整段原文回显),只留开头。
 String _clip(String s) => s.length > 80 ? '${s.substring(0, 80)}…' : s;
 
-String _zh(String lang, String chinese) => lang == 'zh' ? chinese : lang;
+/// Google 和 MyMemory 认的语言代码。
+String _google(String lang) =>
+    const {'zh': 'zh-CN', 'zh-Hant': 'zh-TW'}[lang] ?? lang;
+
+/// 百度认的语言代码。
+String _baidu(String lang) =>
+    const {'zh-Hant': 'cht', 'ja': 'jp'}[lang] ?? lang;
+
+/// 阿里认的语言代码。
+String _ali(String lang) => const {'zh-Hant': 'zh-tw'}[lang] ?? lang;
+
+/// 译成中文、日文时各小段之间不加空格。
+bool _cjk(String lang) => lang != 'en';
 
 Future<Object?> _send(HttpClientRequest request, [String? body]) async {
   if (body != null) request.add(utf8.encode(body));
@@ -128,8 +140,8 @@ Future<String> googleFree(
     Uri.https('translate.googleapis.com', '/translate_a/single', {
       'client': 'gtx',
       'dt': 't',
-      'sl': _zh(from, 'zh-CN'),
-      'tl': _zh(to, 'zh-CN'),
+      'sl': _google(from),
+      'tl': _google(to),
     }),
     {'q': text},
   );
@@ -156,7 +168,7 @@ Future<String> myMemory(
     final request = await client.getUrl(
       Uri.https('api.mymemory.translated.net', '/get', {
         'q': chunk,
-        'langpair': '${_zh(from, 'zh-CN')}|${_zh(to, 'zh-CN')}',
+        'langpair': '${_google(from)}|${_google(to)}',
       }),
     );
     final json = await _send(request);
@@ -173,8 +185,7 @@ Future<String> myMemory(
     }
     out.add(piece);
   }
-  // 中文各段之间不加空格。
-  return out.join(to == 'zh' ? '' : ' ');
+  return out.join(_cjk(to) ? '' : ' ');
 }
 
 /// 把 [text] 切成每段不超过 [maxBytes](UTF-8)的小段,尽量在标点或空格处断开。
@@ -224,8 +235,8 @@ Translator googleCloud(String apiKey) => (client, text, from, to) async {
     }),
     {
       'q': text,
-      'source': _zh(from, 'zh-CN'),
-      'target': _zh(to, 'zh-CN'),
+      'source': _google(from),
+      'target': _google(to),
       'format': 'text',
     },
   );
@@ -252,8 +263,8 @@ Translator baidu(String appId, String secret) =>
         Uri.https('fanyi-api.baidu.com', '/api/trans/vip/translate'),
         {
           'q': text,
-          'from': from,
-          'to': to,
+          'from': _baidu(from),
+          'to': _baidu(to),
           'appid': appId.trim(),
           'salt': salt,
           'sign': sign,
@@ -306,8 +317,8 @@ Translator ali(String keyId, String secret) => (client, text, from, to) async {
     'Format': 'JSON',
     'FormatType': 'text',
     'Scene': 'general',
-    'SourceLanguage': from,
-    'TargetLanguage': to,
+    'SourceLanguage': _ali(from),
+    'TargetLanguage': _ali(to),
     'SourceText': text,
     'AccessKeyId': keyId.trim(),
     'SignatureMethod': 'HMAC-SHA1',

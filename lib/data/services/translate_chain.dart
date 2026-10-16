@@ -9,14 +9,15 @@ typedef ConfigTranslator = Future<TranslateResult> Function(
 
 String mtLabel(String id) => mtEngines.firstWhere((e) => e.id == id).label;
 
-// ponytail: 方向固定英→中(成稿是英文,译文给人核对);要反向或自动识别时再加参数。
-/// 按设置里的引擎顺序、尝试次数和超时翻译 [text]。
+// ponytail: 原文固定当英文(成稿是英文,译文给人核对);要自动识别原文语言时再加参数。
+/// 按设置里的引擎顺序、尝试次数和超时翻译 [text],译成界面语言对应的对照语言
+/// (`AppConfig.glossLanguage`;英文界面不用对照,真调到了就按简体中文)。
 Future<TranslateResult> translateWithConfig(AppConfig config, String text) {
   return translateWithFailover(
     chain: [for (final id in config.mtChain) (id, _engine(config, id))],
     text: text,
     from: 'en',
-    to: 'zh',
+    to: config.glossLanguage ?? 'zh',
     attempts: config.mtAttempts,
     timeout: Duration(seconds: config.mtTimeoutSeconds),
   );

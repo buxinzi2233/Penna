@@ -160,7 +160,7 @@ extension StudioChat on StudioViewModel {
           'role': 'system',
           'content': [
             preset.systemPrompt,
-            _draftFormatPrompt,
+            _draftFormatPrompt(cfg.glossLanguage),
             _skillPrompt(cfg),
             // 「画面规划」开着时它是默认的第一步,不靠模型自己想起来用。
             if (!cfg.disabledSkills.contains('grilling')) _planFirstPrompt,

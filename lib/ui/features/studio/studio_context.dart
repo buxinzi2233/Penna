@@ -259,7 +259,8 @@ extension StudioContext on StudioViewModel {
       if (files.isNotEmpty) '【用户附上了下面的文件,内容仅供参考】\n${files.join('\n\n')}',
       if (message.quote != null)
         '【用户选中了成稿里的这一段,这次只讨论它】\n${message.quote}\n'
-            '要改它时,<draft> 里只写改后的这一段(原来有标注就保留,下一行照样跟〔译〕),其他段不要写。',
+            '要改它时,<draft> 里只写改后的这一段(原来有标注就保留'
+            '${config.config.glossLanguage == null ? '' : ',下一行照样跟〔译〕'}),其他段不要写。',
     ].where((s) => s.isNotEmpty).join('\n\n');
     return _withSkills(message, text, alreadySent);
   }
@@ -320,21 +321,47 @@ String _skillBlock(UserSkill s) =>
 /// 发给模型的自定义 Skill 正文合计上限(字符数)。
 const _skillPromptBudget = 60000;
 
+/// 每段对照译文的语言(见 `AppConfig.glossLanguage`):写进要求里的名字和例句。
+const _glossLanguages = {
+  'zh': (name: '简体中文', example: ['一尊巨大的白色天使雕像,纹理如脉络,翅膀收拢……', '高窗射入的低角度硬光……']),
+  'zh-Hant': (
+    name: '繁体中文(台湾用语)',
+    example: ['一尊巨大的白色天使雕像,紋理如脈絡,翅膀收攏……', '高窗射入的低角度硬光……'],
+  ),
+  'ja': (
+    name: '日文',
+    example: ['翼をたたんだ、筋の走る巨大な白い天使像……', '高い明かり窓から差し込む、低い角度の硬い日差し……'],
+  ),
+};
+
 /// 每个 Preset 的系统提示后面都跟着这一条:最终输出时另出一份分段标注的新成稿。
 /// 标签和标注的写法要和 `draft_block.dart` 的解析对得上。
-const _draftFormatPrompt =
-    '【输出格式】只要这次回复给出了新的或改过的提示词,就把它放在回复最后的 <draft> 和 </draft> 之间,'
-    '供用户放到左侧成稿区。要放进成稿的提示词只写在 <draft> 里,正文里不要把它再抄一遍。'
-    '正文用两三句中文说明你做了什么:动了哪几段、怎么改的、有什么要用户留意的。'
-    '<draft> 里的提示词按内容切成几段。'
-    '每段占两行:第一行行首用【】标出这段写的是什么(标注用中文,不超过 6 个字),后面跟这段提示词原文;'
-    '第二行以〔译〕开头,是这段的中文翻译,只给用户对照看。例如:\n'
-    '<draft>\n'
-    '【主体】A colossal veined white angel statue with folded wings...\n'
-    '〔译〕一尊巨大的白色天使雕像,纹理如脉络,翅膀收拢……\n'
-    '【光影】Hard low sunlight from a high clerestory window...\n'
-    '〔译〕高窗射入的低角度硬光……\n'
-    '</draft>\n'
+/// 每段下面的〔译〕行用 [gloss] 这种语言写;为 null(英文界面)时不要〔译〕行。
+String _draftFormatPrompt(String? gloss) {
+  final lang = _glossLanguages[gloss];
+  final sections = lang == null
+      ? '每段占一行:行首用【】标出这段写的是什么(标注用中文,不超过 6 个字),后面跟这段提示词原文;'
+            '不写〔译〕行。例如:\n'
+            '<draft>\n'
+            '【主体】A colossal veined white angel statue with folded wings...\n'
+            '【光影】Hard low sunlight from a high clerestory window...\n'
+            '</draft>\n'
+      : '每段占两行:第一行行首用【】标出这段写的是什么(标注用中文,不超过 6 个字),后面跟这段提示词原文;'
+            '第二行以〔译〕开头,是这段的${lang.name}翻译,只给用户对照看。例如:\n'
+            '<draft>\n'
+            '【主体】A colossal veined white angel statue with folded wings...\n'
+            '〔译〕${lang.example[0]}\n'
+            '【光影】Hard low sunlight from a high clerestory window...\n'
+            '〔译〕${lang.example[1]}\n'
+            '</draft>\n';
+  return '【输出格式】只要这次回复给出了新的或改过的提示词,就把它放在回复最后的 <draft> 和 </draft> 之间,'
+      '供用户放到左侧成稿区。要放进成稿的提示词只写在 <draft> 里,正文里不要把它再抄一遍。'
+      '正文用两三句中文说明你做了什么:动了哪几段、怎么改的、有什么要用户留意的。'
+      '<draft> 里的提示词按内容切成几段。'
+      '$sections$_draftFormatRest';
+}
+
+const _draftFormatRest =
     '怎么分段、分几段按实际内容定,各段连起来要正好是完整的提示词。'
     '标签里不写解释,不套代码块;'
     '当前成稿已有分段标注时,沿用它的标注:只改了其中几段就只写那几段(没写的段会原样保留),'

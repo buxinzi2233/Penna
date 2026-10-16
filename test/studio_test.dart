@@ -125,6 +125,38 @@ void main() {
       expect(seen.messages.last, {'role': 'user', 'content': '你好'});
     });
 
+    test('每段的对照译文跟着界面语言:日文界面要日文,英文界面不要〔译〕', () async {
+      expect(const AppConfig().glossLanguage, 'zh');
+      expect(const AppConfig(language: 'zh-Hant').glossLanguage, 'zh-Hant');
+      expect(const AppConfig(language: 'en').glossLanguage, isNull);
+
+      Future<String> systemFor(String language) async {
+        final config = tempConfig();
+        config.update(
+          AppConfig(
+            language: language,
+          ).putLlm(_llm).setSecret(llmSecretKey('a'), 'sk-x'),
+        );
+        late LlmRequest seen;
+        final vm = sampleStudio(
+          config: config,
+          streamChat: (req) {
+            seen = req;
+            return const Stream.empty();
+          },
+        );
+        vm.send('写一张图');
+        await pumpEventQueue();
+        return seen.messages.first['content'] as String;
+      }
+
+      expect(await systemFor('zh-Hans'), contains('这段的简体中文翻译'));
+      expect(await systemFor('ja'), contains('这段的日文翻译'));
+      final english = await systemFor('en');
+      expect(english, contains('不写〔译〕行'));
+      expect(english, isNot(contains('翻译,只给用户对照看')));
+    });
+
     test('模型出错时把原因写进回复并结束', () async {
       final config = tempConfig()..update(const AppConfig().putLlm(_llm));
       final vm = sampleStudio(

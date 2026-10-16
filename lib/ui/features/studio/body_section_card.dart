@@ -14,6 +14,7 @@ class _SectionCard extends StatefulWidget {
     this.onPin,
     this.onPolish,
     this.onTranslate,
+    this.showTranslate = true,
     this.onRemove,
     this.actions = const [],
     this.openAll = false,
@@ -63,6 +64,9 @@ class _SectionCard extends StatefulWidget {
   final VoidCallback? onPin;
   final VoidCallback? onPolish;
   final VoidCallback? onTranslate;
+
+  /// 英文界面不要对照译文,「翻译这段」整个藏起来。
+  final bool showTranslate;
 
   /// 放在右上角的按钮;待确认的段用它放「采纳」「驳回」。
   final List<Widget> actions;
@@ -208,8 +212,10 @@ class _SectionCardState extends State<_SectionCard> {
                   const SizedBox(width: 2),
                   _action(Icons.auto_fix_high, tr('润色这段'), widget.onPolish),
                   const SizedBox(width: 2),
-                  _action(Icons.translate, tr('翻译这段'), widget.onTranslate),
-                  const SizedBox(width: 2),
+                  if (widget.showTranslate) ...[
+                    _action(Icons.translate, tr('翻译这段'), widget.onTranslate),
+                    const SizedBox(width: 2),
+                  ],
                   _action(
                     Icons.forum_outlined,
                     tr('和 Agent 讨论这段'),

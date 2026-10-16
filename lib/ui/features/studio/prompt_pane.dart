@@ -188,6 +188,9 @@ class _DraftSectionState extends State<_DraftSection> {
     }
   }
 
+  /// 界面语言要不要每段的对照译文(英文界面不要)。
+  bool get _gloss => vm.config.config.glossLanguage != null;
+
   /// 工作区顶栏。[label] 放不下时把按钮上的字变成空串,[tip] 那时把名字放进悬停提示。
   Widget _toolbar(
     BuildContext context,
@@ -286,16 +289,18 @@ class _DraftSectionState extends State<_DraftSection> {
               ? null
               : () => _polish(context),
         ),
-        const SizedBox(width: 6),
-        PennaButton(
-          label: label(tr('翻译')),
-          icon: Icons.translate,
-          borderColor: PennaColors.border,
-          tooltip: tip(tr('翻译')),
-          onPressed: prompt.isEmpty || vm.isTranslating
-              ? null
-              : () => _translate(context),
-        ),
+        if (_gloss) ...[
+          const SizedBox(width: 6),
+          PennaButton(
+            label: label(tr('翻译')),
+            icon: Icons.translate,
+            borderColor: PennaColors.border,
+            tooltip: tip(tr('翻译')),
+            onPressed: prompt.isEmpty || vm.isTranslating
+                ? null
+                : () => _translate(context),
+          ),
+        ],
         const SizedBox(width: 6),
         PennaButton(
           label: label(tr('合并')),
@@ -340,7 +345,7 @@ class _DraftSectionState extends State<_DraftSection> {
               if (series) tr('保存系列'),
               tr('固定'),
               tr('润色'),
-              tr('翻译'),
+              if (_gloss) tr('翻译'),
               tr('合并'),
               _zhOpen ? tr('收起') : tr('展开'),
             ];
@@ -373,14 +378,21 @@ class _DraftSectionState extends State<_DraftSection> {
                         ? null
                         : (start, end) =>
                               _polish(context, section: (start, end)),
-                    onTranslateSelection: () =>
-                        _translate(context, selection: true),
-                    onTranslate: (section, text) async {
-                      final problem = await vm.translateSection(section, text);
-                      if (problem != null && context.mounted) {
-                        showToast(context, problem, warn: true);
-                      }
-                    },
+                    // 英文界面不要对照译文:几处翻译都不给。
+                    onTranslateSelection: !_gloss
+                        ? null
+                        : () => _translate(context, selection: true),
+                    onTranslate: !_gloss
+                        ? null
+                        : (section, text) async {
+                            final problem = await vm.translateSection(
+                              section,
+                              text,
+                            );
+                            if (problem != null && context.mounted) {
+                              showToast(context, problem, warn: true);
+                            }
+                          },
                   ),
                   if (vm.translation != null) ...[
                     const SizedBox(height: 10),

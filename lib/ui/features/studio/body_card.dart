@@ -257,6 +257,7 @@ class BodyCard extends StatelessWidget {
                           p.offset + s.textStart,
                           p.offset + s.textEnd,
                         ),
+                  showTranslate: onTranslate != null,
                   onTranslate:
                       onTranslate == null ||
                           s.textStart == s.textEnd ||

@@ -499,6 +499,15 @@ class AppConfig {
   /// 深色模式。
   final bool darkMode;
 
+  /// 成稿每段下面的对照译文(〔译〕)和机翻用什么语言,跟着界面语言走:
+  /// 'zh'(简体)、'zh-Hant'、'ja';英文界面不要对照,为 null。
+  String? get glossLanguage => switch (language) {
+    'en' => null,
+    'zh-Hant' => 'zh-Hant',
+    'ja' => 'ja',
+    _ => 'zh',
+  };
+
   /// 被用户关掉的 Skill。不在这里面的都是开着的,对所有 Preset 生效;
   /// 所以新导入、新写出来的 Skill 默认就能用。
   final Set<String> disabledSkills;
