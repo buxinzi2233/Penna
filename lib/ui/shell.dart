@@ -16,7 +16,7 @@ import 'features/studio/studio_page.dart';
 import 'features/studio/studio_view_model.dart';
 
 /// 显示在右下角的版本号;要和 pubspec.yaml 的 version 一致(version_test.dart 会查)。
-const appVersion = '0.1.0';
+const appVersion = '1.0.1';
 
 const _studio = 0,
     _archivePage = 1,

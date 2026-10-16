@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-0.1.0-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.1-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -139,7 +139,7 @@ flutter pub get
 flutter run -d windows
 ```
 
-首次启动后,在「设置」中填入模型接口的 Base URL 与 API Key 即可使用。
+首次启动后,在「设置 → API 管理」中填入模型接口的 Base URL 与 API Key 即可使用。各服务的填写方法见 [API 配置指南](docs/api-setup.md),该文档可直接交给 AI 助手,由它协助完成配置。
 
 ## 数据与隐私
 
