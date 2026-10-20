@@ -169,7 +169,7 @@ extension StudioChat on StudioViewModel {
             })) {
               // 自己以前写的布局、透视不重发:画板可能已被用户改过。
               final text when !m.fromUser => forgetPerspectives(
-                forgetLayouts(text),
+                forgetLayers(forgetLayouts(text)),
               ),
               final text => text,
             },
@@ -214,6 +214,7 @@ extension StudioChat on StudioViewModel {
             }
             _deliverCharacters();
             _deliverLayout();
+            _deliverLayers();
             _deliverPerspective();
             unawaited(_deliverSkill());
             _sendNext();

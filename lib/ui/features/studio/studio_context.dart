@@ -230,6 +230,23 @@ extension StudioContext on StudioViewModel {
     );
   }
 
+  /// 回复里调了图层(`<layers>`):在画板上换先后、改名字和前中后景,并记一笔。
+  void _deliverLayers() {
+    final board = layout;
+    if (board == null || _messages.isEmpty) return;
+    final spec = splitLayers(_messages.last.text).spec;
+    final ops = spec == null ? null : parseLayers(spec);
+    if (ops == null || !board.applyLayers(ops)) return;
+    _updateReply(
+      (m) => m.copyWith(
+        toolSummary: [
+          ?m.toolSummary,
+          tr('已调整图层 · {0} 块', [board.layout.boxes.length]),
+        ].join(' · '),
+      ),
+    );
+  }
+
   /// 回复里写了透视(`<perspective>`):改画板上的透视线,并在这条回复上记一笔。
   void _deliverPerspective() {
     final board = layout;

@@ -60,7 +60,8 @@ class LayoutBoard extends ChangeNotifier {
                   'name 是用户给这一块起的名字,他说"把某某挪到……"指的就是它;'
                   '你写的时候照样带着 name,新加的块也起一个两到六个字的中文名。\n'
                   '各块按前后排:1 在最前面,越往后越靠后,重叠时前面的盖住后面的;'
-                  'items 也照这个先后写(前景、中景、后景依次),要调前后就换它们的先后。'
+                  'items 也照这个先后写(前景、中景、后景依次),要调前后就换它们的先后;'
+                  '只换前后、改名字、换前中后景时写 <layers> 就够了。'
                   '各块在画布上的范围(从左上角量,0% 是左边或顶上):\n$where\n'
                   '<current-layout>\n${mossLayoutJson(l, names: true)}\n</current-layout>'}'
         '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}';
@@ -120,6 +121,32 @@ class LayoutBoard extends ChangeNotifier {
   /// 拖动透视线(画布上拖消失点时用)。
   void movePerspective(Perspective p) =>
       _set(_layout.copyWith(perspective: () => p));
+
+  /// 照 Agent 写的 `<layers>` 调图层(见 [parseLayers]):按给的先后排,顺便改名字和
+  /// 前中后景;框的位置和描述一点不动。没写到的块按原来的先后接在后面。
+  /// 序号对不上或重复时返回 false,画板不动。
+  bool applyLayers(List<LayerOp> ops) {
+    final old = _layout.boxes;
+    final listed = <int>{};
+    for (final op in ops) {
+      if (op.from < 1 || op.from > old.length || !listed.add(op.from)) {
+        return false;
+      }
+    }
+    _selected = null;
+    _set(
+      _layout.copyWith(
+        boxes: [
+          for (final op in ops)
+            old[op.from - 1].copyWith(name: op.name, layer: op.layer),
+          for (final (i, b) in old.indexed)
+            if (!listed.contains(i + 1)) b,
+        ],
+      ),
+      rebuild: true,
+    );
+    return true;
+  }
 
   /// 照 Agent 写的 `<perspective>` 改透视线(见 [parsePerspective])。
   /// 读不了返回 false,画板不动。

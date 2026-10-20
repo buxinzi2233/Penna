@@ -284,6 +284,70 @@ void main() {
     expect(board.prompt, contains('1 在最前面'));
   });
 
+  test('<layers>:Agent 只调图层的先后、名字和前中后景,位置和描述不动', () async {
+    expect(parseLayers('[{"from": 2, "name": " 甲 "}, {"from": 1}]'), [
+      (from: 2, name: '甲', layer: null),
+      (from: 1, name: null, layer: null),
+    ]);
+    expect(parseLayers('[{"from": 1, "layer": "top"}]'), isNull);
+    expect(parseLayers('不是 JSON'), isNull);
+    expect(parseLayers('[]'), isNull);
+    final half = splitLayers('调好了。<layers>[{"fr');
+    expect((half.prose, half.spec), ('调好了。', null));
+
+    final board = LayoutBoard();
+    final service = tempConfig();
+    service.update(
+      service.config.putLlm(
+        const LlmProfile(id: 'a', name: 'A', baseUrl: 'http://a', model: 'm'),
+      ),
+    );
+    for (final (i, n) in ['人', '树', '字'].indexed) {
+      board.addBox(
+        LayoutBox(
+          left: i * 10,
+          top: 0,
+          right: i * 10 + 10,
+          bottom: 10,
+          name: n,
+          caption: '$n 的描述',
+        ),
+      );
+    }
+    // 都是中景,新加的在前:字、树、人。
+    final before = {for (final b in board.layout.boxes) b.name: b};
+    final seen = <List<Map<String, String>>>[];
+    final chat = StudioViewModel(
+      config: service,
+      layout: board,
+      layoutOnly: true,
+      streamChat: (request) {
+        seen.add(request.messages);
+        return Stream.value(
+          seen.length == 1
+              ? '把人放到最前。<layers>[{"from": 3, "name": "主角", "layer": "front"},'
+                    ' {"from": 1}, {"from": 2, "layer": "back"}]</layers>'
+              : '好的。',
+        );
+      },
+    );
+    expect(chat.send('人放最前,改名主角,树放后面'), isNull);
+    await pumpEventQueue();
+    final boxes = board.layout.boxes;
+    expect(boxes.map((b) => '${b.name}${b.layer[0]}').join(' '), '主角f 字m 树b');
+    expect(boxes.first.left, before['人']!.left);
+    expect(boxes.first.caption, '人 的描述');
+    expect(chat.messages.last.toolSummary, contains('已调整图层'));
+    expect(chat.messages.last.text, contains('<layers>'));
+
+    // 下一轮不重发旧的 <layers>。
+    expect(chat.send('好'), isNull);
+    await pumpEventQueue();
+    expect(seen.last[2]['content'], isNot(contains('<layers>')));
+    // 序号对不上的不收,画板不动。
+    expect(board.applyLayers([(from: 9, name: null, layer: null)]), isFalse);
+  });
+
   test('参考图和画布一横一竖时给出对调后的尺寸', () async {
     final board = LayoutBoard();
     Uint8List png(int w, int h) =>

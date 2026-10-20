@@ -359,6 +359,72 @@ const _open = '<layout>';
 String forgetLayouts(String reply) =>
     reply.replaceAll(_block, '(这里写过一份布局 JSON,已放到画板上,内容省略;现在的样子看【布局画板】)');
 
+final _layersTag = RegExp(r'<layers>([\s\S]*?)</layers>');
+const _layersOpen = '<layers>';
+
+/// Agent 调图层的一项:把现在第 [from] 块(从 1 数)排到这个位置,
+/// [name]、[layer] 不为 null 时顺便改掉。
+typedef LayerOp = ({int from, String? name, String? layer});
+
+/// 拆回复里的 `<layers>`(有好几个时取最后一个):[spec] 是里面的内容,
+/// [prose] 是去掉它之后给人看的话;还没写完的那一个先不显示,[spec] 为 null。
+({String prose, String? spec}) splitLayers(String reply) {
+  final done = _layersTag.allMatches(reply).lastOrNull;
+  var prose = reply.replaceAll(_layersTag, '');
+  var spec = done?[1]!.trim();
+  final half = prose.indexOf(_layersOpen);
+  if (half >= 0) {
+    prose = prose.substring(0, half);
+    spec = null;
+  } else {
+    // 开始标签只到了一半(流式生成中)。
+    for (var n = _layersOpen.length - 1; n > 1; n--) {
+      if (prose.endsWith(_layersOpen.substring(0, n))) {
+        prose = prose.substring(0, prose.length - n);
+        break;
+      }
+    }
+  }
+  return (prose: prose.trim(), spec: spec);
+}
+
+/// 读 `<layers>` 里的 JSON 数组:按从前到后的新顺序一项一块,
+/// `[{"from": 2, "name": "维尔汀", "layer": "front"}, {"from": 1}]`。
+/// `from` 是这一块现在的序号(从 1 数);`name`、`layer` 要改才写。
+/// 读不了、layer 不认得时返回 null。
+List<LayerOp>? parseLayers(String spec) {
+  final Object? list;
+  try {
+    // 模型常把 JSON 套进代码块。
+    list = jsonDecode(
+      spec
+          .trim()
+          .replaceFirst(RegExp(r'^```[a-zA-Z]*\s*'), '')
+          .replaceFirst(RegExp(r'\s*```$'), ''),
+    );
+  } on FormatException {
+    return null;
+  }
+  if (list is! List || list.isEmpty) return null;
+  final ops = <LayerOp>[];
+  for (final item in list) {
+    if (item is! Map || item['from'] is! num) return null;
+    final layer = item['layer'];
+    if (layer != null && !layoutLayers.contains(layer)) return null;
+    final name = item['name'];
+    ops.add((
+      from: (item['from'] as num).round(),
+      name: name is String && name.trim().isNotEmpty ? name.trim() : null,
+      layer: layer as String?,
+    ));
+  }
+  return ops;
+}
+
+/// 发给模型的旧回复里,整个 `<layers>…</layers>` 换成一句不带标签的话(同 [forgetLayouts])。
+String forgetLayers(String reply) =>
+    reply.replaceAll(_layersTag, '(这里调过一次图层,已放到画板上,内容省略;现在的样子看【布局画板】)');
+
 /// 把回复里的 `<layout>` 拆出来(有好几个时取最后一个):[json] 是里面的布局,
 /// [prose] 是去掉它之后给人看的话;还没写完的那一个先不显示,[complete] 为假。
 ({String prose, String? json, bool complete}) splitLayout(String reply) {

@@ -812,6 +812,7 @@ const en = <String, String>{
   '测试版': 'Dev',
   '已关掉透视辅助': 'Perspective guides turned off',
   '已调整透视 · {0} 点透视': 'Perspective adjusted · {0}-point',
-  '图层 · 上面的在前': 'Layers · top is front',
+  '图层': 'Layers',
   '拖动换前后': 'Drag to reorder',
+  '已调整图层 · {0} 块': 'Layers adjusted · {0} blocks',
 };

@@ -60,7 +60,7 @@ class _Properties extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(2, 14, 2, 0),
                       child: Text(
-                        tr('图层 · 上面的在前'),
+                        tr('图层'),
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
