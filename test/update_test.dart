@@ -26,6 +26,15 @@ void main() {
     expect(compareVersions('2.0', '1.9.9'), greaterThan(0));
   });
 
+  test('测试版:比同号的正式版旧,比上一个正式版新,同号的按日期再按第几次', () {
+    const dev = '1.0.2-261020-7-dev';
+    expect(compareVersions(dev, '1.0.1'), greaterThan(0));
+    expect(compareVersions('1.0.2', dev), greaterThan(0));
+    expect(compareVersions('1.0.2-261020-10-dev', dev), greaterThan(0));
+    expect(compareVersions('1.0.2-261021-1-dev', dev), greaterThan(0));
+    expect(compareVersions('v$dev', '$dev+3'), 0);
+  });
+
   test('发行版:挑 Windows 安装包,带上 SHA256;说明去掉图片', () {
     final r = parseRelease({
       'tag_name': 'v1.0.2',

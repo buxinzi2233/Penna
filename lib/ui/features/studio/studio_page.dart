@@ -6,7 +6,6 @@ import '../../core/theme.dart';
 import 'activity_bar.dart';
 import 'chat_pane.dart';
 import 'prompt_pane.dart';
-import 'reverse_model.dart';
 import 'studio_view_model.dart';
 
 const _splitterWidth = 4.0;
@@ -22,16 +21,18 @@ class StudioPage extends StatefulWidget {
     required this.vm,
     required this.config,
     required this.archive,
-    required this.reverse,
     required this.onOpenSettings,
+    this.onOpenLayout,
     this.inbox,
   });
 
   final StudioViewModel vm;
   final ArchiveStore archive;
-  final ReverseModel reverse;
   final ConfigService config;
   final VoidCallback onOpenSettings;
+
+  /// 切到区域控制工作台。
+  final VoidCallback? onOpenLayout;
 
   /// 别的页面交过来的话(比如本地反推的结果):收到就填进聊天输入框。
   final ValueNotifier<String?>? inbox;
@@ -102,8 +103,6 @@ class _StudioPageState extends State<StudioPage> {
                 child: PromptPane(
                   vm: widget.vm,
                   archive: widget.archive,
-                  reverse: widget.reverse,
-                  onSendToAgent: _fillInput,
                   // 选中一段后直接去输入框打字。
                   onDiscuss: (section) {
                     widget.vm.quoteSection(section);
@@ -124,6 +123,7 @@ class _StudioPageState extends State<StudioPage> {
                   inputFocus: _inputFocus,
                   onQuickAction: _appendInput,
                   onOpenSettings: widget.onOpenSettings,
+                  onOpenLayout: widget.onOpenLayout,
                 ),
               ),
             ],

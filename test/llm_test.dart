@@ -250,16 +250,19 @@ void main() {
   group('模型按顺序切换', () {
     test('前一个没出字就失败时换下一个,并报告是谁在回答', () async {
       final answering = <String>[];
+      final trying = <String>[];
 
       final out = await streamWithFailover(
         [('A', _req('a')), ('B', _req('b'))],
         (r) => r.model == 'a'
             ? Stream.error(const LlmException('挂了'))
             : Stream.fromIterable(['你', '好']),
+        onTrying: trying.add,
         onAnswering: answering.add,
       ).join();
 
       expect(out, '你好');
+      expect(trying, ['A', 'B']);
       expect(answering, ['B']);
     });
 

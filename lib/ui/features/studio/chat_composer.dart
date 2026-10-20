@@ -14,9 +14,15 @@ class _Composer extends StatelessWidget {
     required this.picker,
     required this.chips,
     required this.onAttach,
+    required this.autoApprove,
+    required this.onAutoApprove,
     required this.dragging,
     this.queued = const [],
   });
+
+  /// 成稿的改动是自动采纳还是等用户点。
+  final bool autoApprove;
+  final ValueChanged<bool> onAutoApprove;
 
   /// 排着队等发的那几条,显示在最上面。
   final List<Widget> queued;
@@ -66,22 +72,27 @@ class _Composer extends StatelessWidget {
             ),
           ),
           if (quickActions.isNotEmpty) ...[
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Row(
               children: [
                 Text(
                   tr('快捷操作:'),
                   style: TextStyle(fontSize: 11, color: PennaColors.slate400),
                 ),
-                for (final action in quickActions)
-                  PennaButton(
-                    // 默认的两个按界面语言翻译,自己加的原样。
-                    label: tr(action.label),
-                    background: PennaColors.slate100,
-                    onPressed: () => onQuickAction(tr(action.prompt)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: ScrollStrip(
+                    visible: _maxQuickActions,
+                    children: [
+                      for (final action in quickActions)
+                        PennaButton(
+                          // 默认的两个按界面语言翻译,自己加的原样。
+                          label: tr(action.label),
+                          background: PennaColors.slate100,
+                          onPressed: () => onQuickAction(tr(action.prompt)),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -136,6 +147,18 @@ class _Composer extends StatelessWidget {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
+                    ),
+                    PennaButton(
+                      label: autoApprove ? tr('自动审批') : tr('手动审批'),
+                      icon: autoApprove
+                          ? Icons.done_all
+                          : Icons.front_hand_outlined,
+                      tooltip: tr('成稿的改动:自动采纳 / 手动确认'),
+                      background: autoApprove ? PennaColors.primaryBg : null,
+                      foreground: autoApprove
+                          ? PennaColors.primary
+                          : PennaColors.slate500,
+                      onPressed: () => onAutoApprove(!autoApprove),
                     ),
                     const Spacer(),
                     Bouncy(

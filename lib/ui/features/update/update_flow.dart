@@ -5,6 +5,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../core/harness/local/download.dart';
 import '../../../core/harness/update/updater.dart';
+import '../../../data/services/config_service.dart';
 import '../../core/theme.dart';
 import '../../core/version.dart';
 import '../../core/widgets.dart';
@@ -14,17 +15,18 @@ import '../../../l10n/l10n.dart';
 
 typedef FetchRelease = Future<Release?> Function();
 
-/// 检查更新。有新版本就弹窗介绍并可一键更新。
+/// 检查更新([channel] 是 'main' 正式版或 'dev' 测试版)。有新版本就弹窗介绍并可一键更新。
 /// [quiet] 为真时(启动时自动检查)已是最新、出错都不打扰用户。
 Future<void> checkForUpdate(
   BuildContext context, {
   bool quiet = false,
-  FetchRelease fetch = fetchLatestRelease,
+  FetchRelease? fetch,
   String current = appVersion,
+  String channel = 'main',
 }) async {
   Release? release;
   try {
-    release = await fetch();
+    release = await (fetch ?? () => fetchLatestRelease(channel: channel))();
   } on UpdateException catch (e) {
     if (!quiet && context.mounted) showToast(context, e.message, warn: true);
     return;
@@ -198,9 +200,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
 /// 设置里的「版本与更新」:当前版本和「检查更新」按钮。
 class UpdateCard extends StatefulWidget {
-  const UpdateCard({super.key, this.fetch = fetchLatestRelease});
+  const UpdateCard({super.key, this.fetch, this.service});
 
-  final FetchRelease fetch;
+  final FetchRelease? fetch;
+
+  /// 有它时显示「正式版 / 测试版」的通道切换,检查更新按它选的来。
+  final ConfigService? service;
 
   @override
   State<UpdateCard> createState() => _UpdateCardState();
@@ -211,7 +216,11 @@ class _UpdateCardState extends State<UpdateCard> {
 
   Future<void> _check() async {
     setState(() => _checking = true);
-    await checkForUpdate(context, fetch: widget.fetch);
+    await checkForUpdate(
+      context,
+      fetch: widget.fetch,
+      channel: widget.service?.config.updateChannel ?? 'main',
+    );
     if (mounted) setState(() => _checking = false);
   }
 
@@ -234,6 +243,22 @@ class _UpdateCardState extends State<UpdateCard> {
               ],
             ),
           ),
+          if (widget.service case final service?) ...[
+            for (final (channel, label) in [
+              ('main', tr('正式版')),
+              ('dev', tr('测试版')),
+            ]) ...[
+              PennaChip(
+                label: label,
+                selected: service.config.updateChannel == channel,
+                onTap: () => service.update(
+                  service.config.copyWith(updateChannel: channel),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            const SizedBox(width: 6),
+          ],
           PennaButton(
             label: _checking ? tr('检查中…') : tr('检查更新'),
             icon: Icons.system_update_alt,

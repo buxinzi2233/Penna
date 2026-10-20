@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../../../data/models/app_config.dart';
@@ -140,7 +143,155 @@ class _PresetSectionState extends State<PresetSection> {
             ],
           ),
         ),
+        gap,
+        _PiercingCard(service: _service),
       ],
+    );
+  }
+}
+
+/// 穿甲弹:一段接在所有 Preset 系统提示最前面的话,默认关。
+/// 文字先改在草稿里,点「保存」才写进设置;能从文本文件导入、导出成文本文件。
+class _PiercingCard extends StatefulWidget {
+  const _PiercingCard({required this.service});
+
+  final ConfigService service;
+
+  @override
+  State<_PiercingCard> createState() => _PiercingCardState();
+}
+
+class _PiercingCardState extends State<_PiercingCard> {
+  ConfigService get service => widget.service;
+
+  late String _draft = service.config.piercingPrompt;
+
+  /// 导入过几次;输入框靠它重建来显示导入的文字。
+  int _imports = 0;
+
+  bool get _dirty => _draft != service.config.piercingPrompt;
+
+  @override
+  void dispose() {
+    // 换到别的分区时卡片会被拆掉:没保存的改动替用户存上,不悄悄丢掉。
+    if (_dirty) {
+      final draft = _draft;
+      Future.microtask(
+        () => service.update(service.config.copyWith(piercingPrompt: draft)),
+      );
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    service.update(service.config.copyWith(piercingPrompt: _draft));
+    await service.flushed();
+    if (!mounted) return;
+    setState(() {});
+    final error = service.lastError;
+    showToast(context, error ?? tr('已保存'), warn: error != null);
+  }
+
+  Future<void> _import() async {
+    final picked = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(label: tr('文本'), extensions: ['txt', 'md']),
+      ],
+    );
+    if (picked == null) return;
+    try {
+      final text = await File(picked.path).readAsString();
+      if (!mounted) return;
+      setState(() {
+        _draft = text;
+        _imports++;
+      });
+    } on Exception {
+      if (mounted) showToast(context, tr('读不了这个文件'), warn: true);
+    }
+  }
+
+  Future<void> _export() async {
+    final at = await getSaveLocation(
+      suggestedName: 'piercing.txt',
+      acceptedTypeGroups: [
+        XTypeGroup(label: tr('文本'), extensions: ['txt']),
+      ],
+    );
+    if (at == null) return;
+    try {
+      await File(at.path).writeAsString(_draft);
+      if (mounted) showToast(context, tr('已导出'));
+    } on FileSystemException {
+      if (mounted) showToast(context, tr('写不进这个位置'), warn: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = service.config;
+    return PennaCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr('穿甲弹'), style: titleStyle),
+                    Text(tr('所有 Preset 共用'), style: hintStyle),
+                  ],
+                ),
+              ),
+              Transform.scale(
+                scale: 0.8,
+                child: Switch(
+                  value: cfg.piercing,
+                  onChanged: (on) =>
+                      service.update(service.config.copyWith(piercing: on)),
+                ),
+              ),
+            ],
+          ),
+          gap,
+          PennaField(
+            key: ValueKey('piercing-$_imports'),
+            label: tr('提示词'),
+            maxLines: 6,
+            value: _draft,
+            onChanged: (v) => setState(() => _draft = v),
+          ),
+          gap,
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              PennaButton(
+                label: tr('保存'),
+                icon: Icons.check,
+                background: _dirty ? PennaColors.primary : PennaColors.slate100,
+                foreground: _dirty ? Colors.white : null,
+                onPressed: _dirty ? _save : null,
+              ),
+              PennaButton(
+                label: tr('导入'),
+                icon: Icons.file_open_outlined,
+                background: PennaColors.slate100,
+                onPressed: _import,
+              ),
+              PennaButton(
+                label: tr('导出'),
+                icon: Icons.save_alt,
+                background: PennaColors.slate100,
+                onPressed: _export,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

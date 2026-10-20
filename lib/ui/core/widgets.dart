@@ -105,7 +105,9 @@ class PennaChip extends StatelessWidget {
 
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+
+  /// 为 null 时不接点击(套在 PopupMenuButton 里,让它来接)。
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +251,8 @@ class PennaButton extends StatelessWidget {
   }
 }
 
+const pennaBarHeight = 48.0;
+
 /// 面板顶部/底部的横条。
 class PennaBar extends StatelessWidget {
   const PennaBar({
@@ -265,8 +269,10 @@ class PennaBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final side = BorderSide(color: PennaColors.border);
+    // 高度固定:并排的几栏(工作区和对话)顶栏的底边才对得齐。
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      height: pennaBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: color ?? PennaColors.slate50,
         border: borderOnTop ? Border(top: side) : Border(bottom: side),
@@ -317,12 +323,14 @@ class PennaField extends StatefulWidget {
     this.hint,
     this.obscure = false,
     this.maxLines = 1,
+    this.focusNode,
   });
 
   final String label;
   final String value;
   final ValueChanged<String> onChanged;
   final String? hint;
+  final FocusNode? focusNode;
 
   /// 机密字段:默认打码,可点眼睛查看。
   final bool obscure;
@@ -363,6 +371,7 @@ class _PennaFieldState extends State<PennaField> {
         TextField(
           contextMenuBuilder: pennaTextMenu,
           controller: _controller,
+          focusNode: widget.focusNode,
           onChanged: widget.onChanged,
           obscureText: widget.obscure && _hidden,
           maxLines: widget.obscure ? 1 : widget.maxLines,

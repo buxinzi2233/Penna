@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../core/harness/characters/character_dict.dart';
 import '../../../core/harness/draft_block.dart';
+import '../../../core/harness/layout.dart';
+import '../../../core/harness/local/local_tools.dart';
 import '../../../core/harness/tags/tag_search.dart';
 import '../../../data/services/skill_store.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'attachment_view.dart';
+import 'layout_card.dart';
 import 'markdown_text.dart';
 import 'mention.dart';
 import 'option_pick.dart';
@@ -44,6 +47,8 @@ class ChatMessageView extends StatelessWidget {
     this.userAvatar = '',
     this.userSkills = const [],
     this.onAddSkill,
+    this.onAdoptLayout,
+    this.onOpenLayout,
     this.lookups = const [],
     this.onOption,
     this.draftSections = const [],
@@ -63,6 +68,12 @@ class ChatMessageView extends StatelessWidget {
 
   /// 把回复里新写的 Skill(整篇 SKILL.md)加进用户的 Skills。
   final ValueChanged<String>? onAddSkill;
+
+  /// 把回复里的布局 JSON 再放到区域控制工作台上。
+  final ValueChanged<String>? onAdoptLayout;
+
+  /// 切到区域控制工作台;只在主工作区的对话里有。
+  final VoidCallback? onOpenLayout;
 
   /// 两边头像的图片路径;空串用默认头像。
   final String agentAvatar;
@@ -88,11 +99,13 @@ class ChatMessageView extends StatelessWidget {
   List<Widget> _reply(BuildContext context) {
     final m = message;
     // 先拆新 Skill:它正文里举例用的成稿标签不能被当成成稿。
-    final made = splitNewSkill(
+    final tools = splitLocalTools(
       splitCharacterTags(splitTagSearch(m.text).prose).prose,
     );
+    final made = splitNewSkill(splitAskLayout(tools.prose).prose);
     final newSkill = made.skill;
-    final asked = splitOptions(made.prose);
+    final laid = splitLayout(made.prose);
+    final asked = splitOptions(laid.prose);
     // 挑成稿里的段:直接列当前页的各段。模型自己列出的多选项正好全是段名时也照此显示。
     final labels = {for (final s in draftSections) s.label};
     final bySection =
@@ -116,9 +129,15 @@ class ChatMessageView extends StatelessWidget {
     return [
       if (prose.isNotEmpty)
         SelectableText.rich(markdownSpan(prose, _bodyStyle))
-      else if (streaming && drafts.isEmpty && newSkill == null)
+      else if (streaming &&
+          drafts.isEmpty &&
+          newSkill == null &&
+          laid.json == null)
         const _TypingDots()
-      else if (drafts.isEmpty && newSkill == null && !m.stopped)
+      else if (drafts.isEmpty &&
+          newSkill == null &&
+          laid.json == null &&
+          !m.stopped)
         const Text('…', style: _bodyStyle),
       // 一份成稿一张卡片;分了页的各去各的页。
       for (final (i, draft) in drafts.indexed) ...[
@@ -145,6 +164,21 @@ class ChatMessageView extends StatelessWidget {
           ),
         ),
       ],
+      if (laid.json != null) ...[
+        if (prose.isNotEmpty || drafts.isNotEmpty || newSkill != null)
+          const SizedBox(height: 10),
+        PopIn(
+          child: LayoutCard(
+            json: laid.json!,
+            complete: laid.complete,
+            writing: streaming && !laid.complete,
+            onAdopt: onAdoptLayout == null
+                ? null
+                : () => onAdoptLayout!(laid.json!),
+            onOpen: onOpenLayout,
+          ),
+        ),
+      ],
       // 给用户点的选项:点一下就当成他的回答发出去。
       // 这条回复已经把成稿写出来了就不显示:没有什么还要他先点头的。
       // 问挑哪几段,当前页却一段都没有:说一声,让用户自己打字回答。
@@ -163,24 +197,7 @@ class ChatMessageView extends StatelessWidget {
           )
         else
           PopIn(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final (i, option) in asked.options.indexed)
-                  PennaButton(
-                    label: option,
-                    background: i == 0
-                        ? PennaColors.primary
-                        : PennaColors.primaryBg,
-                    foreground: i == 0 ? Colors.white : PennaColors.primary,
-                    borderColor: PennaColors.primaryBorder,
-                    onPressed: onOption == null
-                        ? null
-                        : () => onOption!(option),
-                  ),
-              ],
-            ),
+            child: SinglePick(options: asked.options, onPick: onOption),
           ),
       ],
       if (!streaming) ...[
@@ -467,12 +484,6 @@ class _DraftCardState extends State<_DraftCard> {
                                 _ => tr('新成稿 · 新的一页'),
                               },
                               ?draft.name,
-                              // 收起时用各段的标注当摘要。
-                              if (!open)
-                                draft.sections
-                                    .map((s) => s.label)
-                                    .where((l) => l.isNotEmpty)
-                                    .join(tr('、')),
                             ].where((s) => s.isNotEmpty).join(' · '),
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -514,6 +525,21 @@ class _DraftCardState extends State<_DraftCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (!open) const SizedBox(width: double.infinity),
+                // 收起时各段的标注竖着列一行一个,当摘要。
+                if (!open)
+                  for (final l in draft.sections.map((s) => s.label))
+                    if (l.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 18, top: 4),
+                        child: Text(
+                          '·  $l',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: PennaColors.slate500,
+                          ),
+                        ),
+                      ),
                 for (final s
                     in open ? draft.sections : const <DraftSection>[]) ...[
                   const SizedBox(height: 8),
@@ -585,7 +611,8 @@ class _ModelTag extends StatelessWidget {
   }
 }
 
-/// 工具调用折叠块:默认展开,可收起,不抢成稿的注意力。
+/// 工具调用记录:有细节时是折叠块(默认展开,可收起);只有一句话时就是一行,
+/// 不给一个点开是空的箭头。
 class _ToolBlock extends StatelessWidget {
   const _ToolBlock({required this.summary, required this.details});
 
@@ -594,6 +621,37 @@ class _ToolBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final icon = Icon(
+      Icons.check_circle_outline,
+      size: 15,
+      color: PennaColors.accent,
+    );
+    final title = Text(
+      summary,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: PennaColors.slate700,
+      ),
+    );
+    final shown = [
+      for (final d in details)
+        if (d.trim().isNotEmpty) d,
+    ];
+    if (shown.isEmpty) {
+      return PennaCard(
+        color: PennaColors.slate50,
+        radius: 12,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(
+          children: [
+            icon,
+            const SizedBox(width: 10),
+            Expanded(child: title),
+          ],
+        ),
+      );
+    }
     return PennaCard(
       color: PennaColors.slate50,
       radius: 12,
@@ -610,21 +668,10 @@ class _ToolBlock extends StatelessWidget {
             childrenPadding: const EdgeInsets.fromLTRB(34, 0, 10, 10),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
             expandedAlignment: Alignment.centerLeft,
-            leading: Icon(
-              Icons.check_circle_outline,
-              size: 15,
-              color: PennaColors.accent,
-            ),
-            title: Text(
-              summary,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: PennaColors.slate700,
-              ),
-            ),
+            leading: icon,
+            title: title,
             children: [
-              for (final d in details)
+              for (final d in shown)
                 Text(
                   d,
                   style: monoStyle.copyWith(

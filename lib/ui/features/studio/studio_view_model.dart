@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import '../../../core/harness/attachment.dart';
 import '../../../core/harness/characters/character_dict.dart';
 import '../../../core/harness/draft_block.dart';
+import '../../../core/harness/layout.dart';
+import '../../../core/harness/local/local_tools.dart';
 import '../../../core/harness/providers/llm_router.dart';
 import '../../../core/harness/providers/openai_provider.dart';
 import '../../../core/harness/tags/tag_dictionary.dart';
@@ -17,6 +19,8 @@ import '../../../data/services/config_service.dart';
 import '../../../data/services/skill_store.dart';
 import '../../../data/services/translate_chain.dart';
 import '../../../data/services/translate_engines.dart';
+import '../layout/layout_board.dart';
+import '../local/local_model.dart';
 import 'chat_message.dart';
 import '../../../l10n/l10n.dart';
 
@@ -94,6 +98,8 @@ class StudioViewModel extends ChangeNotifier {
     this.tagDictionary,
     this.characters,
     this.characterDict,
+    this.layout,
+    this.layoutOnly = false,
   }) : _blocks = List.unmodifiable(blocks),
        _messages = List.unmodifiable(messages) {
     if (saveFile != null) addListener(_scheduleSave);
@@ -109,6 +115,24 @@ class StudioViewModel extends ChangeNotifier {
   /// 两个都没有就不理它的 `<search-character>` / `<save-character>`。
   final CharacterStore? characters;
   final CharacterDict? characterDict;
+
+  /// 布局画板:模型看得到它的画布尺寸和现有的框,写出的 `<layout>` 放到这里;
+  /// 没有就不提布局,也不理 `<layout>`。
+  final LayoutBoard? layout;
+
+  /// 本地反推:Agent 写 `<reverse-image>`、`<download-model>` 时由它来跑。
+  /// 本地反推页和工作台都建好之后才接上(`main()`、`AppShell`),所以不是 final;
+  /// 没有就不提本地反推,也不理这两个标签。
+  LocalModel? local;
+
+  /// 区域控制工作台的那场对话(`layoutOnly`)。主工作区的 Agent 写 `<ask-layout>` 时,
+  /// 把活转给它,等它把布局放到画板上,再把 JSON 拿回主工作区的新系列。
+  /// 和 [local] 一样建好之后才接上;没有就由主工作区的 Agent 自己写 `<layout>`。
+  StudioViewModel? layoutAgent;
+
+  /// 布局页右边那场对话用的:系统提示只讲布局,回复里的 `<layout>` 放到 [layout] 上,
+  /// 不往成稿里送。界面和工作台的对话是同一个 `ChatPane`。
+  final bool layoutOnly;
 
   /// 工作台存盘的文件(「文档/Penna/workspace.json」);为 null 时不存(测试用)。
   final File? saveFile;
@@ -293,9 +317,6 @@ class StudioViewModel extends ChangeNotifier {
 
   /// 这一轮里查回来过的标签(标准写法)。
   final _foundTags = <String>{};
-
-  /// 参考图反推出的提示词,发给 Agent 当上下文;由图像反推那边写入。
-  String referencePrompt = '';
 
   bool _disposed = false;
 

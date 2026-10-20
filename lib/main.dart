@@ -19,7 +19,7 @@ import 'data/services/skill_store.dart';
 import 'ui/core/look_switcher.dart';
 import 'ui/core/theme.dart';
 import 'ui/features/local/local_model.dart';
-import 'ui/features/studio/reverse_model.dart';
+import 'ui/features/layout/layout_board.dart';
 import 'ui/features/studio/studio_view_model.dart';
 import 'ui/shell.dart';
 
@@ -65,6 +65,9 @@ Future<void> main() async {
       ),
     ),
   );
+  // 布局画板(画布尺寸、框和描述)存在 layout.json。
+  final layout = LayoutBoard(dir: home);
+  await layout.load();
   // 工作台(成稿、对话、历史提示词)存在 workspace.json,下次打开接着用。
   final vm = StudioViewModel(
     config: config,
@@ -74,19 +77,36 @@ Future<void> main() async {
     tagSearch: tagSearcher(() => config.config, tagDictionary),
     characters: characters,
     characterDict: characterDict,
+    layout: layout,
     saveFile: File('${home.path}${sep}workspace.json'),
   );
   await vm.load();
+  // 布局页右边那场对话:和工作台的对话分开,存在 layout_chat.json。
+  final layoutChat = StudioViewModel(
+    config: config,
+    streamChat: streamChat,
+    skills: skills,
+    tagDictionary: tagDictionary,
+    tagSearch: tagSearcher(() => config.config, tagDictionary),
+    characters: characters,
+    characterDict: characterDict,
+    layout: layout,
+    layoutOnly: true,
+    saveFile: File('${home.path}${sep}layout_chat.json'),
+  );
+  await layoutChat.load();
   final archive = ArchiveStore(File('${home.path}${sep}archive.json'));
   await archive.load();
-  final reverse = ReverseModel(vm, dir: home);
-  await reverse.load();
   final local = LocalModel(
     dir: home,
     streamChat: streamChat,
     hfToken: () => config.config.secrets[hfTokenSecret] ?? '',
   );
   await local.load();
+  // Agent 在对话里要用本地模型反推时,交给本地反推页这一份。
+  vm.local = local;
+  // 主工作区要排布局时,交给区域控制工作台的 Agent。
+  vm.layoutAgent = layoutChat;
   // 关窗前先停掉本地反推起的 llama-server:Windows 不会跟着把它关掉。
   await windowManager.setPreventClose(true);
   runApp(
@@ -94,8 +114,8 @@ Future<void> main() async {
       config: config,
       skills: skills,
       vm: vm,
+      layoutChat: layoutChat,
       archive: archive,
-      reverse: reverse,
       local: local,
     ),
   );
@@ -121,14 +141,15 @@ class PennaApp extends StatefulWidget {
     required this.config,
     required this.skills,
     required this.vm,
+    required this.layoutChat,
     required this.archive,
-    required this.reverse,
     required this.local,
   });
 
+  final StudioViewModel layoutChat;
+
   final ArchiveStore archive;
   final LocalModel local;
-  final ReverseModel reverse;
   final StudioViewModel vm;
   final ConfigService config;
   final SkillStore skills;
@@ -217,10 +238,10 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
           ),
           home: AppShell(
             vm: _vm,
+            layoutChat: widget.layoutChat,
             config: widget.config,
             skills: widget.skills,
             archive: widget.archive,
-            reverse: widget.reverse,
             local: widget.local,
             checkUpdates: kReleaseMode,
           ),

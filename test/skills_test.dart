@@ -11,6 +11,7 @@ import 'package:penna/data/services/skill_store.dart';
 import 'package:penna/ui/core/theme.dart';
 import 'package:penna/ui/features/studio/mention.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
+import 'package:penna/ui/features/studio/studio_page.dart';
 import 'package:penna/ui/shell.dart';
 
 import 'fixtures.dart';
@@ -210,7 +211,7 @@ void main() {
     });
 
     test('内置 Skill 都有正文', () {
-      expect(builtinSkillList, hasLength(11));
+      expect(builtinSkillList, hasLength(13));
       expect(builtinSkillList.every((s) => s.body.trim().isNotEmpty), isTrue);
     });
   });
@@ -330,9 +331,13 @@ void main() {
           home: AppShell(vm: vm, config: config, skills: vm.skills!),
         ),
       );
-      final input = find.widgetWithText(
-        TextField,
-        'Enter 发送 · Shift+Enter 换行 · @ 引用 Skill',
+      // 布局页也有一个同样的对话框:只找工作台的。
+      final input = find.descendant(
+        of: find.byType(StudioPage),
+        matching: find.widgetWithText(
+          TextField,
+          'Enter 发送 · Shift+Enter 换行 · @ 引用 Skill',
+        ),
       );
 
       await tester.enterText(input, '帮我 @局部');

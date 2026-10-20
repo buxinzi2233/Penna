@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.1-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261020--1--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -66,27 +66,31 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 - 回复流式输出,可随时停止或重新运行。
 - 生成期间继续发送的消息进入队列,依次自动发出,也可以插队立刻发送。
-- Agent 的提问可以带选项按钮,支持单选和多选;选择成稿中的段落时,直接列出当前页的各段。
+- Agent 的提问以竖排选项列出,支持单选和多选;选择成稿中的段落时,直接列出当前页的各段。
+- 要求 Tag 反推或指定本地模型反推时,Agent 调用本机模型处理对话中的图片;所需模型尚未安装时,由用户选择下载或改用已安装的模型。
+- 要求把成稿转成 JSON 或按位置排版时,Agent 把任务交给区域控制工作台的 Agent;布局写好后显示在区域控制工作台,JSON 同时放入成稿区新建的系列。
 - 图片(最大 10 MB)和文本文件可以通过按钮、拖放或 Ctrl+V 作为附件发送。
 - 输入 `@` 引用某个 Skill;输入框上方的快捷操作接在已输入的内容之后,可以自定义。
 - 多场对话以标签页并列,关闭的对话保留在历史中。
 - 每个 Preset 有独立的系统提示、温度和 Top P。
 
-### 图像反推
-
-放入一张参考图,由模型反推出提示词。结果可以放到成稿,也会作为参考提供给之后的对话。
-
 ### 本地反推
 
-在本机运行模型反推图片,分为两类:
+放入一张图片,由模型反推出标签或提示词,分为三类:
 
 - **Tag 反推**:内置 20 个 ONNX 打标模型,分为 WD14、PixAI、CL 与 OppaiOracle 四个系列,生成 Danbooru 标签;角色与通用标签各有阈值,调整后即时重新筛选。结果中的标签可逐个点选,默认全选。
 - **NL 反推**:内置 15 个看图模型,覆盖 Gemma 4(E2B 至 31B)、Gemma 4 Heretic、ToriiGate、JoyCaption 与 Florence-2,每个模型可选量化档。GGUF 模型由 llama.cpp 运行,运行中的服务可以加入 API 管理,供 Agent 与润色使用;Florence-2 在程序内直接运行,按指令输出标签、各级描述或构图分析。
+- **LLM 反推**:从 API 管理中已启用的模型里选择一个或两个,同时反推并排显示结果,便于比较;写法跟随当前 Preset。
+- 开启「压缩大图」时,大图放入后自动缩小并转为 WebP。
 - 两类模型均按系列折叠显示,系列与模型都可以拖动调整顺序。
 - 模型与运行时可从 HuggingFace 或国内镜像下载,支持断点续传与完整性校验;需要申请访问的模型使用设置中的 HuggingFace Token 下载。
 - 在「设置 → 本地反推」中可以添加模型文件夹:连同子文件夹一起查找已有的模型(兼容 BooruDatasetTagManagerPlus、NLapt 与 HuggingFace 缓存的目录结构),找到的模型直接使用;llama.cpp 运行时、运行参数与看图要求也在这里设置。
 - 看图描述的要求可以像 Preset 一样保存多条,命名并随时切换。
 - 结果可以复制、发送给 Agent 或放到成稿。
+
+### 区域控制工作台
+
+在画布上框出各个区域并逐块描述,生成 MOSS-Image 布局 JSON;右侧有独立的布局对话。布局可以保存到档案库的「区域控制」分区,从档案库放回时回到区域控制工作台。
 
 ### Danbooru 标签
 
@@ -124,7 +128,7 @@ Skill 是一份写法说明(`SKILL.md`),决定 Agent 按什么方式写提示词
 
 ### 档案、历史与回滚
 
-- **档案库**:手动保存的成稿,带名称和分类。
+- **档案库**:手动保存的成稿与区域控制布局,分为两个分区,带名称和分类。
 - **历史提示词**:采纳改动、复制、清空时自动记录,最多 100 条,可以展开全文或放回成稿。
 - **操作记录**:记录页面、固定、采纳驳回等结构性操作,可以回滚到任意一步之前。
 

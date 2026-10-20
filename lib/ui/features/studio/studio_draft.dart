@@ -11,6 +11,14 @@ extension StudioDraft on StudioViewModel {
     _queued = List.unmodifiable(_queued.skip(1));
   }
 
+  /// 开着「自动审批」时,刚提出的改动(连同排着的)直接采纳。
+  void _autoAccept() {
+    if (!config.config.autoApprove) return;
+    while (_pending != null) {
+      acceptDiff();
+    }
+  }
+
   /// 清空工作区,好开始写下一条:成稿(连固定区)、待确认改动、中文对照都清掉。
   /// 清之前先记进历史提示词,点错了能从那里放回来。对话不动。
   void clearDraft() {
@@ -463,6 +471,7 @@ extension StudioDraft on StudioViewModel {
     );
     bodySelection = null;
     _changed();
+    _autoAccept();
   }
 
   /// 把 Agent 另出的那份新成稿变成待确认 diff(不直接改成稿)。
@@ -494,6 +503,7 @@ extension StudioDraft on StudioViewModel {
       );
       bodySelection = null;
       _changed();
+      _autoAccept();
       return null;
     }
     // 一栏并成一块,这样一处改动正好指向一栏(固定区各是一块,留在原位)。
@@ -525,6 +535,7 @@ extension StudioDraft on StudioViewModel {
     _queued = List.unmodifiable(diffs.skip(1));
     bodySelection = null;
     _changed();
+    _autoAccept();
     return null;
   }
 }

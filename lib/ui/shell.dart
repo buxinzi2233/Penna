@@ -9,10 +9,11 @@ import 'core/version.dart';
 import 'core/widgets.dart';
 import 'features/archive/archive_page.dart';
 import 'features/characters/characters_page.dart';
+import 'features/layout/layout_board.dart';
+import 'features/layout/layout_page.dart';
 import 'features/local/local_model.dart';
 import 'features/local/local_page.dart';
 import 'features/settings/settings_page.dart';
-import 'features/studio/reverse_model.dart';
 import 'features/studio/studio_page.dart';
 import 'features/studio/studio_view_model.dart';
 import 'features/update/update_flow.dart';
@@ -24,28 +25,31 @@ const _studio = 0,
     _archivePage = 1,
     _settings = 2,
     _charactersPage = 3,
-    _localPage = 4;
+    _localPage = 4,
+    _layoutPage = 5;
 
-/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「角色库」「本地反推」「设置」之间切换。
+/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「角色库」「本地反推」「布局」「设置」之间切换。
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
     required this.vm,
     required this.config,
     required this.skills,
+    this.layoutChat,
     this.archive,
-    this.reverse,
     this.local,
     this.checkUpdates = false,
   });
+
+  /// 布局页右边那场对话;不给就用一个只在内存里的(测试用)。
+  final StudioViewModel? layoutChat;
 
   final StudioViewModel vm;
   final ConfigService config;
   final SkillStore skills;
 
-  /// 档案库和图像反推;不给就各用一个只在内存里的(测试用)。
+  /// 档案库;不给就用一个只在内存里的(测试用)。
   final ArchiveStore? archive;
-  final ReverseModel? reverse;
 
   /// 本地反推;不给就用一个只在内存里、不能下载的(测试用)。
   final LocalModel? local;
@@ -61,18 +65,37 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    // 测试里没在 main() 接上:Agent 用的就是这一页上的本地反推。
+    widget.vm.local ??= _local;
+    widget.vm.layoutAgent ??= _layoutChat;
     if (widget.checkUpdates) {
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => checkForUpdate(context, quiet: true),
+        (_) => checkForUpdate(
+          context,
+          quiet: true,
+          channel: widget.vm.config.config.updateChannel,
+        ),
       );
     }
   }
 
   int _page = _studio;
   late final _archive = widget.archive ?? ArchiveStore();
-  late final _reverse = widget.reverse ?? ReverseModel(widget.vm);
   // 角色库跟着工作台走:Agent 存进去的和这一页上看到的是同一份。
   late final _characters = widget.vm.characters ?? CharacterStore();
+  // 布局画板同样跟着工作台走:Agent 写的布局放到这一页上。
+  late final _layout = widget.vm.layout ?? LayoutBoard();
+  late final _layoutChat =
+      widget.layoutChat ??
+      StudioViewModel(
+        config: widget.config,
+        streamChat: widget.vm.streamChat,
+        skills: widget.skills,
+        characters: _characters,
+        characterDict: widget.vm.characterDict,
+        layout: _layout,
+        layoutOnly: true,
+      );
 
   /// 别的页面要交给 Agent 的话:工作台收到后填进聊天输入框。
   final _toChat = ValueNotifier<String?>(null);
@@ -111,8 +134,8 @@ class _AppShellState extends State<AppShell> {
                             vm: widget.vm,
                             config: widget.config,
                             archive: _archive,
-                            reverse: _reverse,
                             onOpenSettings: () => _go(_settings),
+                            onOpenLayout: () => _go(_layoutPage),
                             inbox: _toChat,
                           ),
                         ),
@@ -121,7 +144,9 @@ class _AppShellState extends State<AppShell> {
                           child: ArchivePage(
                             archive: _archive,
                             vm: widget.vm,
+                            board: _layout,
                             onOpenStudio: () => _go(_studio),
+                            onOpenLayout: () => _go(_layoutPage),
                           ),
                         ),
                         _Page(
@@ -142,6 +167,18 @@ class _AppShellState extends State<AppShell> {
                               _go(_studio);
                               _toChat.value = text;
                             },
+                          ),
+                        ),
+                        _Page(
+                          active: _page == _layoutPage,
+                          child: LayoutPage(
+                            board: _layout,
+                            vm: widget.vm,
+                            chat: _layoutChat,
+                            archive: _archive,
+                            config: widget.config,
+                            onOpenStudio: () => _go(_studio),
+                            onOpenSettings: () => _go(_settings),
                           ),
                         ),
                         _Page(
@@ -272,6 +309,13 @@ class _NavRail extends StatelessWidget {
             tooltip: tr('本地反推'),
             selected: page == _localPage,
             onTap: () => onSelect(_localPage),
+          ),
+          const SizedBox(height: 6),
+          _RailButton(
+            icon: Icons.crop_free,
+            tooltip: tr('区域控制工作台'),
+            selected: page == _layoutPage,
+            onTap: () => onSelect(_layoutPage),
           ),
           const Spacer(),
           _RailButton(

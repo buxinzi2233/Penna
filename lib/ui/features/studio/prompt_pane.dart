@@ -9,8 +9,6 @@ import '../archive/archive_page.dart';
 import '../settings/settings_sections.dart';
 import 'body_card.dart';
 import 'polish_dialog.dart';
-import 'reverse_model.dart';
-import 'reverse_pane.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
 
@@ -54,17 +52,11 @@ class PromptPane extends StatelessWidget {
     super.key,
     required this.vm,
     required this.archive,
-    required this.reverse,
     this.onDiscuss,
-    this.onSendToAgent,
   });
-
-  /// 把一段文字放进聊天输入框。
-  final ValueChanged<String>? onSendToAgent;
 
   final StudioViewModel vm;
   final ArchiveStore archive;
-  final ReverseModel reverse;
 
   /// 用户要拿成稿里的某一段去和 Agent 讨论。
   final ValueChanged<String>? onDiscuss;
@@ -83,14 +75,7 @@ class PromptPane extends StatelessWidget {
               onDiscuss: onDiscuss,
             ),
           ),
-          Expanded(
-            flex: 10,
-            child: _SummarySection(
-              vm: vm,
-              reverse: reverse,
-              onSendToAgent: onSendToAgent,
-            ),
-          ),
+          Expanded(flex: 10, child: _SummarySection(vm: vm)),
         ],
       ),
     );
@@ -148,7 +133,10 @@ class _DraftSectionState extends State<_DraftSection> {
   /// 把当前成稿存进档案库(带着分段标注,放回来时分段还在)。
   Future<void> _save(BuildContext context) async {
     final text = vm.labeledPrompt;
-    final picked = await showSaveDialog(context, archive.categories);
+    final picked = await showSaveDialog(
+      context,
+      archive.categoriesOf(archivePrompt),
+    );
     if (picked == null) return;
     archive.add(text: text, title: picked.title, category: picked.category);
     if (context.mounted) showToast(context, tr('已存进档案库'));

@@ -7,6 +7,80 @@ import '../../../l10n/l10n.dart';
 /// 多选里的一项:[label] 是发出去的字,[detail] 是排在它后面的一行预览(可以是空串)。
 typedef PickItem = ({String label, String detail});
 
+/// 单选的选项:竖着一行一项,点哪一行就把它当成回答发出去。样子和 [MultiPick] 一样;
+/// 第一项是模型推荐的,底色标出来。[onPick] 为 null 时只是摆着看。
+class SinglePick extends StatelessWidget {
+  const SinglePick({super.key, required this.options, required this.onPick});
+
+  final List<String> options;
+  final ValueChanged<String>? onPick;
+
+  Widget _row(int i, String option) {
+    final first = i == 0;
+    return InkWell(
+      onTap: () => onPick?.call(option),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        decoration: BoxDecoration(
+          color: first ? PennaColors.primaryBg : PennaColors.card,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: first ? PennaColors.primaryBorder : PennaColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.radio_button_unchecked,
+              size: 16,
+              color: first ? PennaColors.primary : PennaColors.slate400,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                option,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: first ? PennaColors.primary : PennaColors.text,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 16, color: PennaColors.slate400),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (options.isEmpty) return const SizedBox.shrink();
+    final live = onPick != null;
+    return IgnorePointer(
+      ignoring: !live,
+      child: Opacity(
+        opacity: live ? 1 : 0.55,
+        child: PennaCard(
+          color: PennaColors.slate50,
+          radius: 10,
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (i, option) in options.indexed) ...[
+                if (i > 0) const SizedBox(height: 4),
+                _row(i, option),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 多选的选项:竖着一行一项,勾上几个(或点「全选」),再点「确定」一起当成回答发出去。
 /// 挑成稿里的段时,每行后面是那段提示词的开头。
 /// [onSubmit] 为 null 时只是摆着看(不是最新那条回复,或正在生成)。

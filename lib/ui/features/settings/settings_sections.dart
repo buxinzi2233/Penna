@@ -6,11 +6,13 @@ import '../../../l10n/l10n.dart';
 const gap = SizedBox(height: 12);
 
 /// 删除前问一句;用户点了"删除"才返回 true。
+/// 确认框。[action] 是确认按钮上的字,不给就是红色的「删除」。
 Future<bool> confirmDelete(
   BuildContext context,
   String title,
-  String body,
-) async {
+  String body, {
+  String? action,
+}) async {
   final ok = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -23,8 +25,10 @@ Future<bool> confirmDelete(
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, true),
-          style: TextButton.styleFrom(foregroundColor: PennaColors.diffDelText),
-          child: Text(tr('删除')),
+          style: action == null
+              ? TextButton.styleFrom(foregroundColor: PennaColors.diffDelText)
+              : null,
+          child: Text(action ?? tr('删除')),
         ),
       ],
     ),

@@ -1,27 +1,11 @@
 part of 'prompt_pane.dart';
 
-// 工作区下半区:成稿汇总、图像反推、最终提示词和历史提示词。
+// 工作区下半区:成稿汇总、最终提示词和历史提示词。
 
-class _SummarySection extends StatefulWidget {
-  const _SummarySection({
-    required this.vm,
-    required this.reverse,
-    this.onSendToAgent,
-  });
+class _SummarySection extends StatelessWidget {
+  const _SummarySection({required this.vm});
 
   final StudioViewModel vm;
-  final ReverseModel reverse;
-  final ValueChanged<String>? onSendToAgent;
-
-  @override
-  State<_SummarySection> createState() => _SummarySectionState();
-}
-
-class _SummarySectionState extends State<_SummarySection> {
-  /// 现在看的是「图像反推」而不是「成稿汇总」。
-  bool _reversing = false;
-
-  StudioViewModel get vm => widget.vm;
 
   @override
   Widget build(BuildContext context) {
@@ -29,32 +13,21 @@ class _SummarySectionState extends State<_SummarySection> {
     return Column(
       children: [
         const Divider(height: 1),
+        // 页签留着:以后这里还会加别的分页。
         PennaBar(
           children: [
             _Tab(
               icon: Icons.inventory_2_outlined,
               label: tr('成稿汇总'),
-              selected: !_reversing,
-              onTap: () => setState(() => _reversing = false),
-            ),
-            const SizedBox(width: 6),
-            _Tab(
-              icon: Icons.image_search,
-              label: tr('图像反推'),
-              selected: _reversing,
-              onTap: () => setState(() => _reversing = true),
+              selected: true,
+              onTap: () {},
             ),
           ],
         ),
         Expanded(
           child: ColoredBox(
             color: PennaColors.editorBg,
-            child: _reversing
-                ? ReversePane(
-                    model: widget.reverse,
-                    onSend: widget.onSendToAgent,
-                  )
-                : prompt.isEmpty && vm.tags.isEmpty && vm.promptLog.isEmpty
+            child: prompt.isEmpty && vm.tags.isEmpty && vm.promptLog.isEmpty
                 ? Center(
                     child: Text(
                       tr('暂无内容'),

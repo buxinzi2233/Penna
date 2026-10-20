@@ -11,6 +11,7 @@ import '../../../core/harness/local/caption_catalog.dart';
 import '../../../core/harness/local/download.dart';
 import '../../../core/harness/local/florence.dart';
 import '../../../core/harness/local/llama_server.dart';
+import '../../../core/harness/local/local_tools.dart';
 import '../../../core/harness/local/model_scan.dart';
 import '../../../core/harness/local/tagger.dart';
 import '../../../core/harness/providers/llm_http.dart';
@@ -18,7 +19,9 @@ import '../../../data/services/florence_engine.dart';
 import '../../../data/services/onnx_model.dart';
 import '../../../l10n/l10n.dart';
 
+part 'local_agent.dart';
 part 'local_caption.dart';
+part 'local_llm.dart';
 part 'local_tagger.dart';
 
 /// 看图描述的一条要求:名字和正文。
@@ -113,6 +116,9 @@ class LocalModel extends ChangeNotifier {
   /// Florence-2 用的指令。
   String florenceTask = florenceTaskLabels.keys.first;
 
+  /// LLM 反推选的模型(最多 [maxLlmPicks] 个),一起跑、并排显示。
+  List<LlmPick> llmPicks = const [];
+
   // —— 只在内存里的 ——
   Attachment? _image;
   final _downloads = <String, Progress>{};
@@ -136,6 +142,12 @@ class LocalModel extends ChangeNotifier {
   String _caption = '';
   FlorenceEngine? _florence;
   String? _florenceFor;
+
+  /// LLM 反推各模型的结果。
+  Map<LlmPick, LlmResult> _llmResults = const {};
+
+  /// 换图时加一,作废还在路上的 LLM 反推(不跟 [_round]:换打标模型不该打断它)。
+  int _llmRound = 0;
 
   Attachment? get image => _image;
   bool get tagging => _tagging;
@@ -226,10 +238,12 @@ class LocalModel extends ChangeNotifier {
 
   void setImage(Attachment? image) {
     _round++;
+    _llmRound++;
     _image = image;
     _tags = null;
     _scores = null;
     _caption = '';
+    _llmResults = const {};
     notifyListeners();
   }
 
@@ -363,6 +377,9 @@ class LocalModel extends ChangeNotifier {
     'quantPicks': quantPicks,
     'captionPick': captionPick,
     'florenceTask': florenceTask,
+    'llmPicks': [
+      for (final p in llmPicks) {'llm': p.llm, 'model': p.model},
+    ],
   };
 
   void _save() {
@@ -420,6 +437,10 @@ class LocalModel extends ChangeNotifier {
       );
       captionPick = j['captionPick'] as String? ?? '';
       florenceTask = j['florenceTask'] as String? ?? florenceTask;
+      llmPicks = List.unmodifiable([
+        for (final p in j['llmPicks'] as List? ?? const [])
+          (llm: (p as Map)['llm'] as String, model: p['model'] as String),
+      ]);
       // 不等它扫完:文件夹大的话要好一会儿,不拦着程序启动。
       if (modelFolders.isNotEmpty) rescan();
       notifyListeners();

@@ -1,11 +1,13 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/harness/attachment.dart';
 import '../../../core/harness/local/caption_catalog.dart';
 import '../../../core/harness/local/download.dart';
 import '../../../core/harness/local/florence.dart';
 import '../../../core/harness/local/model_scan.dart';
 import '../../../core/harness/local/tagger.dart';
+import '../../../core/harness/providers/llm_http.dart';
 import '../../../data/models/app_config.dart';
 import '../../../data/services/config_service.dart';
 import '../../core/image_drop.dart';
@@ -17,11 +19,13 @@ import '../studio/studio_view_model.dart';
 import 'local_model.dart';
 import '../../../l10n/l10n.dart';
 
+part 'local_llm_tab.dart';
 part 'local_nl_tab.dart';
 part 'local_tag_tab.dart';
 
-/// 本地反推:左边放一张图,右边用本机的模型给它反推。
-/// 「Tag 反推」用 ONNX 打标模型出 Danbooru 标签,「NL 反推」用看图模型写描述。
+/// 本地反推:左边放一张图,右边给它反推。
+/// 「Tag 反推」用 ONNX 打标模型出 Danbooru 标签,「NL 反推」用本机的看图模型写描述,
+/// 「LLM 反推」用「API 管理」里的模型(可以同时两个)写提示词。
 class LocalPage extends StatefulWidget {
   const LocalPage({
     super.key,
@@ -76,6 +80,7 @@ class _LocalPageState extends State<LocalPage> {
                 for (final (i, label) in [
                   tr('Tag 反推'),
                   tr('NL 反推'),
+                  tr('LLM 反推'),
                 ].indexed) ...[
                   PennaChip(
                     label: label,
@@ -97,6 +102,7 @@ class _LocalPageState extends State<LocalPage> {
                       image: model.image,
                       onChanged: model.setImage,
                       hint: tr('点击或拖入要反推的图片'),
+                      compress: widget.config.config.compressImages,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -106,18 +112,26 @@ class _LocalPageState extends State<LocalPage> {
                       controller: _scroll,
                       child: PopIn(
                         key: ValueKey(_tab),
-                        child: _tab == 0
-                            ? _TagTab(
-                                model: model,
-                                onToDraft: (text) => _toDraft(context, text),
-                                onSend: widget.onSendToAgent,
-                              )
-                            : _NlTab(
-                                model: model,
-                                config: widget.config,
-                                onToDraft: (text) => _toDraft(context, text),
-                                onSend: widget.onSendToAgent,
-                              ),
+                        child: switch (_tab) {
+                          0 => _TagTab(
+                            model: model,
+                            onToDraft: (text) => _toDraft(context, text),
+                            onSend: widget.onSendToAgent,
+                          ),
+                          1 => _NlTab(
+                            model: model,
+                            config: widget.config,
+                            onToDraft: (text) => _toDraft(context, text),
+                            onSend: widget.onSendToAgent,
+                          ),
+                          _ => _LlmTab(
+                            model: model,
+                            config: widget.config,
+                            vm: widget.vm,
+                            onToDraft: (text) => _toDraft(context, text),
+                            onSend: widget.onSendToAgent,
+                          ),
+                        },
                       ),
                     ),
                   ),
@@ -522,8 +536,11 @@ class _ResultActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+    // 放不下时折到下一行:LLM 反推两份结果并排时一份只有半宽。
+    return Wrap(
+      alignment: WrapAlignment.end,
+      spacing: 6,
+      runSpacing: 6,
       children: [
         PennaButton(
           label: tr('复制'),
@@ -531,14 +548,12 @@ class _ResultActions extends StatelessWidget {
           borderColor: PennaColors.border,
           onPressed: () => copyWithToast(context, text, tr('已复制')),
         ),
-        const SizedBox(width: 6),
         PennaButton(
           label: tr('发送给 Agent'),
           icon: Icons.send_outlined,
           borderColor: PennaColors.border,
           onPressed: () => onSend(text),
         ),
-        const SizedBox(width: 6),
         PennaButton(
           label: tr('放到成稿'),
           icon: Icons.keyboard_double_arrow_up,

@@ -138,6 +138,7 @@ extension StudioRewrite on StudioViewModel {
       );
       // 有待确认改动时编辑框会被换成只读视图,旧选区随之作废。
       bodySelection = null;
+      _autoAccept();
       return null;
     } on LlmException catch (e) {
       return e.message;

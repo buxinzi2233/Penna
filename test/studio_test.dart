@@ -8,6 +8,7 @@ import 'package:penna/data/models/app_config.dart';
 import 'package:penna/data/services/translate_engines.dart';
 import 'package:penna/ui/core/theme.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
+import 'package:penna/ui/features/studio/studio_page.dart';
 import 'package:penna/ui/shell.dart';
 
 import 'fixtures.dart';
@@ -133,9 +134,9 @@ void main() {
       Future<String> systemFor(String language) async {
         final config = tempConfig();
         config.update(
-          AppConfig(
-            language: language,
-          ).putLlm(_llm).setSecret(llmSecretKey('a'), 'sk-x'),
+          AppConfig(language: language)
+              .putLlm(_llm)
+              .setSecret(llmSecretKey('a'), 'sk-x'),
         );
         late LlmRequest seen;
         final vm = sampleStudio(
@@ -227,7 +228,14 @@ void main() {
         home: AppShell(vm: vm, config: config, skills: tempSkills()),
       ),
     );
-    expect(find.text('未连接模型 · 去设置'), findsOneWidget);
+    // 布局页的对话也会这么提示:只看工作台的。
+    expect(
+      find.descendant(
+        of: find.byType(StudioPage),
+        matching: find.text('未连接模型 · 去设置'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('设置'));
     await tester.pump();
@@ -295,7 +303,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('Diff 待合并'), findsNothing);
-    expect(find.text('保存'), findsOneWidget);
+    // 区域控制工作台也有「保存」:只看工作台这一页。
+    expect(
+      find.descendant(of: find.byType(StudioPage), matching: find.text('保存')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('回复里的新成稿显示成卡片,并自动成为左侧的待确认改动;能重新运行', (tester) async {
@@ -325,13 +337,15 @@ void main() {
     await tester.runAsync(pumpEventQueue);
     await tester.pumpAndSettle();
 
-    // 已经送到左边了,右边的卡片收起来,只留一行摘要。
-    expect(find.text('新成稿 · 主体、场景'), findsOneWidget);
+    // 已经送到左边了,右边的卡片收起来,各段的标注竖着列一行一个当摘要。
+    expect(find.text('新成稿'), findsOneWidget);
+    expect(find.text('·  主体'), findsOneWidget);
+    expect(find.text('·  场景'), findsOneWidget);
     expect(find.text('主体'), findsOneWidget);
     expect(find.textContaining('<draft>'), findsNothing);
 
     // 点标题展开:右边卡片里一个,左边待确认的分段框里一个。
-    await tester.tap(find.text('新成稿 · 主体、场景'));
+    await tester.tap(find.text('新成稿'));
     await tester.pumpAndSettle();
     expect(find.text('主体'), findsNWidgets(2));
 

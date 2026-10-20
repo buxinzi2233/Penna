@@ -4,13 +4,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:penna/core/harness/attachment.dart';
 import 'package:penna/core/harness/mcp/mcp_client.dart';
 import 'package:penna/core/harness/providers/openai_provider.dart';
 import 'package:penna/core/harness/tags/tag_dictionary.dart';
 import 'package:penna/core/harness/tags/tag_search.dart';
 import 'package:penna/data/models/app_config.dart';
-import 'package:penna/ui/features/studio/reverse_model.dart';
+import 'package:penna/ui/features/local/local_model.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 
 import 'fixtures.dart';
@@ -392,24 +391,26 @@ void main() {
     });
   });
 
-  test('图像反推带上用户当前的 Preset', () async {
+  test('LLM 反推只问指定的那个模型,带上用户当前的 Preset', () async {
     final seen = <LlmRequest>[];
     final vm = _studio(seen: seen, reply: (_) => 'a fox');
-    final model = ReverseModel(vm)
-      ..setImage(
-        Attachment.image(
-          name: 'a.png',
-          mime: 'image/png',
-          bytes: Uint8List.fromList([1]),
-        ),
-      );
+    final preset = vm.config.config.activePreset.systemPrompt;
 
-    await model.run();
-
-    expect(
-      seen.single.messages.first['content'],
-      contains(vm.config.config.activePreset.systemPrompt),
+    final out = await vm.askModel(
+      vm.config.config.llms.single.copyWith(model: 'm1, m2'),
+      'm2',
+      llmReverseMessages(preset),
+      images: {
+        1: [
+          (mime: 'image/png', bytes: Uint8List.fromList([1])),
+        ],
+      },
     );
+
+    expect(out, 'a fox');
+    expect(seen.single.model, 'm2');
+    expect(seen.single.messages.first['content'], contains(preset));
+    expect(seen.single.images[1]!.single.mime, 'image/png');
   });
 
   test('新的两个内置 Skill 默认开着,正文在系统提示里', () async {

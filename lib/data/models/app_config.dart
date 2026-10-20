@@ -27,6 +27,8 @@ const builtinSkills = [
   Option('grilling', '画面规划', '用户只给了大概想法时,写词前先一问一答把画面定下来'),
   Option('storyboard', '分镜', '把故事或情节拆成一组镜头,每个镜头一条能单独出图的提示词'),
   Option('character-lib', '角色库', '用户提到某个具体角色时先查它的触发词和特征;要存角色时也用'),
+  Option('moss-layout', '区域控制', '要按位置安排画面(画框、bbox、转成 MOSS-Image 布局 JSON)时写布局'),
+  Option('local-reverse', '本地反推', '用户要用 Tag 反推、或点名用本机的某个模型反推图片时,调用本地模型'),
 ];
 
 /// 聊天框上方的快捷操作:点一下把 [prompt] 接在输入框末尾。
@@ -379,6 +381,12 @@ class AppConfig {
     this.darkMode = false,
     this.disabledSkills = const {},
     this.tagSearchOnline = true,
+    this.piercing = false,
+    this.piercingPrompt = '',
+    this.compressImages = true,
+    this.autoApprove = false,
+    this.characterPreviews = false,
+    this.updateChannel = 'main',
     this.quickActions = defaultQuickActions,
     this.mcpServers = const [],
     this.secrets = const {},
@@ -420,6 +428,12 @@ class AppConfig {
       language: m['language'] as String? ?? 'zh-Hans',
       darkMode: m['darkMode'] as bool? ?? false,
       tagSearchOnline: m['tagSearchOnline'] as bool? ?? true,
+      piercing: m['piercing'] as bool? ?? false,
+      piercingPrompt: m['piercingPrompt'] as String? ?? '',
+      compressImages: m['compressImages'] as bool? ?? true,
+      autoApprove: m['autoApprove'] as bool? ?? false,
+      characterPreviews: m['characterPreviews'] as bool? ?? false,
+      updateChannel: m['updateChannel'] == 'dev' ? 'dev' : 'main',
       // 旧配置里没有这一项才给默认的;用户删空了就是空的。
       quickActions: m['quickActions'] == null
           ? defaultQuickActions
@@ -515,6 +529,26 @@ class AppConfig {
   /// 查 Danbooru 标签时先问在线的 DanbooruSearch;关掉就只查内置词库。
   final bool tagSearchOnline;
 
+  /// 穿甲弹:开着时 [piercingPrompt] 放在每次请求的系统提示最前面,所有 Preset 都带。
+  final bool piercing;
+  final String piercingPrompt;
+
+  /// 要注入的穿甲弹文字;关着或没填为空串。
+  String get piercingText => piercing ? piercingPrompt.trim() : '';
+
+  /// 对话里附上的大图先缩小、转成 WebP 再发。
+  final bool compressImages;
+
+  /// 成稿的待确认改动一出来就自动采纳,不用用户点。
+  final bool autoApprove;
+
+  /// 内置角色库要不要下载预览图。
+  // ponytail: 只是个开关,预览图的仓库还没建;建好后角色库按它去下载、缓存。
+  final bool characterPreviews;
+
+  /// 检查更新看哪个通道:'main' 是正式版,'dev' 是测试版。
+  final String updateChannel;
+
   /// 聊天框上方的快捷操作,先后就是显示顺序。
   final List<QuickAction> quickActions;
   final List<McpServer> mcpServers;
@@ -540,6 +574,12 @@ class AppConfig {
     'darkMode': darkMode,
     'disabledSkills': disabledSkills.toList(),
     'tagSearchOnline': tagSearchOnline,
+    'piercing': piercing,
+    'piercingPrompt': piercingPrompt,
+    'compressImages': compressImages,
+    'autoApprove': autoApprove,
+    'characterPreviews': characterPreviews,
+    'updateChannel': updateChannel,
     'quickActions': [
       for (final a in quickActions) {'label': a.label, 'prompt': a.prompt},
     ],
@@ -580,6 +620,12 @@ class AppConfig {
     bool? darkMode,
     Set<String>? disabledSkills,
     bool? tagSearchOnline,
+    bool? piercing,
+    String? piercingPrompt,
+    bool? compressImages,
+    bool? autoApprove,
+    bool? characterPreviews,
+    String? updateChannel,
     List<QuickAction>? quickActions,
     List<McpServer>? mcpServers,
     Map<String, String>? secrets,
@@ -603,6 +649,12 @@ class AppConfig {
     darkMode: darkMode ?? this.darkMode,
     disabledSkills: disabledSkills ?? this.disabledSkills,
     tagSearchOnline: tagSearchOnline ?? this.tagSearchOnline,
+    piercing: piercing ?? this.piercing,
+    piercingPrompt: piercingPrompt ?? this.piercingPrompt,
+    compressImages: compressImages ?? this.compressImages,
+    autoApprove: autoApprove ?? this.autoApprove,
+    characterPreviews: characterPreviews ?? this.characterPreviews,
+    updateChannel: updateChannel ?? this.updateChannel,
     quickActions: quickActions ?? this.quickActions,
     mcpServers: mcpServers ?? this.mcpServers,
     secrets: secrets ?? this.secrets,

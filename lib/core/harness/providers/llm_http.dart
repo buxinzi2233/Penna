@@ -89,6 +89,7 @@ Stream<String> runLlmStream(Stream<String> Function(HttpClient client) chat) {
 /// 所以认不出的异常只报类型,不原样转述。
 LlmException _friendly(Object e) => switch (e) {
   LlmException() => e,
+  TimeoutException() => LlmException(tr('模型接口超时')),
   SocketException() => LlmException(tr('连不上模型接口:{0}', [e.message])),
   HandshakeException() => LlmException(tr('HTTPS 握手失败:{0}', [e.message])),
   HttpException() => LlmException(tr('网络请求中断:{0}', [e.message])),
@@ -118,12 +119,20 @@ Stream<String> postForLines(
   request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
   headers.forEach(request.headers.set);
   request.add(utf8.encode(jsonEncode(body)));
-  final response = await request.close();
+  // 模型卡住不说话时不能一直等:超时算失败,还没出字就会换下一个模型。
+  final response = await request.close().timeout(llmStallTimeout);
   if (response.statusCode != HttpStatus.ok) {
     throw _statusError(response.statusCode, await utf8.decodeStream(response));
   }
-  yield* response.transform(utf8.decoder).transform(const LineSplitter());
+  yield* response
+      .transform(utf8.decoder)
+      .transform(const LineSplitter())
+      // 推理模型思考时也一直在发数据,隔这么久一行都没有才算卡住。
+      .timeout(llmStallTimeout);
 }
+
+/// 等模型回话最多等多久(从发出请求到收到回应,或两段数据之间)。
+const llmStallTimeout = Duration(seconds: 60);
 
 LlmException _statusError(int status, String body) {
   // 回来的是一张网页:多半是地址填错了,打到了网站而不是接口上。

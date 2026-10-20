@@ -14,6 +14,7 @@ import 'package:penna/core/harness/local/llama_server.dart';
 import 'package:penna/core/harness/local/model_scan.dart';
 import 'package:penna/core/harness/local/tagger.dart';
 import 'package:penna/core/harness/providers/llm_http.dart';
+import 'package:penna/data/models/app_config.dart';
 import 'package:penna/ui/features/local/local_model.dart';
 import 'package:penna/ui/features/local/local_page.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
@@ -953,6 +954,111 @@ void main() {
 
       expect(find.widgetWithText(TextField, 'a cat on a sofa'), findsOneWidget);
       await tester.runAsync(local.stopServer);
+    });
+  });
+
+  group('LLM 反推', () {
+    LocalModel withImage() =>
+        LocalModel(streamChat: (_) => const Stream.empty())..setImage(
+          Attachment.image(
+            name: 'a.png',
+            mime: 'image/png',
+            bytes: Uint8List.fromList([1]),
+          ),
+        );
+
+    test('最多选两个,再选挤掉最早的;取消选择', () {
+      final model = withImage();
+      const a = (llm: 'x', model: 'a'), b = (llm: 'x', model: 'b');
+      const c = (llm: 'y', model: 'c');
+      model.toggleLlm(a);
+      model.toggleLlm(b);
+      model.toggleLlm(c);
+      expect(model.llmPicks, [b, c]);
+      model.toggleLlm(b);
+      expect(model.llmPicks, [c]);
+    });
+
+    test('两个模型一起跑,各自出结果;一个出错不影响另一个', () async {
+      final model = withImage();
+      const a = (llm: 'x', model: 'a'), b = (llm: 'y', model: 'b');
+      final gate = Completer<String>();
+      final running = model.runLlm([a, b], (pick, image) {
+        expect(image.mime, 'image/png');
+        return pick == a
+            ? gate.future
+            : Future.error(const LlmException('看不了图'));
+      });
+      await pumpEventQueue();
+      expect(model.llmResultOf(a)!.busy, isTrue);
+      expect(model.llmResultOf(b)!.error, '看不了图');
+      expect(model.llmBusy, isTrue);
+
+      gate.complete(' a fox ');
+      expect(await running, isNull);
+      expect(model.llmResultOf(a), (text: 'a fox', error: null, busy: false));
+      expect(model.llmBusy, isFalse);
+    });
+
+    test('等结果时换了图,旧结果作废', () async {
+      final model = withImage();
+      const a = (llm: 'x', model: 'a');
+      final gate = Completer<String>();
+      final running = model.runLlm([a], (_, _) => gate.future);
+      model.setImage(null);
+      gate.complete('old');
+      await running;
+      expect(model.llmResultOf(a), isNull);
+      expect(model.llmBusy, isFalse);
+      expect(await model.runLlm([a], (_, _) async => ''), '先放一张图');
+    });
+
+    testWidgets('选两个模型一起反推,结果并排显示', (tester) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final config = tempConfig()
+        ..update(
+          const AppConfig().putLlm(
+            const LlmProfile(
+              id: 'a',
+              name: 'A',
+              baseUrl: 'http://x',
+              model: 'm1, m2',
+            ),
+          ),
+        );
+      final vm = StudioViewModel(
+        config: config,
+        streamChat: (req) => Stream.value('from ${req.model}'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShell(
+            vm: vm,
+            config: config,
+            skills: tempSkills(),
+            local: withImage(),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('本地反推'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('LLM 反推'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('m1'));
+      await tester.tap(find.text('m2'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: find.byType(LocalPage), matching: find.text('反推')),
+      );
+      await tester.runAsync(pumpEventQueue);
+      await tester.pumpAndSettle();
+
+      expect(find.text('from m1'), findsOneWidget);
+      expect(find.text('from m2'), findsOneWidget);
+      expect(find.text('A · m1'), findsOneWidget);
     });
   });
 }

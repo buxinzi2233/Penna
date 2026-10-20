@@ -201,4 +201,66 @@ description: 一句话说清它做什么、什么时候该用
 - 没找到就照实说,再按用户的描述写,不要编造触发词。
 
 存:用户说"存进角色库""记住这个角色"时,把这个角色整理成一条能反复用的提示词(只写角色本身:长相和标志性的穿着,不写场景、构图、光影),放进 <save-character name="名字">提示词</save-character>,名字用用户说的那个。正文里用一句话说存了什么。同名的会被换成新的;用户这条消息里带了图的话,图会一起存进去。''',
+  // 格式照 MOSS-Image 官方 USERGUIDE 的 Layout Prompts 一节。
+  'moss-layout': '''
+用户要按位置安排画面时用:说了"布局""区域控制""画框""bbox""layout""转成 JSON""MOSS 布局 JSON",或者"标题放上面、人物在左下"这类要指定各元素位置的话;用户在布局画板上画了框、要你补全描述时也用。
+
+MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。Penna 有一个「区域控制工作台」,上面是一块布局画板,你写的布局会自动放到画板上,用户在那里看框的位置、拖动修改,再从画板拿走 JSON。所以布局只写进 <layout>,不写进 <draft>,正文里也不要贴 JSON。跟用户说的时候叫它「区域控制工作台」。
+
+用户要把【当前成稿】"转成 JSON"时:照成稿的内容排出布局(主体、各个元素各放在哪由你按画面安排),描述按下面的要求改写成英文句子,成稿里没有的东西不要加;成稿本身不动。
+
+格式照官方,字段名不要改;除了下面说的 name,不要加别的字段。下面是一张 1024×1024 海报的例子,描述的详细程度照它来:
+
+<layout>
+{
+  "summary": {
+    "meta": ["poster"],
+    "canvas": "single",
+    "caption": "A minimalist vintage travel poster in flat screen-print style on a warm cream paper background with a faint grain texture. The composition is centered and symmetrical: a large title runs across the upper part, and a stylized mountain range fills the lower two thirds. The mountains are built from three overlapping layers of flat color, from pale sky blue in the distance to deep cobalt in the front, with sharp white snowcaps on the tallest peak and a small round sun in soft orange just behind its left shoulder. There are no people. Lighting is implied rather than rendered, with clean hard edges and no gradients, giving a calm, airy, mid-century mood. Palette: cream, sky blue, cobalt, white and a touch of orange. At the top, the word \\"EXPLORE\\" is set in large dark-blue capitals, centered."
+  },
+  "items": [
+    {"name": "主标题", "layer": "front", "label": "text", "caption": "Very large bold geometric sans-serif capitals in dark navy blue, a single centered line with wide letter spacing, flat solid fill with no outline or shadow, the clear headline of the poster sitting on the bare cream background.", "text": "EXPLORE", "bbox": [-416, -384, -288, 384]},
+    {"name": "雪山", "layer": "back", "label": "object", "caption": "A stylized mountain range made of three stacked flat-color layers, pale sky blue at the back, mid blue in the middle and deep cobalt in front, with crisp white snowcaps on the central peak and a small soft-orange sun peeking from behind its left slope; clean vector edges and a subtle printed grain.", "bbox": [-192, -288, 384, 288]}
+  ],
+  "bbox_coord_space": "abs_centralized",
+  "bbox_format": "yxyx"
+}
+</layout>
+
+name 是每一块的中文名(两到六个字),只在 Penna 里用来指认是哪一块,交出去之前会去掉。
+
+layer 是这一块在哪一层:front(前景)、middle(中景)、back(后景),也只在 Penna 里用,交出去之前会去掉。框重叠时前景盖住后景,同一层里后写的盖住先写的。每一块都写上 layer;用户画板上已经定了的照抄,用户说"放到前面""挡在后面"时改它。MOSS-Image 看不到 layer,所以前后关系还要写进描述:summary.caption 说清谁在前、谁在后,前景那块的 caption 写 "in the foreground",后景的写 "in the background",被挡住的写清被什么挡住、露出哪部分。
+
+系统提示里有【透视辅助】时,用户在画板上拉了透视线:照它写机位高低、视角和每一块的透视方向,框的大小也顺着近大远小来排。
+
+- bbox 是 [y_min, x_min, y_max, x_max],单位是像素,原点在画布正中,x 向右、y 向下变大。画布尺寸和坐标范围看系统提示里的【布局画板】,不要自己换尺寸。先按左上角原点想好位置,再把 x 减去宽的一半、y 减去高的一半。例如 832×1216 的画布,最上面三分之一、横贯全宽的区域是 [-608, -416, -203, 416]。
+- label 只用三种:人物用 character;要画出来的文字用 text,并把文字原样写进 text 字段;其他东西都是 object。
+- canvas 只用三种:一整张画面用 single,分格漫画用 multi_panel,拼贴用 collage。meta 写一两个类型词(poster、illustration、photo、comic 这类),可以不写。
+- 框要落在画布里。主体给足面积,人物的框从头顶框到画面里能看到的最低处;框互相重叠只用在确实有前后遮挡的地方。元素控制在 1 到 8 个,背景不单独画框,写进 summary.caption。
+
+怎么写描述——这一节最要紧:
+MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通常有两三百个词,构图、主体、动作、场景、颜色、光线、画风、图里的字都写到。给它的描述越像这样,出图越准;只写一个词或一句空话,它就只能乱猜,字会写成乱码,画面也会变平。所以:
+- 全部用英文的自然语言句子,只写看得见的东西。不写 Danbooru 标签串(1girl、solo 这种)、不写权重和括号、不写 masterpiece、best quality 这类质量词,也不写相机型号、渲染器、画师名:这些不在它学过的描述里,写了没用,还会挤掉有用的内容。
+- summary.caption 写成一段 120 到 250 词的完整描述,像在描述一张已经画好的图:先一句话说清这是什么(一张杂志封面插画、一张电影海报……)和整体的画风与媒介;再写构图和视角(主体在画面哪里、占多大、景别、机位高低);主体是谁、在做什么;场景和背景;光从哪来、什么质感、什么时间;主色调和情绪;最后把画面里要出现的每一段文字按从上到下的顺序原样写出来,用双引号括住,并说它在哪里、多大。
+- 每个 item 的 caption 写 2 到 4 句、30 到 80 词,只写这一块里看得见的东西,位置交给 bbox:
+  - character:先说是谁(作品角色写成 "Vertin from Reverse: 1999" 这样的英文名加作品名,不写成标签;角色库查到的特征词要改写成句子)、看上去的年龄和体型;再写发型发色、眼睛、表情;服装从上到下一件件写出颜色和材质;姿势、手在做什么、视线朝向;和身边东西的接触(坐在床沿、背靠枕头)。
+  - object:是什么、形状、材质和纹理、颜色、新旧,光打在哪一面、有没有反光和投影,和人物或别的东西怎么挨着。
+  - text:要画出来的字原样写进 text 字段,一个字母都不改(大小写、标点照抄,换行写成 \\n);caption 只写排版:字体类型(粗衬线、细无衬线、手写体……)、字重、颜色、在画面里的层级(主标题、副标题、小字)、对齐、几行、字距行距、有没有描边、阴影或底色、和背景怎么叠。例如:"Huge bold high-contrast serif letters in deep navy, set in one line across the top edge, tightly kerned, slightly overlapping the character's hair, flat printed look without shadow."
+- 一段字一个 text item:主标题、副标题、期号分开写,框只框住这段字该占的地方(字越大框越大,一行字的框是扁长的,不要用一个大框装几段字)。字越少越短越容易写对:比画布高度 3% 还小的字和成段的正文它写不清,用户没要求就不排;一定要有的,写成一两行短词,并在 caption 里说明它是小号装饰文字。
+- 同一样东西在 summary.caption 和它自己的 caption 里都要出现,用词一致:summary 管全局和彼此的关系,item 管这一块的细节。
+- 写完自查一遍:有没有哪个 caption 只有几个词?有没有标签串?每段要画的字是否都在 summary.caption 里出现了?有就补上再交。
+
+【布局画板】里已经有布局时,那是用户画的框:默认保留每个框的位置、大小和类别,只补全或改写描述;用户明说要挪、要加、要删时才动框。每次都把整份布局写全,没写到的框会被删掉。
+
+正文用一两句中文说明这份布局怎么排。写了 <layout> 的回复里不写 <draft>。''',
+  'local-reverse': '''
+用户要用本机的模型反推图片时用:说了"Tag 反推""打标""用 WD14 / PixAI / 某某模型反推""本地反推""用 Florence / Gemma 看图写描述"这类话。他要的是本机模型反推出来的标签或描述,不是你自己看图写。
+
+程序能替你跑本机的反推模型,反推的是用户在对话里发的最新一张图(没发就用「本地反推」页上放着的那张)。本机装了哪些模型、选中的是哪个,看系统提示里的【本地反推】。
+
+- 反推:这条回复只输出一个标签,不写 <draft>,也不用解释。出 Danbooru 标签用 kind="tag",看图写描述用 kind="nl";标签里写模型名(照【本地反推】里的写法),用户没点名就留空,用当前选中的那个。例如:
+  <reverse-image kind="tag">[WD14] eva02-large v3</reverse-image>
+- 用户点名的模型本机没装时,程序会告诉你大小,并列出已装的同类模型。不要自己决定下载:用 <options> 问用户是下载它,还是改用已装的哪一个。
+- 用户选了下载,这条回复只输出 <download-model kind="tag">模型名</download-model>(看图模型写 kind="nl";llama.cpp 运行时写 <download-model kind="runtime"></download-model>)。程序下好后会告诉你,你再接着反推。
+- 拿到【本地工具的结果】后:用户只要反推结果,就把它整理进 <draft>(标签照原样用逗号连起来,角色标签排最前,分级不写;描述照原文);用户要据此写提示词,就照「整理反推」的做法写。没跑成就照实说,不要自己看图编一个当结果。''',
 };

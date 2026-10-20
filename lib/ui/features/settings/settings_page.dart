@@ -95,7 +95,10 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Align(
               alignment: Alignment.topLeft,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
+                // 软件设置在右边另有一栏,放宽一些。
+                constraints: BoxConstraints(
+                  maxWidth: _tab == _tabs.length - 1 ? appSectionMaxWidth : 760,
+                ),
                 // 换分区时新内容弹入;key 不变时(同一分区内的改动)不重播。
                 child: PopIn(
                   key: ValueKey(_tab),

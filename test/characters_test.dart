@@ -156,6 +156,23 @@ void main() {
       expect(again.cards, isEmpty);
       expect(File(first.image).existsSync(), isFalse);
     });
+
+    test('拖着换顺序;改一个不挪位置;只换图时存成 WebP', () {
+      final dir = Directory.systemTemp.createTempSync('penna_chars');
+      final store = CharacterStore(dir);
+      for (final n in ['a', 'b', 'c']) {
+        store.put(name: n, prompt: n);
+      }
+      String order() => store.cards.map((c) => c.name).join();
+      expect(order(), 'cba');
+      store.move(store.cards.last.id, store.cards.first.id);
+      expect(order(), 'acb');
+      store.put(name: 'b', prompt: 'bb');
+      expect(order(), 'acb');
+      store.setImage(store.cards.first.id, [9]);
+      expect(store.cards.first.image, endsWith('.webp'));
+      expect(store.cards.first.prompt, 'a');
+    });
   });
 
   group('Agent 用角色库', () {

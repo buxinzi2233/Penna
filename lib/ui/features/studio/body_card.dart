@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../core/harness/draft_block.dart';
+import '../../../core/harness/layout.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../layout/layout_json_view.dart';
 import 'page_strip.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
@@ -175,6 +177,19 @@ class BodyCard extends StatelessWidget {
           ),
       ],
     );
+    // 布局 JSON:按功能区分框看,但它仍是一整块文字,不拆成分段。
+    final regions = layoutJsonRegions(p.text);
+    if (regions != null && regions.isNotEmpty) {
+      return [
+        const SizedBox(height: 6),
+        LayoutJsonColumn(
+          text: p.text,
+          regions: regions,
+          style: monoStyle,
+          editor: editor(p.text, 0, p.text.length, 6),
+        ),
+      ];
+    }
     final spans = sectionSpans(p.text);
     if (spans.isEmpty) {
       return [

@@ -30,7 +30,7 @@ class CharacterStore extends ChangeNotifier {
 
   List<CharacterCard> _cards = const [];
 
-  /// 新的在前。
+  /// 显示的顺序(新加的在前,拖过的照拖完的)。
   List<CharacterCard> get cards => _cards;
 
   File? get _file => dir == null
@@ -73,8 +73,35 @@ class CharacterStore extends ChangeNotifier {
           : _saveImage(cardId, image, time, replacing: old?.image ?? ''),
       time: time,
     );
-    _set([card, ..._cards.where((c) => c.id != cardId)]);
+    // 改的留在原位(用户可能拖着排过顺序),新加的放最前。
+    _set(
+      old == null
+          ? [card, ..._cards]
+          : [for (final c in _cards) c.id == cardId ? card : c],
+    );
     return card;
+  }
+
+  /// 把 [id] 挪到 [before] 前面(拖着换顺序)。
+  void move(String id, String before) {
+    final moving = _cards.where((c) => c.id == id).firstOrNull;
+    if (moving == null || id == before) return;
+    final rest = _cards.where((c) => c.id != id).toList();
+    final at = rest.indexWhere((c) => c.id == before);
+    if (at < 0) return;
+    _set([...rest.take(at), moving, ...rest.skip(at)]);
+  }
+
+  /// 只换图([webp] 是已经转好的 WebP),名字和提示词不动。
+  void setImage(String id, List<int> webp) {
+    final old = _cards.where((c) => c.id == id).firstOrNull;
+    if (old == null) return;
+    put(
+      id: id,
+      name: old.name,
+      prompt: old.prompt,
+      image: (bytes: webp, ext: 'webp'),
+    );
   }
 
   void remove(String id) {

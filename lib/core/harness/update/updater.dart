@@ -31,24 +31,43 @@ class UpdateException implements Exception {
   String toString() => message;
 }
 
-List<int> _parts(String version) => [
-  for (final p
-      in version
-          .trim()
-          .replaceFirst(RegExp('^[vV]'), '')
-          .split(RegExp(r'[.+-]')))
-    int.tryParse(p) ?? 0,
-];
+/// 测试版的版本号:`1.0.2-261020-7-dev`,即下一个正式版的号、日期(年月日各两位)、
+/// 当天第几次改。
+final _devVersion = RegExp(r'^(.*?)-(\d{6})-(\d+)-dev$');
 
-/// 比较两个版本号(1.0.10 比 1.0.9 新,开头的 v 不算):a 新返回正数,一样返回 0。
+/// 拆成 [主.次.修订, 日期, 第几次]。正式版没有后两个,算作比同号的测试版都新。
+List<int> _parts(String version) {
+  final v = version.trim().replaceFirst(RegExp('^[vV]'), '').split('+').first;
+  final dev = _devVersion.firstMatch(v);
+  final core = (dev?[1] ?? v).split(RegExp('[.-]'));
+  return [
+    for (var i = 0; i < 3; i++)
+      i < core.length ? int.tryParse(core[i]) ?? 0 : 0,
+    // 正式版排在同号的所有测试版后面。
+    if (dev == null) ...[
+      1 << 30,
+      0,
+    ] else ...[
+      int.parse(dev[2]!),
+      int.parse(dev[3]!),
+    ],
+  ];
+}
+
+/// 比较两个版本号(1.0.10 比 1.0.9 新,开头的 v 不算;1.0.2 比 1.0.2-261020-7-dev 新,
+/// 同号的测试版按日期、再按第几次):a 新返回正数,一样返回 0。
 int compareVersions(String a, String b) {
   final x = _parts(a), y = _parts(b);
-  for (var i = 0; i < 3; i++) {
-    final d = (i < x.length ? x[i] : 0) - (i < y.length ? y[i] : 0);
+  for (var i = 0; i < x.length; i++) {
+    final d = x[i] - y[i];
     if (d != 0) return d;
   }
   return 0;
 }
+
+/// 更新通道:正式版只看 GitHub 标成最新的那个发行版;测试版看最近的所有发行版
+/// (测试版和正式版都算),取最新的。
+const updateChannels = ['main', 'dev'];
 
 /// 从 GitHub 的发行版 JSON 里取出版本号、说明和 Windows 安装包;没有安装包时为 null。
 Release? parseRelease(Map<String, dynamic> j) {
@@ -75,14 +94,33 @@ String releaseNotes(String body) => body
     .replaceAll(RegExp(r'\n{3,}'), '\n\n')
     .trim();
 
-/// 问 GitHub 最新的发行版。还没有发行版时为 null;连不上、出错时抛 [UpdateException]。
+/// 问 GitHub 最新的发行版([channel] 见 [updateChannels])。
+/// 还没有发行版时为 null;连不上、出错时抛 [UpdateException]。
 Future<Release?> fetchLatestRelease({
+  String channel = 'main',
   Duration timeout = const Duration(seconds: 15),
 }) async {
+  if (channel != 'dev') {
+    final j = await _getJson('releases/latest', timeout);
+    return j is Map<String, dynamic> ? parseRelease(j) : null;
+  }
+  final list = await _getJson('releases?per_page=30', timeout);
+  final releases = [
+    for (final j in list is List ? list : const [])
+      if (j is Map<String, dynamic> && j['draft'] != true) ?parseRelease(j),
+  ];
+  if (releases.isEmpty) return null;
+  return releases.reduce(
+    (a, b) => compareVersions(a.version, b.version) >= 0 ? a : b,
+  );
+}
+
+/// GET GitHub 的一个发行版接口,返回解出来的 JSON;404 返回 null。
+Future<Object?> _getJson(String path, Duration timeout) async {
   final client = HttpClient()..connectionTimeout = timeout;
   try {
     final request = await client.getUrl(
-      Uri.parse('https://api.github.com/repos/$updateRepo/releases/latest'),
+      Uri.parse('https://api.github.com/repos/$updateRepo/$path'),
     );
     request.headers
       ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
@@ -93,7 +131,7 @@ Future<Release?> fetchLatestRelease({
     if (response.statusCode != HttpStatus.ok) {
       throw UpdateException(tr('检查更新失败(HTTP {0})', [response.statusCode]));
     }
-    return parseRelease(jsonDecode(body) as Map<String, dynamic>);
+    return jsonDecode(body);
   } on UpdateException {
     rethrow;
   } on TimeoutException {

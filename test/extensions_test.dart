@@ -186,6 +186,34 @@ void main() {
       expect(system, contains('胶片指令'));
       expect(system, isNot(contains('别的指令')));
     });
+
+    test('穿甲弹:开着时接在系统提示最前面,关着不带', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final config = tempConfig();
+      config.update(
+        const AppConfig().putLlm(_llm).copyWith(piercingPrompt: '穿甲内容'),
+      );
+      final seen = <LlmRequest>[];
+      final vm = StudioViewModel(
+        config: config,
+        skills: tempSkills(),
+        streamChat: (r) {
+          seen.add(r);
+          return Stream.value('ok');
+        },
+      );
+
+      vm.send('你好');
+      await pumpEventQueue();
+      config.update(config.config.copyWith(piercing: true));
+      vm.send('再来');
+      await pumpEventQueue();
+
+      expect(seen.first.messages.first['content'], isNot(contains('穿甲内容')));
+      final system = seen.last.messages.first['content']!;
+      expect(system, startsWith('穿甲内容\n\n'));
+      expect(seen.last.messages.first['role'], 'system');
+    });
   });
 
   group('MCP', () {

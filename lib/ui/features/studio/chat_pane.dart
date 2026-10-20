@@ -11,6 +11,7 @@ import '../../../core/harness/attachment.dart';
 import '../../../core/harness/draft_block.dart';
 import '../../../data/models/app_config.dart';
 import '../../../data/services/config_service.dart';
+import '../../core/scroll_strip.dart';
 import '../../core/smooth_scroll.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -29,6 +30,9 @@ part 'chat_header.dart';
 const _byOrder = '#order';
 const _manageModels = '#manage';
 
+/// 快捷操作最多露出几个,多的横着滚。
+const _maxQuickActions = 6;
+
 /// 右栏:Agent 对话时间线 + 输入框。
 class ChatPane extends StatefulWidget {
   const ChatPane({
@@ -39,6 +43,8 @@ class ChatPane extends StatefulWidget {
     required this.inputFocus,
     required this.onQuickAction,
     required this.onOpenSettings,
+    this.onOpenLayout,
+    this.onImage,
   });
 
   final StudioViewModel vm;
@@ -47,6 +53,12 @@ class ChatPane extends StatefulWidget {
   final FocusNode inputFocus;
   final ValueChanged<String> onQuickAction;
   final VoidCallback onOpenSettings;
+
+  /// 切到区域控制工作台(主工作区才给)。
+  final VoidCallback? onOpenLayout;
+
+  /// 输入框里放进了一张图(区域控制工作台拿它看横竖)。
+  final ValueChanged<Attachment>? onImage;
 
   @override
   State<ChatPane> createState() => _ChatPaneState();
@@ -71,6 +83,19 @@ class _ChatPaneState extends State<ChatPane> {
   /// 有文件正拖在窗口上方。
   bool _dragging = false;
 
+  bool get _compress => widget.config.config.compressImages;
+
+  /// 加上一个附件;它是压缩过的图就提醒一句(压缩能在软件设置里关掉)。
+  void _add(Attachment attachment) {
+    setState(() {
+      _attachments = List.unmodifiable([..._attachments, attachment]);
+    });
+    if (attachment.compressed) {
+      showToast(context, tr('大图已压缩为 WebP,可在软件设置里关闭'));
+    }
+    if (attachment.isImage) widget.onImage?.call(attachment);
+  }
+
   /// 把选中或拖进来的文件加成附件;读不了的逐个提示,不影响其余的。
   Future<void> _attach(Iterable<String> paths) async {
     for (final path in paths) {
@@ -81,11 +106,11 @@ class _ChatPaneState extends State<ChatPane> {
         return;
       }
       try {
-        final attachment = await readAttachment(File(path));
-        if (!mounted) return;
-        setState(() {
-          _attachments = List.unmodifiable([..._attachments, attachment]);
-        });
+        final attachment = await readAttachment(
+          File(path),
+          compress: _compress,
+        );
+        if (mounted) _add(attachment);
       } on AttachmentException catch (e) {
         if (mounted) showToast(context, e.message, warn: true);
       }
@@ -102,22 +127,23 @@ class _ChatPaneState extends State<ChatPane> {
       if (text != null && text.isNotEmpty) return;
       final image = await Pasteboard.image;
       if (image == null || !mounted) return;
-      final problem = image.length > maxImageBytes
+      final pasted = Attachment.image(
+        name: tr('粘贴的图片.png'),
+        mime: 'image/png',
+        bytes: image,
+      );
+      // 截图常常是好几 MB 的 PNG,正是该压的。
+      final attachment = _compress && image.length <= maxRawImageBytes
+          ? await compressImage(pasted)
+          : pasted;
+      if (!mounted) return;
+      final problem = attachment.bytes!.length > maxImageBytes
           ? tr('图片超过 {0}', [maxImageLabel])
           : _attachments.length >= maxAttachments
           ? tr('最多 {0} 个附件', [maxAttachments])
           : null;
       if (problem != null) return showToast(context, problem, warn: true);
-      setState(() {
-        _attachments = List.unmodifiable([
-          ..._attachments,
-          Attachment.image(
-            name: tr('粘贴的图片.png'),
-            mime: 'image/png',
-            bytes: image,
-          ),
-        ]);
-      });
+      _add(attachment);
     } on Object {
       // 剪贴板读不了就当里面没有图,不打扰用户。
     }
@@ -313,6 +339,11 @@ class _ChatPaneState extends State<ChatPane> {
     showToast(context, problem ?? tr('已放到左侧'), warn: problem != null);
   }
 
+  void _adoptLayout(String json) {
+    final ok = widget.vm.adoptLayout(json);
+    showToast(context, ok ? tr('已放到布局画板') : tr('布局读不了'), warn: !ok);
+  }
+
   /// 把回复里新写的 Skill 加进(或替换进)用户的 Skills。
   Future<void> _addSkill(String text) async {
     final store = widget.vm.skills;
@@ -424,6 +455,8 @@ class _ChatPaneState extends State<ChatPane> {
         draftStatus: _draftStatus,
         userSkills: widget.vm.skills?.skills ?? const [],
         onAddSkill: _addSkill,
+        onAdoptLayout: _adoptLayout,
+        onOpenLayout: widget.onOpenLayout,
         streaming: widget.vm.isStreaming && last,
         onRetry: !widget.vm.isStreaming && last && !message.fromUser
             ? _retry
@@ -535,6 +568,10 @@ class _ChatPaneState extends State<ChatPane> {
                   onPick: _pickMention,
                 ),
           onAttach: _pickFiles,
+          autoApprove: widget.config.config.autoApprove,
+          onAutoApprove: (on) => widget.config.update(
+            widget.config.config.copyWith(autoApprove: on),
+          ),
           dragging: _dragging,
           queued: [
             for (final (i, m) in widget.vm.outbox.indexed)
@@ -554,7 +591,7 @@ class _ChatPaneState extends State<ChatPane> {
             if (widget.vm.quote != null)
               MentionChip(
                 name: sectionTitle(widget.vm.quote!),
-                prefix: tr('段 · '),
+                prefix: widget.vm.layoutOnly ? tr('块 · ') : tr('段 · '),
                 onRemove: () => widget.vm.quoteSection(null),
               ),
             for (final (i, attachment) in _attachments.indexed)

@@ -13,7 +13,14 @@ import '../update/update_flow.dart';
 import 'settings_agent_sections.dart';
 import 'settings_sections.dart';
 
-/// 「软件设置」:界面语言、深色模式、字体与头像、版本与更新、关于。
+/// 软件设置分区最宽多少:够宽时右边另起一栏放对话相关的开关。
+const appSectionMaxWidth = 1200.0;
+
+/// 宽于这个就分两栏,窄了右栏接在下面。
+const _twoColumnsAt = 1000.0;
+
+/// 「软件设置」:界面语言、深色模式、字体与头像、版本与更新、关于;
+/// 右栏是对话相关的开关。
 class AppSection extends StatelessWidget {
   const AppSection({super.key, required this.service});
 
@@ -21,6 +28,26 @@ class AppSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final left = _general();
+    final right = _ChatOptions(service: service);
+    return LayoutBuilder(
+      builder: (context, box) => box.maxWidth < _twoColumnsAt
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [left, gap, right],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: left),
+                const SizedBox(width: 20),
+                Expanded(flex: 2, child: right),
+              ],
+            ),
+    );
+  }
+
+  Widget _general() {
     final cfg = service.config;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,9 +117,70 @@ class AppSection extends StatelessWidget {
         ),
         _Appearance(service: service),
         gap,
-        const UpdateCard(),
+        UpdateCard(service: service),
         gap,
         const _About(),
+      ],
+    );
+  }
+}
+
+/// 对话相关的开关:压缩大图、自动审批、内置角色预览图。
+class _ChatOptions extends StatelessWidget {
+  const _ChatOptions({required this.service});
+
+  final ConfigService service;
+
+  Widget _toggle(
+    String title,
+    String hint,
+    bool value,
+    ValueChanged<bool> on,
+  ) => PennaCard(
+    padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: titleStyle),
+              Text(hint, style: hintStyle),
+            ],
+          ),
+        ),
+        Switch(value: value, onChanged: on),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = service.config;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeading(tr('对话'), tr('图片与成稿')),
+        _toggle(
+          tr('压缩大图'),
+          tr('超过 1 MB 的图片缩到 2048 像素以内,转为 WebP'),
+          cfg.compressImages,
+          (v) => service.update(service.config.copyWith(compressImages: v)),
+        ),
+        gap,
+        _toggle(
+          tr('自动审批'),
+          tr('成稿的改动直接采纳'),
+          cfg.autoApprove,
+          (v) => service.update(service.config.copyWith(autoApprove: v)),
+        ),
+        gap,
+        _toggle(
+          tr('内置角色预览图'),
+          tr('角色库下载内置角色的图'),
+          cfg.characterPreviews,
+          (v) => service.update(service.config.copyWith(characterPreviews: v)),
+        ),
       ],
     );
   }

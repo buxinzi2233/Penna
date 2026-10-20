@@ -15,11 +15,17 @@ class _Header extends StatelessWidget {
 
   /// 「新对话」和「历史」两个按钮;生成中换不了,所以先禁用。
   List<Widget> _chatButtons(BuildContext context) => [
-    PennaButton(
-      label: tr('新对话'),
-      icon: Icons.add_comment_outlined,
-      borderColor: PennaColors.border,
-      onPressed: vm.isStreaming || vm.messages.isEmpty ? null : vm.newChat,
+    // 和旁边的「历史」同一个样子、同样大。
+    MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: vm.isStreaming || vm.messages.isEmpty ? null : vm.newChat,
+        child: _HeaderChip(
+          icon: Icons.add_comment_outlined,
+          label: tr('新对话'),
+          enabled: !vm.isStreaming && vm.messages.isNotEmpty,
+        ),
+      ),
     ),
     const SizedBox(width: 6),
     PopupMenuButton<String>(
@@ -83,35 +89,10 @@ class _Header extends StatelessWidget {
             ),
           ),
       ],
-      child: Bouncy(
-        child: PennaCard(
-          color: PennaColors.card,
-          radius: 6,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.history,
-                size: 14,
-                color: vm.pastChats.isEmpty
-                    ? PennaColors.slate400
-                    : PennaColors.slate700,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                tr('历史'),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: vm.pastChats.isEmpty
-                      ? PennaColors.slate400
-                      : PennaColors.slate700,
-                ),
-              ),
-            ],
-          ),
-        ),
+      child: _HeaderChip(
+        icon: Icons.history,
+        label: tr('历史'),
+        enabled: vm.pastChats.isNotEmpty,
       ),
     ),
     const SizedBox(width: 6),
@@ -251,6 +232,46 @@ class _Header extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 顶栏上「新对话」「历史」这种白底小按钮。
+class _HeaderChip extends StatelessWidget {
+  const _HeaderChip({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled ? PennaColors.slate700 : PennaColors.slate400;
+    return Bouncy(
+      child: PennaCard(
+        color: PennaColors.card,
+        radius: 6,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

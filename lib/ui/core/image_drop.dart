@@ -16,9 +16,13 @@ class ImageDrop extends StatefulWidget {
     required this.image,
     required this.onChanged,
     this.hint,
+    this.compress = false,
   });
 
   final Attachment? image;
+
+  /// 大图读进来时缩小、转成 WebP(软件设置里的「压缩大图」)。
+  final bool compress;
 
   /// 没有图时中间的那句话;不给就是「点击或拖入参考图」。
   final String? hint;
@@ -40,9 +44,15 @@ class _ImageDropState extends State<ImageDrop> {
 
   Future<void> _use(BuildContext context, String path) async {
     try {
-      final picked = await readAttachment(File(path));
+      final picked = await readAttachment(
+        File(path),
+        compress: widget.compress,
+      );
       if (!picked.isImage) throw AttachmentException(tr('这不是图片'));
       widget.onChanged(picked);
+      if (picked.compressed && context.mounted) {
+        showToast(context, tr('大图已压缩为 WebP,可在软件设置里关闭'));
+      }
     } on AttachmentException catch (e) {
       if (context.mounted) showToast(context, e.message, warn: true);
     }
