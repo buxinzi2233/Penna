@@ -127,10 +127,32 @@ class _Brand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
+    final mark = Image.asset(
       'assets/wordmark.png',
       height: 17,
       filterQuality: FilterQuality.medium,
+    );
+    if (!isDevBuild) return mark;
+    // 测试版:右下角(最后那个 a 的下面是空的)标一个红色的 dev,和字标右边对齐。
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        mark,
+        const Positioned(
+          right: 0,
+          bottom: -2,
+          child: Text(
+            'dev',
+            style: TextStyle(
+              fontSize: 8.5,
+              height: 1,
+              fontWeight: FontWeight.w700,
+              // 红色,深浅两套配色上都看得清。
+              color: Color(0xFFE5484D),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
