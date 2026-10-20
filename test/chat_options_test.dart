@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -37,6 +38,27 @@ void main() {
         bytes: img.encodePng(img.Image(width: 8, height: 8)),
       );
       expect(identical(await compressImage(small), small), isTrue);
+    });
+
+    test('剪贴板贴进来的 BMP:比 10 MB 大也能压成 WebP;不压缩时转成真正的 PNG', () async {
+      // Windows 上 pasteboard 给的就是不压缩的 32 位 BMP。
+      final bmp = img.encodeBmp(
+        img.Image(width: 3000, height: 1500, numChannels: 4),
+      );
+      expect(bmp.length, greaterThan(maxImageBytes));
+
+      final webp = (await pastedImage(bmp, compress: true))!;
+      expect((webp.mime, webp.compressed), ('image/webp', true));
+      expect(webp.name, endsWith('.webp'));
+      expect(webp.bytes!.length, lessThan(maxImageBytes));
+      final back = img.decodeWebP(webp.bytes!)!;
+      expect([back.width, back.height], [2048, 1024]);
+
+      final png = (await pastedImage(bmp, compress: false))!;
+      expect((png.mime, png.compressed), ('image/png', false));
+      expect(img.decodePng(png.bytes!)!.width, 3000);
+
+      expect(await pastedImage(Uint8List(10), compress: true), isNull);
     });
   });
 

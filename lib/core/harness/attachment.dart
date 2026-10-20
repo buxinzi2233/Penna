@@ -103,16 +103,48 @@ Future<Uint8List?> toPreviewWebP(Uint8List bytes) =>
 Uint8List? _toWebP(Uint8List bytes, {int maxSide = compressMaxSide}) {
   final image = img.decodeImage(bytes);
   if (image == null) return null;
+  return _webP(_shrink(image, maxSide));
+}
+
+/// 长边超过 [maxSide] 时等比缩到 [maxSide]。
+img.Image _shrink(img.Image image, int maxSide) {
+  if (max(image.width, image.height) <= maxSide) return image;
   final wide = image.width >= image.height;
-  final small = max(image.width, image.height) <= maxSide
-      ? image
-      : img.copyResize(
-          image,
-          width: wide ? maxSide : null,
-          height: wide ? null : maxSide,
-          interpolation: img.Interpolation.average,
-        );
-  return img.encodeWebP(small, lossless: false, quality: 80, singleFrame: true);
+  return img.copyResize(
+    image,
+    width: wide ? maxSide : null,
+    height: wide ? null : maxSide,
+    interpolation: img.Interpolation.average,
+  );
+}
+
+Uint8List _webP(img.Image image) =>
+    img.encodeWebP(image, lossless: false, quality: 80, singleFrame: true);
+
+/// 剪贴板里贴进来的图最大多少字节。Windows 上 `pasteboard` 给的是不压缩的 32 位 BMP
+/// (宽 × 高 × 4),比原图大得多,所以这条线远高于图片文件的 [maxRawImageBytes]。
+const maxPastedBytes = 512 * 1024 * 1024;
+
+/// 把剪贴板里的图(Windows 上是不压缩的 BMP)转成能发给模型的附件:
+/// [compress] 时缩到长边 [compressMaxSide] 的 WebP,否则原尺寸的 PNG。
+/// 在另一个线程里做。读不了返回 null。
+Future<Attachment?> pastedImage(Uint8List raw, {required bool compress}) async {
+  final out = await Isolate.run(() {
+    final image = img.decodeImage(raw);
+    if (image == null) return null;
+    return compress
+        ? _webP(_shrink(image, compressMaxSide))
+        : img.encodePng(image);
+  });
+  if (out == null) return null;
+  final name = tr('粘贴的图片.png');
+  return Attachment.image(
+    name: compress ? name.replaceFirst(RegExp(r'\.png$'), '.webp') : name,
+    mime: compress ? 'image/webp' : 'image/png',
+    bytes: out,
+    // 本来就小的截图转一下格式不算"压缩了大图",不提示。
+    compressed: compress && raw.length > compressAboveBytes,
+  );
 }
 
 /// 把一个文件读成附件:图片按扩展名认,其余的当 UTF-8 文本读。

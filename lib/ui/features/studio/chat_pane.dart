@@ -127,16 +127,14 @@ class _ChatPaneState extends State<ChatPane> {
       if (text != null && text.isNotEmpty) return;
       final image = await Pasteboard.image;
       if (image == null || !mounted) return;
-      final pasted = Attachment.image(
-        name: tr('粘贴的图片.png'),
-        mime: 'image/png',
-        bytes: image,
-      );
-      // 截图常常是好几 MB 的 PNG,正是该压的。
-      final attachment = _compress && image.length <= maxRawImageBytes
-          ? await compressImage(pasted)
-          : pasted;
+      // Windows 给的是不压缩的 BMP,比原图大好几倍:先转成 WebP(压缩开着)或 PNG。
+      final attachment = image.length > maxPastedBytes
+          ? null
+          : await pastedImage(image, compress: _compress);
       if (!mounted) return;
+      if (attachment == null) {
+        return showToast(context, tr('读不了这张图'), warn: true);
+      }
       final problem = attachment.bytes!.length > maxImageBytes
           ? tr('图片超过 {0}', [maxImageLabel])
           : _attachments.length >= maxAttachments
