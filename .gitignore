@@ -55,7 +55,7 @@ app.*.map.json
 /design/
 
 # 写给 AI 助手的开发笔记,只留在本机
-/CLAUDE.md
+CLAUDE.md
 
 # 宣传视频的工程(录屏素材、依赖、成片),只留在本机
 /video/
