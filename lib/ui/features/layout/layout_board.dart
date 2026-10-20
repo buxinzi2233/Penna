@@ -333,7 +333,14 @@ class LayoutBoard extends ChangeNotifier {
       _revision++;
       notifyListeners();
     } on Object {
-      // 读不了就从默认的空画板开始,不拦着程序启动。
+      // 读不了就从默认的空画板开始;文件先改名留个底,不让下一次保存把它盖掉。
+      try {
+        file.renameSync(
+          '${file.path}.bad-${DateTime.now().millisecondsSinceEpoch}',
+        );
+      } on FileSystemException {
+        // 留底失败也不拦着程序启动。
+      }
     }
   }
 

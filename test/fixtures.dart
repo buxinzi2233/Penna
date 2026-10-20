@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:penna/core/harness/local/llama_server.dart';
 import 'package:penna/core/harness/providers/openai_provider.dart';
 import 'package:penna/data/services/config_service.dart';
 import 'package:penna/data/services/skill_store.dart';
@@ -11,22 +14,11 @@ ConfigService tempConfig() =>
 SkillStore tempSkills() =>
     SkillStore(Directory.systemTemp.createTempSync('penna_skills'));
 
-/// 一个开头有固定区、后面三块正文、一处待确认 diff 和两个候选方案的工作台。
+/// 一个开头有固定区、后面三块正文、一处待确认 diff 的工作台。
 StudioViewModel sampleStudio({
   ConfigService? config,
   ChatStreamer? streamChat,
 }) {
-  const lighting = PromptVariant(
-    title: '方案 A',
-    text: 'dramatic volumetric neon rim lighting, ',
-    segmentIndex: 2,
-    recommended: true,
-  );
-  const droplets = PromptVariant(
-    title: '方案 B',
-    text: 'condensation water droplets, ',
-    segmentIndex: 2,
-  );
   final time = DateTime(2026, 10, 8, 14, 28, 10);
   return StudioViewModel(
     config: config ?? tempConfig(),
@@ -41,18 +33,62 @@ StudioViewModel sampleStudio({
       title: 'Agent 建议',
       segmentIndex: 2,
       removed: 'flat generic ambient lighting, ',
-      added: lighting.text,
+      added: 'dramatic volumetric neon rim lighting, ',
     ),
     messages: [
       ChatMessage(fromUser: true, text: '增强背光', time: time),
       ChatMessage(
         fromUser: false,
-        text: '两个方案:',
+        text: '改好了:',
         time: time,
         toolSummary: '已调用技能: local-edit',
         toolDetails: const ['锁定区校验通过'],
-        variants: const [lighting, droplets],
       ),
     ],
+  );
+}
+
+/// 假的 llama-server 进程:不真的起程序,[exit] 之后算退出。
+class FakeProcess implements Process {
+  final _exit = Completer<int>();
+  final _err = StreamController<List<int>>();
+  bool killed = false;
+
+  void exit(int code, [String stderr = '']) {
+    _err.add(utf8.encode(stderr));
+    _err.close();
+    _exit.complete(code);
+  }
+
+  @override
+  Future<int> get exitCode => _exit.future;
+  @override
+  Stream<List<int>> get stdout => const Stream.empty();
+  @override
+  Stream<List<int>> get stderr => _err.stream;
+  @override
+  IOSink get stdin => throw UnimplementedError();
+  @override
+  int get pid => 1;
+  @override
+  bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    killed = true;
+    if (!_exit.isCompleted) exit(-1);
+    return true;
+  }
+}
+
+/// 临时文件夹里放好假的 llama-server.exe 和模型,返回启动参数。
+ServerSpec fakeServerSpec(Directory dir) {
+  for (final name in ['llama-server.exe', 'm.gguf']) {
+    File('${dir.path}/$name').writeAsStringSync('x');
+  }
+  return (
+    exe: '${dir.path}/llama-server.exe',
+    model: '${dir.path}/m.gguf',
+    mmproj: '',
+    port: 8091,
+    context: 4096,
+    gpuLayers: -1,
   );
 }

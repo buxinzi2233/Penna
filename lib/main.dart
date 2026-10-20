@@ -15,6 +15,7 @@ import 'data/models/app_config.dart';
 import 'data/services/archive_store.dart';
 import 'data/services/character_store.dart';
 import 'data/services/config_service.dart';
+import 'data/services/error_log.dart';
 import 'data/services/skill_store.dart';
 import 'ui/core/look_switcher.dart';
 import 'ui/core/theme.dart';
@@ -40,6 +41,12 @@ Future<void> main() async {
   final config = ConfigService(
     dir: home,
     legacyFile: ConfigService.defaultLegacyFile(),
+  );
+  _logErrors(
+    ErrorLog(
+      File('${home.path}${sep}error.log'),
+      secrets: () => config.config.secrets.values,
+    ),
   );
   final skills = SkillStore(Directory('${home.path}${sep}skills'));
   await config.load();
@@ -119,6 +126,49 @@ Future<void> main() async {
       local: local,
     ),
   );
+}
+
+/// 出的错都记进 [log]:各处存盘失败写的 debugPrint、界面里的异常、没人接的异步异常。
+/// 界面异常也走 debugPrint(dumpErrorToConsole),所以只在 debugPrint 这一处写文件。
+void _logErrors(ErrorLog log) {
+  final original = debugPrint;
+  debugPrint = (message, {wrapWidth}) {
+    original(message, wrapWidth: wrapWidth);
+    if (message != null) log.write(message);
+  };
+  // forceReport:默认第二个起只打一行摘要,日志里要完整的。
+  FlutterError.onError = (details) =>
+      FlutterError.dumpErrorToConsole(details, forceReport: true);
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    debugPrint('$error\n$stack');
+    return true;
+  };
+}
+
+/// 「界面大小」:按缩小了 [scale] 倍的窗口排版,再整个放大铺满,
+/// 文字、图标、间距一起变大。倍数是 1 时也套着,换倍数时下面的状态不丢。
+class _Scaled extends StatelessWidget {
+  const _Scaled({required this.scale, required this.child});
+
+  final double scale;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final size = mq.size / scale;
+    return MediaQuery(
+      data: mq.copyWith(
+        size: size,
+        devicePixelRatio: mq.devicePixelRatio * scale,
+      ),
+      child: FittedBox(
+        fit: BoxFit.fill,
+        alignment: Alignment.topLeft,
+        child: SizedBox.fromSize(size: size, child: child),
+      ),
+    );
+  }
 }
 
 /// 标题栏左边的字标。
@@ -239,22 +289,25 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
           // (flutter/flutter#175041,accessibility_bridge.cc:229):有读屏、输入法这类 UIA
           // 程序在读窗口时,切页就会闪退。代价是读屏软件读不到 Penna;引擎修好后去掉这层。
           builder: (context, child) => ExcludeSemantics(
-            child: LookSwitcher(
-              config: widget.config,
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: kWindowCaptionHeight,
-                    child: WindowCaption(
-                      brightness: PennaColors.isDark
-                          ? Brightness.dark
-                          : Brightness.light,
-                      backgroundColor: PennaColors.sidebar,
-                      title: const _Brand(),
+            child: _Scaled(
+              scale: cfg.uiScale,
+              child: LookSwitcher(
+                config: widget.config,
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: kWindowCaptionHeight,
+                      child: WindowCaption(
+                        brightness: PennaColors.isDark
+                            ? Brightness.dark
+                            : Brightness.light,
+                        backgroundColor: PennaColors.sidebar,
+                        title: const _Brand(),
+                      ),
                     ),
-                  ),
-                  Expanded(child: child!),
-                ],
+                    Expanded(child: child!),
+                  ],
+                ),
               ),
             ),
           ),

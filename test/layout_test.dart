@@ -122,6 +122,18 @@ void main() {
     expect(again.sizes, contains((width: 1216, height: 832)));
   });
 
+  test('画板:layout.json 读不了时改名留底,从空画板开始', () async {
+    final dir = Directory.systemTemp.createTempSync('penna_layout');
+    File('${dir.path}/layout.json').writeAsStringSync('{坏的');
+    final board = LayoutBoard(dir: dir);
+    await board.load();
+    expect(board.layout.boxes, isEmpty);
+    final names = dir.listSync().map((f) => f.uri.pathSegments.last);
+    expect(names.where((n) => n.startsWith('layout.json.bad-')), hasLength(1));
+    expect(names, isNot(contains('layout.json')));
+    dir.deleteSync(recursive: true);
+  });
+
   test('图层和透视:存盘读回;Agent 漏写 layer 时沿用,透视线留着;都说给模型听', () {
     final board = LayoutBoard()
       ..addBox(

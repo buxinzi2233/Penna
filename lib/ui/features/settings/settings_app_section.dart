@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../../../data/models/app_config.dart';
 import '../../../data/services/config_service.dart';
 import '../../../l10n/l10n.dart';
 import '../../core/look_switcher.dart';
@@ -80,6 +81,30 @@ class AppSection extends StatelessWidget {
                       onPressed: () => service.update(
                         service.config.copyWith(language: l.code),
                       ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        gap,
+        PennaCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('界面大小'), style: titleStyle),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final s in uiScales)
+                    PennaChip(
+                      label: '${(s * 100).round()}%',
+                      selected: s == cfg.uiScale,
+                      onTap: () =>
+                          service.update(service.config.copyWith(uiScale: s)),
                     ),
                 ],
               ),

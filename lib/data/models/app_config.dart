@@ -96,6 +96,11 @@ const maxMtTimeoutSeconds = 120;
 const defaultMtAttempts = 3;
 const defaultMtTimeoutSeconds = 25;
 
+/// 「界面大小」能选的倍数。
+const uiScales = [1.0, 1.25, 1.5, 1.75, 2.0];
+const minUiScale = 1.0;
+const maxUiScale = 2.0;
+
 /// 把存下来的顺序整理成"每个已知引擎恰好出现一次":丢掉不认识的,补上漏掉的。
 List<String> normalizeMtOrder(Iterable<String> saved) {
   final known = {for (final e in mtEngines) e.id};
@@ -379,6 +384,7 @@ class AppConfig {
     this.userAvatar = '',
     this.language = 'zh-Hans',
     this.darkMode = false,
+    this.uiScale = 1,
     this.disabledSkills = const {},
     this.tagSearchOnline = true,
     this.piercing = false,
@@ -427,6 +433,9 @@ class AppConfig {
       userAvatar: m['userAvatar'] as String? ?? '',
       language: m['language'] as String? ?? 'zh-Hans',
       darkMode: m['darkMode'] as bool? ?? false,
+      uiScale: ((m['uiScale'] as num?) ?? 1)
+          .clamp(minUiScale, maxUiScale)
+          .toDouble(),
       tagSearchOnline: m['tagSearchOnline'] as bool? ?? true,
       piercing: m['piercing'] as bool? ?? false,
       piercingPrompt: m['piercingPrompt'] as String? ?? '',
@@ -513,6 +522,9 @@ class AppConfig {
   /// 深色模式。
   final bool darkMode;
 
+  /// 界面整体放大几倍(高分屏上嫌小时调),1 是原样。
+  final double uiScale;
+
   /// 成稿每段下面的对照译文(〔译〕)和机翻用什么语言,跟着界面语言走:
   /// 'zh'(简体)、'zh-Hant'、'ja';英文界面不要对照,为 null。
   String? get glossLanguage => switch (language) {
@@ -572,6 +584,7 @@ class AppConfig {
     'userAvatar': userAvatar,
     'language': language,
     'darkMode': darkMode,
+    'uiScale': uiScale,
     'disabledSkills': disabledSkills.toList(),
     'tagSearchOnline': tagSearchOnline,
     'piercing': piercing,
@@ -618,6 +631,7 @@ class AppConfig {
     String? userAvatar,
     String? language,
     bool? darkMode,
+    double? uiScale,
     Set<String>? disabledSkills,
     bool? tagSearchOnline,
     bool? piercing,
@@ -647,6 +661,7 @@ class AppConfig {
     userAvatar: userAvatar ?? this.userAvatar,
     language: language ?? this.language,
     darkMode: darkMode ?? this.darkMode,
+    uiScale: uiScale ?? this.uiScale,
     disabledSkills: disabledSkills ?? this.disabledSkills,
     tagSearchOnline: tagSearchOnline ?? this.tagSearchOnline,
     piercing: piercing ?? this.piercing,

@@ -3,24 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../../core/harness/attachment.dart';
 import '../../../l10n/l10n.dart';
 
-/// Agent 给出的候选改法。
-@immutable
-class PromptVariant {
-  const PromptVariant({
-    required this.title,
-    required this.text,
-    required this.segmentIndex,
-    this.notes = const [],
-    this.recommended = false,
-  });
-
-  final String title;
-  final String text;
-  final int segmentIndex;
-  final List<String> notes;
-  final bool recommended;
-}
-
 @immutable
 class ChatMessage {
   const ChatMessage({
@@ -29,7 +11,6 @@ class ChatMessage {
     required this.time,
     this.toolSummary,
     this.toolDetails = const [],
-    this.variants = const [],
     this.failed = false,
     this.stopped = false,
     this.by,
@@ -60,7 +41,6 @@ class ChatMessage {
   final DateTime time;
   final String? toolSummary;
   final List<String> toolDetails;
-  final List<PromptVariant> variants;
 
   /// 这条回复以出错告终;不再作为历史发给模型。
   final bool failed;
@@ -88,7 +68,6 @@ class ChatMessage {
     tool: tool,
     toolSummary: toolSummary ?? this.toolSummary,
     toolDetails: toolDetails ?? this.toolDetails,
-    variants: variants,
   );
 
   // ponytail: 附件(图片、文件)只在内存里,不存盘;重开后旧消息不带附件。

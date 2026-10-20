@@ -150,12 +150,10 @@ void main() {
       expect(_show(vm), ['[PIN]', '[a red fox]']);
     });
 
-    test('候选方案指向固定区时不收;有待确认改动时不能动固定区', () {
+    test('有待确认改动时不能动固定区', () {
       final vm = sampleStudio();
-      const bad = PromptVariant(title: 'x', text: 'y', segmentIndex: 0);
       final before = _show(vm);
 
-      expect(() => vm.proposeVariant(bad), throwsArgumentError);
       vm
         ..addPin('P')
         ..unpin(0)

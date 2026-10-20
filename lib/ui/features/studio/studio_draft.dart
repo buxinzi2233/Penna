@@ -456,24 +456,6 @@ extension StudioDraft on StudioViewModel {
     _changed();
   }
 
-  /// 把候选方案变成待确认 diff(不直接改成稿)。指向固定区的方案不收。
-  void proposeVariant(PromptVariant variant) {
-    final target =
-        _blocks[RangeError.checkValidIndex(variant.segmentIndex, _blocks)];
-    if (target.pinned) throw ArgumentError(tr('固定区不能改'));
-    // 候选方案会顶掉眼前这处改动,后面排着的也一起作废,免得接着冒出来对不上号。
-    _queued = const [];
-    _pending = DiffProposal(
-      title: variant.title,
-      segmentIndex: variant.segmentIndex,
-      removed: target.text,
-      added: variant.text,
-    );
-    bodySelection = null;
-    _changed();
-    _autoAccept();
-  }
-
   /// 把 Agent 另出的那份新成稿变成待确认 diff(不直接改成稿)。
   /// 固定区留在原位,换掉的是那一栏可编辑文字。不能放时返回给用户看的原因。
   // ponytail: 成稿被固定区隔成几栏时,每栏的改动排着队一处一处确认([_queued]),

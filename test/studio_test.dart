@@ -50,25 +50,6 @@ void main() {
       expect(vm.finalPrompt, before);
     });
 
-    test('采纳候选方案只生成待确认 diff,不直接改成稿', () {
-      final vm = sampleStudio()..rejectDiff();
-      final before = vm.finalPrompt;
-      final variant = vm.messages.last.variants.last;
-
-      vm.proposeVariant(variant);
-
-      expect(vm.finalPrompt, before);
-      expect(vm.pending!.added, variant.text);
-      expect(vm.pending!.removed, vm.blocks[variant.segmentIndex].text);
-    });
-
-    test('候选方案指向不存在的段落时报错', () {
-      final vm = sampleStudio();
-      const bad = PromptVariant(title: 'x', text: 'y', segmentIndex: 99);
-
-      expect(() => vm.proposeVariant(bad), throwsRangeError);
-    });
-
     test('手动编辑正文会更新成稿;空成稿没有多余空格', () {
       final vm = StudioViewModel(
         config: tempConfig(),

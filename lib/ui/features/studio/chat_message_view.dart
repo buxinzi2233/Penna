@@ -37,7 +37,6 @@ class ChatMessageView extends StatelessWidget {
   const ChatMessageView({
     super.key,
     required this.message,
-    required this.onAdopt,
     required this.onAdoptDraft,
     required this.draftStatus,
     this.streaming = false,
@@ -83,7 +82,6 @@ class ChatMessageView extends StatelessWidget {
   final List<String> skillNames;
 
   final ChatMessage message;
-  final ValueChanged<PromptVariant> onAdopt;
 
   /// 把回复里的一份新成稿放到左侧它该去的那一页。
   final ValueChanged<AgentDraft> onAdoptDraft;
@@ -327,10 +325,6 @@ class ChatMessageView extends StatelessWidget {
                     for (final name in skillNames) MentionChip(name: name),
                   ],
                 ),
-              ],
-              for (final v in m.variants) ...[
-                const SizedBox(height: 8),
-                _VariantCard(variant: v, onAdopt: () => onAdopt(v)),
               ],
             ],
           ),
@@ -685,70 +679,6 @@ class _ToolBlock extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _VariantCard extends StatelessWidget {
-  const _VariantCard({required this.variant, required this.onAdopt});
-
-  final PromptVariant variant;
-  final VoidCallback onAdopt;
-
-  @override
-  Widget build(BuildContext context) {
-    final v = variant;
-    return PennaCard(
-      radius: 12,
-      padding: const EdgeInsets.all(12),
-      borderColor: v.recommended
-          ? PennaColors.primaryBorder
-          : PennaColors.border,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  v.title,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: v.recommended
-                        ? PennaColors.primary
-                        : PennaColors.slate700,
-                  ),
-                ),
-              ),
-              PennaButton(
-                label: tr('采纳至成稿'),
-                background: v.recommended
-                    ? PennaColors.primary
-                    : PennaColors.slate100,
-                foreground: v.recommended ? Colors.white : PennaColors.slate700,
-                onPressed: onAdopt,
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          PennaCard(
-            color: PennaColors.slate50,
-            borderColor: PennaColors.slate100,
-            radius: 4,
-            padding: const EdgeInsets.all(8),
-            child: Text('+ ${v.text}', style: monoStyle.copyWith(fontSize: 12)),
-          ),
-          if (v.notes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              v.notes.join('  •  '),
-              style: TextStyle(fontSize: 11, color: PennaColors.slate400),
-            ),
-          ],
-        ],
       ),
     );
   }

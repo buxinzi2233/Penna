@@ -75,7 +75,8 @@ class _LookSwitcherState extends State<LookSwitcher>
     final ui.Image image;
     try {
       image = boundary.toImageSync(
-        pixelRatio: View.of(context).devicePixelRatio,
+        // 用 MediaQuery 的:「界面大小」放大时它跟着乘上倍数,截图才不糊。
+        pixelRatio: MediaQuery.devicePixelRatioOf(context),
       );
     } on Object {
       return; // 拍不下来就不放动画,直接换。
@@ -83,7 +84,11 @@ class _LookSwitcherState extends State<LookSwitcher>
     _old?.dispose();
     setState(() {
       _old = image;
-      _origin = lookRevealOrigin;
+      // 记下的是窗口坐标,换成这块画面自己的(「界面大小」放大过时两者不同)。
+      _origin = switch (lookRevealOrigin) {
+        final o? => boundary.globalToLocal(o),
+        null => null,
+      };
     });
     lookRevealOrigin = null;
     _reveal.forward(from: 0).whenComplete(() {

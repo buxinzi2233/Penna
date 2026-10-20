@@ -565,10 +565,13 @@ Future<String?> askName(
 }
 
 /// 在鼠标的位置弹一个小菜单,返回选中的那一项。
+/// [at] 是窗口坐标;菜单按弹窗层自己的坐标放(它在标题栏下面,还可能被「界面大小」放大过)。
 Future<String?> popMenu(BuildContext context, Offset at, List<String> items) {
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+  final p = overlay.globalToLocal(at);
   return showMenu<String>(
     context: context,
-    position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
+    position: RelativeRect.fromLTRB(p.dx, p.dy, p.dx, p.dy),
     items: [
       for (final item in items)
         PopupMenuItem(

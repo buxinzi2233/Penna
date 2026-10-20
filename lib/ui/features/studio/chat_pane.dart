@@ -322,11 +322,6 @@ class _ChatPaneState extends State<ChatPane> {
         if (s.id == id) s.name,
   ];
 
-  void _adopt(PromptVariant variant) {
-    widget.vm.proposeVariant(variant);
-    showToast(context, tr('已标出改动'));
-  }
-
   /// [replacing] 是这条回复讨论的那一段成稿;为 null 表示换整篇。
   void _adoptDraft(AgentDraft draft, String? replacing) {
     final problem = widget.vm.placeDraft(
@@ -440,7 +435,6 @@ class _ChatPaneState extends State<ChatPane> {
         agentAvatar: widget.config.config.agentAvatar,
         userAvatar: widget.config.config.userAvatar,
         skillNames: _namesOf(message.skillIds),
-        onAdopt: _adopt,
         // 中间可能隔着查标签的那几条,所以找用户自己发的最后一条。
         onAdoptDraft: (draft) => _adoptDraft(
           draft,
