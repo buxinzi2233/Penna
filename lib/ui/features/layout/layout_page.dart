@@ -83,9 +83,35 @@ class _LayoutPageState extends State<LayoutPage> {
     super.dispose();
   }
 
-  /// 画布上点了第 [i] 块:属性栏滚到它那张卡片;[edit] 时光标放进它的正文。
+  /// 图层面板里展开着的几块(按第几块记);默认都折叠。
+  var _open = <int>{};
+
+  void _toggle(int i) => setState(
+    () => _open = _open.contains(i) ? ({..._open}..remove(i)) : {..._open, i},
+  );
+
+  /// 拖着换前后。序号都变了,展开状态只留给挪动的那一块(它展开着的话)。
+  void _move(int from, int to) {
+    final wasOpen = _open.contains(from);
+    board.move(from, to);
+    setState(() => _open = {if (wasOpen) ?board.selected});
+  }
+
+  /// 删掉一块:后面的序号往前挪一个,展开状态跟着挪。
+  void _delete(int i) {
+    board.removeBox(i);
+    setState(
+      () => _open = {
+        for (final j in _open)
+          if (j != i) j > i ? j - 1 : j,
+      },
+    );
+  }
+
+  /// 画布上点了第 [i] 块:属性栏滚到它那张卡片;[edit] 时展开它并把光标放进正文。
   void _reveal(int i, {bool edit = false}) {
-    // 等这一帧建好(刚画出来的框还没有卡片)。
+    if (edit && !_open.contains(i)) setState(() => _open = {..._open, i});
+    // 等这一帧建好(刚画出来的框还没有卡片,刚展开的还没有输入框)。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final card = _cards[i]?.currentContext;
       if (card == null || !card.mounted) return;
@@ -180,6 +206,10 @@ class _LayoutPageState extends State<LayoutPage> {
                       onAsk: _ask,
                       cardKey: _cardKey,
                       fieldFocus: _fieldFocus,
+                      isOpen: _open.contains,
+                      onToggle: _toggle,
+                      onMove: _move,
+                      onDelete: _delete,
                     ),
                   ),
                   Expanded(

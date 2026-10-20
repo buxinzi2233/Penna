@@ -244,6 +244,46 @@ void main() {
     expect(seen.last.first['content'], contains('"horizon":75'));
   });
 
+  test('图层顺序:第 1 个在最前;拖动换前后时前中后景跟着落点变;改层时选中跟着走', () {
+    LayoutBox box(String name, String layer) => LayoutBox(
+      left: 0,
+      top: 0,
+      right: 10,
+      bottom: 10,
+      name: name,
+      layer: layer,
+    );
+    String order(LayoutBoard b) =>
+        b.layout.boxes.map((x) => '${x.name}${x.layer[0]}').join(' ');
+    final board = LayoutBoard()
+      ..addBox(box('山', 'back'))
+      ..addBox(box('甲', 'middle'))
+      ..addBox(box('乙', 'middle'))
+      ..addBox(box('字', 'front'));
+    // 前景在前、后景在后;同一层里新加的在最前。
+    expect(order(board), '字f 乙m 甲m 山b');
+    expect(board.selected, 0);
+
+    // 后景的「山」拖到「乙」和「甲」之间:夹在两个中景之间,成了中景。
+    board.move(3, 2);
+    expect(order(board), '字f 乙m 山m 甲m');
+    expect(board.selected, 2);
+    // 拖到最前面:成了前景。
+    board.move(2, 0);
+    expect(order(board), '山f 字f 乙m 甲m');
+
+    // 把「甲」改成前景:挪到前景那一组里,选中的跟着它。
+    board
+      ..select(3)
+      ..updateBox(3, board.layout.boxes[3].copyWith(layer: 'front'));
+    expect(order(board), '山f 字f 甲f 乙m');
+    expect(board.layout.boxes[board.selected!].name, '甲');
+
+    // Agent 写回来的 JSON 也按前后排好,画板存的旧数据读回来也一样。
+    expect(stacked([box('a', 'back'), box('b', 'front')]).first.name, 'b');
+    expect(board.prompt, contains('1 在最前面'));
+  });
+
   test('参考图和画布一横一竖时给出对调后的尺寸', () async {
     final board = LayoutBoard();
     Uint8List png(int w, int h) =>

@@ -229,7 +229,7 @@ MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。
 
 name 是每一块的中文名(两到六个字),只在 Penna 里用来指认是哪一块,交出去之前会去掉。
 
-layer 是这一块在哪一层:front(前景)、middle(中景)、back(后景),也只在 Penna 里用,交出去之前会去掉。框重叠时前景盖住后景,同一层里后写的盖住先写的。每一块都写上 layer;用户画板上已经定了的照抄,用户说"放到前面""挡在后面"时改它。MOSS-Image 看不到 layer,所以前后关系还要写进描述:summary.caption 说清谁在前、谁在后,前景那块的 caption 写 "in the foreground",后景的写 "in the background",被挡住的写清被什么挡住、露出哪部分。
+layer 是这一块在哪一层:front(前景)、middle(中景)、back(后景),也只在 Penna 里用,交出去之前会去掉。items 按从前到后的顺序写:前景在最前,然后中景、后景;同一层里先写的在前面。框重叠时前面的盖住后面的。每一块都写上 layer;用户画板上已经定了的照抄,用户说"放到前面""挡在后面"时改它。MOSS-Image 看不到 layer,所以前后关系还要写进描述:summary.caption 说清谁在前、谁在后,前景那块的 caption 写 "in the foreground",后景的写 "in the background",被挡住的写清被什么挡住、露出哪部分。
 
 画板上可以开透视辅助线,现在的样子看系统提示里的【透视辅助】。开着时照它写机位高低、视角和每一块的透视方向,框的大小也顺着近大远小来排。
 

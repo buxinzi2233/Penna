@@ -107,13 +107,11 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
     return KeyEventResult.handled;
   }
 
-  /// 画框的先后:后景、中景、前景,同一层里按先后。后画的盖在上面。
-  List<int> get _paintOrder {
-    final boxes = _board.layout.boxes;
-    int rank(int i) => layoutLayers.indexOf(boxes[i].layer);
-    return [for (var i = 0; i < boxes.length; i++) i]
-      ..sort((a, b) => rank(a) != rank(b) ? rank(a) - rank(b) : a - b);
-  }
+  /// 画框的先后:画板里的框已经按前后排好(第 0 个在最前,见 `stacked`),
+  /// 倒着画,后画的盖在上面。
+  List<int> get _paintOrder => [
+    for (var i = _board.layout.boxes.length - 1; i >= 0; i--) i,
+  ];
 
   /// 按在了哪个消失点上;没开透视或没按中是 null。
   int? _hitVanishing(Offset p, double scale) {

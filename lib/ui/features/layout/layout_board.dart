@@ -59,15 +59,26 @@ class LayoutBoard extends ChangeNotifier {
                   '没让你动的框,bbox 照这里原样抄,label、meta、canvas 也照抄。'
                   'name 是用户给这一块起的名字,他说"把某某挪到……"指的就是它;'
                   '你写的时候照样带着 name,新加的块也起一个两到六个字的中文名。\n'
+                  '各块按前后排:1 在最前面,越往后越靠后,重叠时前面的盖住后面的;'
+                  'items 也照这个先后写(前景、中景、后景依次),要调前后就换它们的先后。'
                   '各块在画布上的范围(从左上角量,0% 是左边或顶上):\n$where\n'
                   '<current-layout>\n${mossLayoutJson(l, names: true)}\n</current-layout>'}'
         '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}';
   }
 
-  void _set(Layout layout, {bool rebuild = false}) {
-    _layout = layout;
-    if (rebuild) _revision++;
-    if (_selected != null && _selected! >= layout.boxes.length) {
+  /// 换成 [layout]:框先按前后排好(见 [stacked])。[follow] 是要跟着选中的那一块
+  /// (排序后它的位置可能变了)。框的先后变了时输入框要重建,和 [rebuild] 一样。
+  void _set(Layout layout, {bool rebuild = false, LayoutBox? follow}) {
+    final boxes = stacked(layout.boxes);
+    final reordered = [
+      for (final (i, b) in boxes.indexed) identical(b, layout.boxes[i]),
+    ].contains(false);
+    _layout = layout.copyWith(boxes: boxes);
+    if (rebuild || reordered) _revision++;
+    if (follow != null) {
+      final at = boxes.indexWhere((b) => identical(b, follow));
+      _selected = at < 0 ? null : at;
+    } else if (_selected != null && _selected! >= boxes.length) {
       _selected = null;
     }
     notifyListeners();
@@ -151,10 +162,14 @@ class LayoutBoard extends ChangeNotifier {
   void setSummary({String? caption, String? meta, String? canvas}) =>
       _set(_layout.copyWith(caption: caption, meta: meta, canvas: canvas));
 
-  /// 加一个框并选中它。
+  /// 加一个框并选中它:放在它那一层的最前面(像 PS 新建的图层在最上面)。
   void addBox(LayoutBox box) {
-    _set(_layout.copyWith(boxes: [..._layout.boxes, box]));
-    select(_layout.boxes.length - 1);
+    final at = _layout.boxes.indexWhere(
+      (b) => _rank(b.layer) <= _rank(box.layer),
+    );
+    final boxes = [..._layout.boxes]
+      ..insert(at < 0 ? _layout.boxes.length : at, box);
+    _set(_layout.copyWith(boxes: boxes), follow: box);
   }
 
   void updateBox(int i, LayoutBox box) {
@@ -163,7 +178,26 @@ class LayoutBoard extends ChangeNotifier {
       _layout.copyWith(
         boxes: [for (final (j, b) in _layout.boxes.indexed) j == i ? box : b],
       ),
+      // 改了前中后景时它会挪到别处,选中的跟着它走。
+      follow: _selected == i ? box : null,
     );
+  }
+
+  /// 拖着换前后:把第 [from] 块挪到第 [to] 个位置(按挪走之后的列表数)。
+  /// 前、中、后景跟着落点变:夹在两个前景之间的就成了前景,拖到前景和中景之间的
+  /// 尽量保持原来那一层。
+  void move(int from, int to) {
+    final boxes = [..._layout.boxes];
+    if (from < 0 || from >= boxes.length) return;
+    final b = boxes.removeAt(from);
+    final at = to.clamp(0, boxes.length);
+    final above = at > 0 ? _rank(boxes[at - 1].layer) : layoutLayers.length - 1;
+    final below = at < boxes.length ? _rank(boxes[at].layer) : 0;
+    final moved = b.copyWith(
+      layer: layoutLayers[_rank(b.layer).clamp(below, above)],
+    );
+    boxes.insert(at, moved);
+    _set(_layout.copyWith(boxes: boxes), rebuild: true, follow: moved);
   }
 
   void removeBox(int i) {
@@ -259,7 +293,8 @@ class LayoutBoard extends ChangeNotifier {
     if (file == null || !file.existsSync()) return;
     try {
       final j = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-      _layout = Layout.fromJson(j['layout'] as Map<String, dynamic>);
+      final loaded = Layout.fromJson(j['layout'] as Map<String, dynamic>);
+      _layout = loaded.copyWith(boxes: stacked(loaded.boxes));
       _sizes = List.unmodifiable([
         for (final s in j['sizes'] as List? ?? const [])
           if (s is List &&
@@ -297,6 +332,16 @@ Future<({int width, int height})?> _imageSize(Uint8List bytes) async {
   } on Object {
     return null;
   }
+}
+
+int _rank(String layer) => layoutLayers.indexOf(layer);
+
+/// 按前后排好:第 0 个在最前面,前景、中景、后景依次往后,同一层里保持原来的先后
+/// (`mergeSort` 是稳定排序)。画布倒着画,后画的盖住先画的。
+List<LayoutBox> stacked(List<LayoutBox> boxes) {
+  final out = [...boxes];
+  mergeSort(out, compare: (a, b) => _rank(b.layer) - _rank(a.layer));
+  return out;
 }
 
 /// 说给模型听的图层名。
