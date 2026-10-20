@@ -11,7 +11,8 @@ List<Offset> vanishingPoints(Perspective p) => [
 ];
 
 /// 把第 [i] 个消失点拖到 [to](画布像素)。地平线上的消失点上下拖时地平线跟着走。
-// ponytail: 消失点只能拖到画布里面;要放到画布外,得让画布四周留出能拖的空白。
+// ponytail: 消失点只能拖到画布里面(Agent 能放到画面外,那种点拖不到);
+// 要在画面外也能拖,得让画布四周留出能拖的空白。
 Perspective dragVanishing(Perspective p, int i, Offset to) {
   final x = to.dx.round(), y = to.dy.round();
   if (i < p.xs.length) {
@@ -58,7 +59,9 @@ class PerspectivePainter extends CustomPainter {
     );
     canvas.restore();
     // 圆点画在裁剪外面:贴着边的消失点也看得全。
-    for (final v in points) {
+    // 在画面外的(Agent 照参考图放的)不画,免得压住旁边的界面;辐射线照样朝它收拢。
+    final room = (Offset.zero & size).inflate(8);
+    for (final v in points.where(room.contains)) {
       canvas
         ..drawCircle(v, 6, Paint()..color = Colors.white)
         ..drawCircle(

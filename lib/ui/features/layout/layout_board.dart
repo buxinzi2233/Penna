@@ -59,7 +59,7 @@ class LayoutBoard extends ChangeNotifier {
                   '你写的时候照样带着 name,新加的块也起一个两到六个字的中文名。\n'
                   '各块在画布上的范围(从左上角量,0% 是左边或顶上):\n$where\n'
                   '<current-layout>\n${mossLayoutJson(l, names: true)}\n</current-layout>'}'
-        '${l.perspective == null ? '' : '\n\n${l.perspective!.describe(l.width, l.height)}'}';
+        '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}';
   }
 
   void _set(Layout layout, {bool rebuild = false}) {
@@ -107,6 +107,15 @@ class LayoutBoard extends ChangeNotifier {
   /// 拖动透视线(画布上拖消失点时用)。
   void movePerspective(Perspective p) =>
       _set(_layout.copyWith(perspective: () => p));
+
+  /// 照 Agent 写的 `<perspective>` 改透视线(见 [parsePerspective])。
+  /// 读不了返回 false,画板不动。
+  bool applyPerspective(String spec) {
+    final parsed = parsePerspective(spec, _layout.width, _layout.height);
+    if (parsed == null) return false;
+    _set(_layout.copyWith(perspective: () => parsed.value));
+    return true;
+  }
 
   /// 宽高对调(横竖切换)。
   void swap() => setSize(_layout.height, _layout.width);

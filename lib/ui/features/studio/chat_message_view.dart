@@ -105,7 +105,8 @@ class ChatMessageView extends StatelessWidget {
     final made = splitNewSkill(splitAskLayout(tools.prose).prose);
     final newSkill = made.skill;
     final laid = splitLayout(made.prose);
-    final asked = splitOptions(laid.prose);
+    // 透视标签由程序放到画板上,聊天里只留回复上那一笔记录。
+    final asked = splitOptions(splitPerspective(laid.prose).prose);
     // 挑成稿里的段:直接列当前页的各段。模型自己列出的多选项正好全是段名时也照此显示。
     final labels = {for (final s in draftSections) s.label};
     final bySection =

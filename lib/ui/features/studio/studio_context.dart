@@ -230,6 +230,19 @@ extension StudioContext on StudioViewModel {
     );
   }
 
+  /// 回复里写了透视(`<perspective>`):改画板上的透视线,并在这条回复上记一笔。
+  void _deliverPerspective() {
+    final board = layout;
+    if (board == null || _messages.isEmpty) return;
+    final spec = splitPerspective(_messages.last.text).spec;
+    if (spec == null || !board.applyPerspective(spec)) return;
+    final p = board.layout.perspective;
+    final note = p == null ? tr('已关掉透视辅助') : tr('已调整透视 · {0} 点透视', [p.points]);
+    _updateReply(
+      (m) => m.copyWith(toolSummary: [?m.toolSummary, note].join(' · ')),
+    );
+  }
+
   /// 把排布局的活交给区域控制的 Agent([layoutAgent]):在那边开一场新对话发过去
   /// (用户发的图一起转过去),等它把布局放到画板上,再把 JSON 放进成稿区新建的系列。
   /// [run] 是这一轮工具的编号:等的时候用户点了停止,就不往成稿里放了。
@@ -253,7 +266,8 @@ extension StudioContext on StudioViewModel {
     try {
       await agent.sendAndWait(
         '【主工作区转来的任务】${ask.brief}\n\n'
-        '这是从主工作区转过来的活,用户不在这边看:不要提问,直接排一份完整的布局放进 <layout>。',
+        '这是从主工作区转过来的活,用户不在这边看:不要提问,直接排一份完整的布局放进 <layout>'
+        '${image == null ? '' : ';参考图里看得出透视的话,同时写 <perspective>'}。',
         attachments: [?image],
       );
     } on LlmException catch (e) {
@@ -505,6 +519,8 @@ const _layoutAgentPrompt =
     '他用名字说"哪一块"时,对照 name 找。\n'
     '- 要用户在几种排法里挑时,先用一两句中文说明每种的区别,在回复最后加 <options>,里面一行一个选项'
     '(每个不超过 12 个字),这条回复不写 <layout>。\n'
+    '- 用户发了参考图,而图里看得出透视时,照技能里说的估出地平线和消失点,写 <perspective> 调好画板上的透视线,'
+    '不用等用户开口。\n'
     '- 每一块的描述都照技能里「怎么写描述」那一节写足:英文句子、写看得见的细节,'
     '字的块写清排版。只写一两个词的描述等于没写。\n'
     '- 不写 <draft>,不写负面词,正文里不贴 JSON。';

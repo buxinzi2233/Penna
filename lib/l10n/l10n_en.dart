@@ -810,4 +810,6 @@ const en = <String, String>{
   '角色库下载内置角色的图': 'Download images for built-in characters',
   '正式版': 'Stable',
   '测试版': 'Dev',
+  '已关掉透视辅助': 'Perspective guides turned off',
+  '已调整透视 · {0} 点透视': 'Perspective adjusted · {0}-point',
 };

@@ -171,7 +171,76 @@ void main() {
       ..swap();
     expect(board.layout.perspective!.horizon, (300 * 832 / 1216).round());
     board.setPerspective(null);
-    expect(board.prompt, isNot(contains('透视辅助')));
+    expect(board.prompt, contains('【透视辅助】现在关着'));
+  });
+
+  test('<perspective>:按百分比读,能放到画面外,off 是关掉;写到一半的不显示', () {
+    final p = parsePerspective(
+      '{"horizon": 50, "vanishing": [10, 95], "third": [50, -40]}',
+      1000,
+      2000,
+    )!;
+    expect(p.off, isFalse);
+    expect(p.value!.horizon, 1000);
+    expect(p.value!.xs, [100, 950]);
+    expect(p.value!.third, (x: 500, y: -800));
+    // 太远的截到 -300% / 400%。
+    expect(
+      parsePerspective(
+        '{"horizon": 50, "vanishing": [9999]}',
+        100,
+        100,
+      )!.value!.xs,
+      [400],
+    );
+    expect(parsePerspective(' off ', 100, 100)!.off, isTrue);
+    expect(parsePerspective('{"horizon": 50}', 100, 100), isNull);
+    expect(
+      parsePerspective('{"horizon": 50, "vanishing": []}', 100, 100),
+      isNull,
+    );
+
+    final done = splitPerspective('调好了。<perspective>off</perspective>');
+    expect((done.prose, done.spec), ('调好了。', 'off'));
+    final half = splitPerspective('调好了。<persp');
+    expect((half.prose, half.spec), ('调好了。', null));
+    expect(splitPerspective('调好了。<perspective>{"hor').spec, isNull);
+  });
+
+  test('布局对话:Agent 写了 <perspective> 就改画板的透视线,下一轮不重发旧的数', () async {
+    final board = LayoutBoard();
+    final seen = <List<Map<String, String>>>[];
+    final service = tempConfig();
+    service.update(
+      service.config.putLlm(
+        const LlmProfile(id: 'a', name: 'A', baseUrl: 'http://a', model: 'm'),
+      ),
+    );
+    final replies = [
+      '照参考图调了透视。<perspective>{"horizon": 75, "vanishing": [20, 80]}</perspective>',
+      '好的。',
+    ];
+    final chat = StudioViewModel(
+      config: service,
+      layout: board,
+      layoutOnly: true,
+      streamChat: (request) {
+        seen.add(request.messages);
+        return Stream.value(replies[seen.length - 1]);
+      },
+    );
+    expect(chat.send('照这张图的透视'), isNull);
+    await pumpEventQueue();
+    expect(seen.first.first['content'], contains('【透视辅助】现在关着'));
+    final p = board.layout.perspective!;
+    expect((p.points, p.horizon), (2, 912));
+    expect(chat.messages.last.toolSummary, contains('2 点透视'));
+
+    expect(chat.send('再说说'), isNull);
+    await pumpEventQueue();
+    expect(seen.last[2]['content'], isNot(contains('"horizon"')));
+    expect(seen.last.first['content'], contains('2 点透视'));
+    expect(seen.last.first['content'], contains('"horizon":75'));
   });
 
   test('参考图和画布一横一竖时给出对调后的尺寸', () async {

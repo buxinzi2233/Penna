@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 /// 区域控制画板上的透视辅助线(像 Photoshop 拉的透视线):一条地平线,
@@ -68,6 +70,17 @@ class Perspective {
     );
   }
 
+  /// 写成 Agent 用的 `<perspective>` 里那份 JSON(位置都是占画布的百分比),
+  /// 让它照着现在的数改。
+  String toSpec(int width, int height) {
+    int pct(int v, int side) => (v * 100 / side).round();
+    return jsonEncode({
+      'horizon': pct(horizon, height),
+      'vanishing': [for (final x in xs) pct(x, width)],
+      if (third != null) 'third': [pct(third!.x, width), pct(third!.y, height)],
+    });
+  }
+
   /// 说给模型听:几点透视、地平线和各消失点在画面哪里、这意味着什么机位。
   String describe(int width, int height) {
     String pct(int v, int side) => '${(v * 100 / side).round()}%';
@@ -92,6 +105,79 @@ class Perspective {
         '照这个透视写:summary.caption 写清机位高低、视角和透视的强弱;'
         '每一块的 caption 写它朝哪个消失点延伸、近大远小的方向,'
         '人物写清从这个视角看到的样子(仰视看得到下巴和下侧,俯视看得到头顶和肩)。'
-        '框的位置和大小也要顺着透视:离消失点越近的东西越小。';
+        '框的位置和大小也要顺着透视:离消失点越近的东西越小。'
+        '现在的写法是 <perspective>${toSpec(width, height)}</perspective>。';
   }
 }
+
+/// 消失点最远能放到画面外多远(占画布的百分比):参考图里的消失点常在画面外。
+const _minPct = -300.0, _maxPct = 400.0;
+
+/// 读 Agent 写的 `<perspective>` 里的内容,放到 [width]×[height] 的画布上。
+/// `off` 是关掉([off] 为真);否则是 JSON,位置都是占画布的百分比(从左上角量,
+/// 可以小于 0 或大于 100,表示在画面外):
+/// `{"horizon": 62, "vanishing": [10, 95], "third": [50, -40]}`。
+/// 读不了返回 null。
+({bool off, Perspective? value})? parsePerspective(
+  String spec,
+  int width,
+  int height,
+) {
+  final text = spec.trim();
+  if (text.toLowerCase() == 'off') return (off: true, value: null);
+  final Object? j;
+  try {
+    j = jsonDecode(text);
+  } on FormatException {
+    return null;
+  }
+  if (j is! Map || j['horizon'] is! num || j['vanishing'] is! List) return null;
+  int px(Object v, int side) =>
+      ((v as num).toDouble().clamp(_minPct, _maxPct) * side / 100).round();
+  final xs = [
+    for (final x in j['vanishing'] as List)
+      if (x is num) px(x, width),
+  ];
+  if (xs.isEmpty || xs.length > 2) return null;
+  final t = j['third'];
+  return (
+    off: false,
+    value: Perspective(
+      horizon: px(j['horizon'] as num, height),
+      xs: List.unmodifiable(xs),
+      third: t is List && t.length == 2 && t[0] is num && t[1] is num
+          ? (x: px(t[0] as num, width), y: px(t[1] as num, height))
+          : null,
+    ),
+  );
+}
+
+final _tag = RegExp(r'<perspective>([\s\S]*?)</perspective>');
+const _open = '<perspective>';
+
+/// 把回复里的 `<perspective>` 拆出来(有好几个时取最后一个):[spec] 是里面的内容,
+/// [prose] 是去掉它之后给人看的话;还没写完的那一个先不显示,[spec] 为 null。
+({String prose, String? spec}) splitPerspective(String reply) {
+  final done = _tag.allMatches(reply).lastOrNull;
+  var prose = reply.replaceAll(_tag, '');
+  var spec = done?[1]!.trim();
+  final half = prose.indexOf(_open);
+  if (half >= 0) {
+    prose = prose.substring(0, half);
+    spec = null;
+  } else {
+    // 开始标签只到了一半(流式生成中)。
+    for (var n = _open.length - 1; n > 1; n--) {
+      if (prose.endsWith(_open.substring(0, n))) {
+        prose = prose.substring(0, prose.length - n);
+        break;
+      }
+    }
+  }
+  return (prose: prose.trim(), spec: spec);
+}
+
+/// 发给模型的旧回复里,`<perspective>` 的内容换成一句话(同 `forgetLayouts`):
+/// 用户之后可能拖过消失点,现在的样子只看【透视辅助】。
+String forgetPerspectives(String reply) =>
+    reply.replaceAll(_tag, '<perspective>(已放到画板上,现在的样子看【透视辅助】)</perspective>');

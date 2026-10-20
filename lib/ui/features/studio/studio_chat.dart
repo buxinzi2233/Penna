@@ -167,8 +167,10 @@ extension StudioChat on StudioViewModel {
               for (final s in skills?.all ?? const <UserSkill>[])
                 if (!cfg.disabledSkills.contains(s.id)) s.id,
             })) {
-              // 自己以前写的布局不重发:画板可能已被用户改过。
-              final text when !m.fromUser => forgetLayouts(text),
+              // 自己以前写的布局、透视不重发:画板可能已被用户改过。
+              final text when !m.fromUser => forgetPerspectives(
+                forgetLayouts(text),
+              ),
               final text => text,
             },
           },
@@ -212,6 +214,7 @@ extension StudioChat on StudioViewModel {
             }
             _deliverCharacters();
             _deliverLayout();
+            _deliverPerspective();
             unawaited(_deliverSkill());
             _sendNext();
           },
