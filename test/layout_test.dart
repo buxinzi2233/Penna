@@ -239,6 +239,7 @@ void main() {
     expect(chat.send('再说说'), isNull);
     await pumpEventQueue();
     expect(seen.last[2]['content'], isNot(contains('"horizon"')));
+    expect(seen.last[2]['content'], isNot(contains('<perspective>')));
     expect(seen.last.first['content'], contains('2 点透视'));
     expect(seen.last.first['content'], contains('"horizon":75'));
   });
@@ -394,6 +395,8 @@ void main() {
     // 上一轮自己写的旧坐标不重发,画板此刻的位置在系统提示里。
     expect(seen.last[2]['content'], isNot(contains('bbox')));
     expect(seen.last[2]['content'], contains('现在的样子看【布局画板】'));
+    // 标签本身也不留:留着的话模型会照样子把那句说明当成布局写回来。
+    expect(seen.last[2]['content'], isNot(contains('<layout>')));
     expect(seen.last.first['content'], contains('横向 0%–50%,纵向 0%–50%'));
     expect(seen.last.first['content'], contains('-608,'));
     // 第二轮带着上一轮;选中的那块随消息发出,系统提示里是带名字的现有布局。

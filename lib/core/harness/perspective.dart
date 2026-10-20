@@ -177,7 +177,7 @@ const _open = '<perspective>';
   return (prose: prose.trim(), spec: spec);
 }
 
-/// 发给模型的旧回复里,`<perspective>` 的内容换成一句话(同 `forgetLayouts`):
-/// 用户之后可能拖过消失点,现在的样子只看【透视辅助】。
+/// 发给模型的旧回复里,整个 `<perspective>…</perspective>` 换成一句不带标签的话
+/// (同 `forgetLayouts`):用户之后可能拖过消失点,现在的样子只看【透视辅助】。
 String forgetPerspectives(String reply) =>
-    reply.replaceAll(_tag, '<perspective>(已放到画板上,现在的样子看【透视辅助】)</perspective>');
+    reply.replaceAll(_tag, '(这里调过一次透视,已放到画板上,内容省略;现在的样子看【透视辅助】)');

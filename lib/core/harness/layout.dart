@@ -353,10 +353,11 @@ const _askOpen = '<ask-layout';
 final _block = RegExp(r'<layout>([\s\S]*?)</layout>');
 const _open = '<layout>';
 
-/// 发给模型的旧回复里,`<layout>` 的内容换成一句话:用户之后可能拖过框、改过字,
+/// 发给模型的旧回复里,整个 `<layout>…</layout>` 换成一句话:用户之后可能拖过框、改过字,
 /// 旧坐标留在上文里,模型会照抄回去。画板现在的样子只看系统提示里的【布局画板】。
+/// 这句话不带标签:带着 `<layout>` 的话,模型会照样子把这句话当成布局写回来。
 String forgetLayouts(String reply) =>
-    reply.replaceAll(_block, '<layout>(已放到画板上,之后用户可能改过,现在的样子看【布局画板】)</layout>');
+    reply.replaceAll(_block, '(这里写过一份布局 JSON,已放到画板上,内容省略;现在的样子看【布局画板】)');
 
 /// 把回复里的 `<layout>` 拆出来(有好几个时取最后一个):[json] 是里面的布局,
 /// [prose] 是去掉它之后给人看的话;还没写完的那一个先不显示,[complete] 为假。
