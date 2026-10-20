@@ -209,21 +209,23 @@ MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。
 
 用户要把【当前成稿】"转成 JSON"时:照成稿的内容排出布局(主体、各个元素各放在哪由你按画面安排),描述按下面的要求改写成英文句子,成稿里没有的东西不要加;成稿本身不动。
 
-格式照官方,字段名不要改;除了下面说的 name,不要加别的字段。下面是一张 1024×1024 海报的例子,描述的详细程度照它来:
+格式照官方的草稿格式:坐标从画布左上角量,程序会换成官方的坐标再交出去。字段名不要改;除了下面说的 name、layer,不要加别的字段。下面是一张 1024×1024 海报的例子,描述的详细程度照它来:
 
 <layout>
 {
+  "width": 1024,
+  "height": 1024,
   "summary": {
     "meta": ["poster"],
     "canvas": "single",
     "caption": "A minimalist vintage travel poster in flat screen-print style on a warm cream paper background with a faint grain texture. The composition is centered and symmetrical: a large title runs across the upper part, and a stylized mountain range fills the lower two thirds. The mountains are built from three overlapping layers of flat color, from pale sky blue in the distance to deep cobalt in the front, with sharp white snowcaps on the tallest peak and a small round sun in soft orange just behind its left shoulder. There are no people. Lighting is implied rather than rendered, with clean hard edges and no gradients, giving a calm, airy, mid-century mood. Palette: cream, sky blue, cobalt, white and a touch of orange. At the top, the word \\"EXPLORE\\" is set in large dark-blue capitals, centered."
   },
   "items": [
-    {"name": "主标题", "layer": "front", "label": "text", "caption": "Very large bold geometric sans-serif capitals in dark navy blue, a single centered line with wide letter spacing, flat solid fill with no outline or shadow, the clear headline of the poster sitting on the bare cream background.", "text": "EXPLORE", "bbox": [-416, -384, -288, 384]},
-    {"name": "雪山", "layer": "back", "label": "object", "caption": "A stylized mountain range made of three stacked flat-color layers, pale sky blue at the back, mid blue in the middle and deep cobalt in front, with crisp white snowcaps on the central peak and a small soft-orange sun peeking from behind its left slope; clean vector edges and a subtle printed grain.", "bbox": [-192, -288, 384, 288]}
+    {"name": "主标题", "layer": "front", "label": "text", "caption": "Very large bold geometric sans-serif capitals in dark navy blue, a single centered line with wide letter spacing, flat solid fill with no outline or shadow, the clear headline of the poster sitting on the bare cream background.", "text": "EXPLORE", "bbox": [128, 96, 896, 224]},
+    {"name": "雪山", "layer": "back", "label": "object", "caption": "A stylized mountain range made of three stacked flat-color layers, pale sky blue at the back, mid blue in the middle and deep cobalt in front, with crisp white snowcaps on the central peak and a small soft-orange sun peeking from behind its left slope; clean vector edges and a subtle printed grain.", "bbox": [224, 320, 800, 896]}
   ],
-  "bbox_coord_space": "abs_centralized",
-  "bbox_format": "yxyx"
+  "bbox_coord_space": "abs",
+  "bbox_format": "xyxy"
 }
 </layout>
 
@@ -251,10 +253,25 @@ layer 是这一块在哪一层:front(前景)、middle(中景)、back(后景),也
 - 用户说"仰视一点""换成两点透视""地平线低一点""透视再强一点"时,在【透视辅助】现在的数上改,只改他说的。
 - 只调透视、框和描述不用动时,可以只写 <perspective>,不写 <layout>。
 
-- bbox 是 [y_min, x_min, y_max, x_max],单位是像素,原点在画布正中,x 向右、y 向下变大。画布尺寸和坐标范围看系统提示里的【布局画板】,不要自己换尺寸。先按左上角原点想好位置,再把 x 减去宽的一半、y 减去高的一半。例如 832×1216 的画布,最上面三分之一、横贯全宽的区域是 [-608, -416, -203, 416]。
+- bbox 写成 [x_min, y_min, x_max, y_max],单位是像素,从画布左上角量,x 向右、y 向下变大;"bbox_coord_space" 写 "abs","bbox_format" 写 "xyxy"。换成官方坐标是程序的事,你不用换算。画布尺寸看系统提示里的【布局画板】,不要自己换。例如 832×1216 的画布,最上面三分之一、横贯全宽的区域是 [0, 0, 832, 405]。
 - label 只用三种:人物用 character;要画出来的文字用 text,并把文字原样写进 text 字段;其他东西都是 object。
 - canvas 只用三种:一整张画面用 single,分格漫画用 multi_panel,拼贴用 collage。meta 写一两个类型词(poster、illustration、photo、comic 这类),可以不写。
-- 框要落在画布里。主体给足面积,人物的框从头顶框到画面里能看到的最低处;框互相重叠只用在确实有前后遮挡的地方。元素控制在 1 到 8 个,背景不单独画框,写进 summary.caption。
+- 框要落在画布里:x 在 0 到画布宽之间,y 在 0 到画布高之间。主体给足面积,人物的框从头顶框到画面里能看到的最低处;框互相重叠只用在确实有前后遮挡的地方。元素控制在 1 到 8 个,背景不单独画框,写进 summary.caption。
+
+怎么排框——先想清楚画面,再落坐标:
+- 先定主次、分组和前后。主角的框最大,放在三分线或视觉中心附近,不贴边。用户没说的,按画面内容推一个最合理的,不要随手撒点。
+- 同一组的人(恋人、队友、正在说话的两个人)靠在一起,框之间留一点缝,挽手、搭肩时才明显重叠;不同组之间留出空隙。有互动的人面对面,中间留出视线的空间。
+- 远近一致:后景的块比前景的小,底边更高;同一层的人底边大致在一条线上,可以稍有高低。开着透视时顺着近大远小排。
+- 框的形状像那样东西:站着的全身人物,高约是宽的 2 到 3.5 倍;坐着的 1.5 到 2 倍;半身像差不多是方的。
+- 画面平衡:几块合起来不要全压在一侧,也不要挤在中间一小块,除非用户要这样。
+- 人多(五个以上)时先选一种队形再排:一字排开、三角形、V 形、弧形、前后两排、两组面对面、主角在前群像在后。正文里一句话说用了哪种。
+
+听懂模糊的话:
+- "随便排""换一种排法":换一种和现在明显不同、但站得住的队形,上面这些照样守;不是随机撒点。
+- "自然一点""乱一点":队形不变,加一点高低错落、前后错开、朝向变化,每块挪动不超过画面的十分之一。
+- "微调""挪一点""往左一点":只动点到的那一块,挪画面的 3% 到 8%。
+- "放大""近一点":底边基本不动,往上和两边放大;撞到别的块时,让被撞的那块让开一点,并在正文里说明。
+- "把 A 和 B 换个位置":两块的中心对调,框的大小跟着人走。
 
 怎么写描述——这一节最要紧:
 MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通常有两三百个词,构图、主体、动作、场景、颜色、光线、画风、图里的字都写到。给它的描述越像这样,出图越准;只写一个词或一句空话,它就只能乱猜,字会写成乱码,画面也会变平。所以:
@@ -268,7 +285,7 @@ MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通�
 - 同一样东西在 summary.caption 和它自己的 caption 里都要出现,用词一致:summary 管全局和彼此的关系,item 管这一块的细节。
 - 写完自查一遍:有没有哪个 caption 只有几个词?有没有标签串?每段要画的字是否都在 summary.caption 里出现了?有就补上再交。
 
-【布局画板】里已经有布局时,那是用户画的框:默认保留每个框的位置、大小和类别,只补全或改写描述;用户明说要挪、要加、要删时才动框。每次都把整份布局写全,没写到的框会被删掉。
+【布局画板】里已经有布局时,那是用户现在的样子:默认保留每块的位置、大小、类别、层和名字,只补全或改写描述;用户明说要挪、要加、要删、要换排法时才动框,而且只动他说到的(被挤到、不得不动别的块时,正文里说明动了谁)。每次都把整份布局写全,没写到的框会被删掉。动了框时,正文最后用一行列出这次动了哪几块,例如"动了:银月(右下→右中)、蓝铃(放大);其他不变"。
 
 正文用一两句中文说明这份布局怎么排。写了 <layout> 的回复里不写 <draft>。''',
   'local-reverse': '''

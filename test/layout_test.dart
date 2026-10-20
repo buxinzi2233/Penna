@@ -91,6 +91,101 @@ void main() {
     expect(parseMossLayout('不是 JSON', width: 400, height: 400), isNull);
   });
 
+  test('草稿格式(abs + xyxy):从左上角量;给 Agent 的草稿读回来和原来一样', () {
+    final l = parseMossLayout(
+      '{"width": 832, "height": 1216, "items": [{"bbox": [100, 200, 300, 400]}],'
+      ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+      width: 832,
+      height: 1216,
+    )!;
+    final b = l.boxes.single;
+    expect((b.left, b.top, b.right, b.bottom), (100, 200, 300, 400));
+
+    final official = parseMossLayout(_official, width: 1024, height: 1024)!;
+    final draft = mossLayoutJson(official, draft: true);
+    expect(draft, contains('"bbox_coord_space": "abs"'));
+    final back = parseMossLayout(draft, width: 1024, height: 1024)!;
+    // 交出去的仍是官方格式,坐标一点不差。
+    expect(mossLayoutJson(back), mossLayoutJson(official));
+    expect(mossLayoutJson(back), isNot(contains('"width"')));
+  });
+
+  test('读的时候改掉的地方都记下来:超出画布的、读不了的、没面积的;差一像素不算', () {
+    final read = readMossLayout(
+      '{"items": ['
+      '{"name": "甲", "bbox": [-10, 0, 50, 50]},'
+      '{"bbox": [0, 0, 100.6, 100]},'
+      '{"name": "乙", "bbox": [1, 2, 3]},'
+      '{"bbox": [10, 10, 10, 50]}'
+      '], "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+      width: 100,
+      height: 100,
+    )!;
+    expect(read.layout.boxes, hasLength(2));
+    expect(read.fixes, [
+      (item: 1, name: '甲', clipped: true),
+      (item: 3, name: '乙', clipped: false),
+      (item: 4, name: '', clipped: false),
+    ]);
+  });
+
+  test('接上漏写的名字和层:先按名字,块数没变时按位置,不按先后', () {
+    const a = LayoutBox(left: 0, top: 0, right: 100, bottom: 100, name: '左');
+    const b = LayoutBox(left: 500, top: 0, right: 600, bottom: 100, name: '右');
+    final old = [a.copyWith(layer: 'front'), b.copyWith(layer: 'back')];
+    // Agent 把两块的先后换了,名字都漏了,位置略有挪动。
+    final swapped = inheritNames(old, [
+      const LayoutBox(left: 510, top: 0, right: 610, bottom: 100),
+      const LayoutBox(left: 10, top: 0, right: 110, bottom: 100),
+    ], keepLayers: true);
+    expect(swapped.map((x) => (x.name, x.layer)), [
+      ('右', 'back'),
+      ('左', 'front'),
+    ]);
+    // 块数变了:写了名字的照名字接层,没写名字的新块不乱认。
+    final more = inheritNames(old, [
+      const LayoutBox(left: 0, top: 0, right: 10, bottom: 10, name: '右'),
+      const LayoutBox(left: 0, top: 0, right: 10, bottom: 10),
+      const LayoutBox(left: 0, top: 0, right: 10, bottom: 10),
+    ], keepLayers: true);
+    expect(more.map((x) => (x.name, x.layer)), [
+      ('右', 'back'),
+      ('', defaultLayer),
+      ('', defaultLayer),
+    ]);
+    // Agent 写了 layer 时用它写的。
+    final own = inheritNames(old, [
+      a.copyWith(layer: 'middle'),
+      b.copyWith(layer: 'middle'),
+    ], keepLayers: false);
+    expect(own.map((x) => x.layer), ['middle', 'middle']);
+  });
+
+  test('画布边长对齐到 16 的倍数,并留在范围里', () {
+    expect(snapLayoutSide(830), 832);
+    expect(snapLayoutSide(1200), 1200);
+    expect(snapLayoutSide(1207), 1200);
+    expect(snapLayoutSide(10), minLayoutSide);
+    expect(snapLayoutSide(5000), maxLayoutSide);
+  });
+
+  test('画板:放上去时改掉的地方写进给 Agent 的系统提示,画板再改过就不提了', () {
+    final board = LayoutBoard()..setSize(400, 400);
+    expect(
+      board.apply(
+        '{"items": [{"name": "人", "bbox": [300, 0, 500, 100]}],'
+        ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+      ),
+      isTrue,
+    );
+    expect(board.layout.boxes.single.right, 400);
+    expect(board.fixes, hasLength(1));
+    expect(board.prompt, contains('第 1 项「人」超出画布'));
+    board.setSummary(caption: 'x');
+    expect(board.fixes, isEmpty);
+    expect(board.prompt, isNot(contains('超出画布')));
+  });
+
   test('拆 <layout>:写完的取出来,写到一半的不显示', () {
     final done = splitLayout('排好了。<layout>{"items": []}</layout>');
     expect(done.prose, '排好了。');
@@ -472,7 +567,7 @@ void main() {
     );
     final replies = [
       '排好了。<layout>$named</layout>',
-      // 没写 name、还顺手写了成稿:名字按先后接上,成稿不理。
+      // 没写 name、还顺手写了成稿:名字按位置接上,成稿不理。
       '改好了。<layout>$_official</layout><draft>【主体】x</draft>',
     ];
     final chat = StudioViewModel(
@@ -514,7 +609,10 @@ void main() {
     // 标签本身也不留:留着的话模型会照样子把那句说明当成布局写回来。
     expect(seen.last[2]['content'], isNot(contains('<layout>')));
     expect(seen.last.first['content'], contains('横向 0%–50%,纵向 0%–50%'));
-    expect(seen.last.first['content'], contains('-608,'));
+    // 给 Agent 的现有布局是草稿格式:左上角原点,不用它换算。
+    expect(seen.last.first['content'], contains('"bbox_coord_space": "abs"'));
+    expect(seen.last.first['content'], contains('"width": 832'));
+    expect(seen.last.first['content'], isNot(contains('-608')));
     // 第二轮带着上一轮;选中的那块随消息发出,系统提示里是带名字的现有布局。
     expect(seen.last.map((m) => m['role']), [
       'system',

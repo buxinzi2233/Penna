@@ -49,9 +49,10 @@ class LayoutBoard extends ChangeNotifier {
             '横向 ${pct(b.left, l.width)}–${pct(b.right, l.width)},'
             '纵向 ${pct(b.top, l.height)}–${pct(b.bottom, l.height)}',
     ].join('\n');
-    return '【布局画板】画布 ${l.width}×${l.height}(宽×高),'
-        'abs_centralized 坐标里 x 从 ${-(l.width ~/ 2)} 到 ${l.width - l.width ~/ 2},'
-        'y 从 ${-(l.height ~/ 2)} 到 ${l.height - l.height ~/ 2}。'
+    return '【布局画板】画布 ${l.width}×${l.height}(宽×高)。'
+        'bbox 从左上角量,写成 [x_min, y_min, x_max, y_max],'
+        'x 从 0 到 ${l.width},y 从 0 到 ${l.height};换成官方坐标由程序来做。'
+        '${_fixesNote()}'
         '${l.isEmpty ? '现在是空的。' : '下面是画板此刻的样子:用户可能刚拖过框、改过字或类别,'
                   '一切以这里为准,上文对话里的旧布局不算数'
                   '(你以前写的布局在上文里已省略,只留了一句说明)。'
@@ -63,13 +64,14 @@ class LayoutBoard extends ChangeNotifier {
                   'items 也照这个先后写(前景、中景、后景依次),要调前后就换它们的先后;'
                   '只换前后、改名字、换前中后景时写 <layers> 就够了。'
                   '各块在画布上的范围(从左上角量,0% 是左边或顶上):\n$where\n'
-                  '<current-layout>\n${mossLayoutJson(l, names: true)}\n</current-layout>'}'
+                  '<current-layout>\n${mossLayoutJson(l, draft: true)}\n</current-layout>'}'
         '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}';
   }
 
   /// 换成 [layout]:框先按前后排好(见 [stacked])。[follow] 是要跟着选中的那一块
   /// (排序后它的位置可能变了)。框的先后变了时输入框要重建,和 [rebuild] 一样。
   void _set(Layout layout, {bool rebuild = false, LayoutBox? follow}) {
+    _fixes = const [];
     final boxes = stacked(layout.boxes);
     final reordered = [
       for (final (i, b) in boxes.indexed) identical(b, layout.boxes[i]),
@@ -255,33 +257,51 @@ class LayoutBoard extends ChangeNotifier {
 
   /// 换成一份布局 JSON(Agent 写的),用当前的画布尺寸。读不了返回 false。
   bool apply(String json) {
-    final parsed = parseMossLayout(
+    final read = readMossLayout(
       json,
       width: _layout.width,
       height: _layout.height,
     );
-    if (parsed == null) return false;
-    // Agent 常把 name、layer 漏掉:块数没变时按先后把原来的接上。
-    final old = _layout.boxes;
-    final same = old.length == parsed.boxes.length;
-    final layers = json.contains('"layer"');
-    final boxes = [
-      for (final (i, b) in parsed.boxes.indexed)
-        same
-            ? b.copyWith(
-                name: b.name.isEmpty ? old[i].name : null,
-                layer: layers ? null : old[i].layer,
-              )
-            : b,
-    ];
+    if (read == null) return false;
+    final parsed = read.layout;
+    // Agent 常把 name、layer 漏掉:按名字或位置把原来的接上(见 inheritNames)。
+    final boxes = inheritNames(
+      _layout.boxes,
+      parsed.boxes,
+      keepLayers: !json.contains('"layer"'),
+    );
     _selected = null;
     // 透视线是用户拉的,JSON 里没有它:留着。
     _set(
       parsed.copyWith(boxes: boxes, perspective: () => _layout.perspective),
       rebuild: true,
     );
+    _fixes = read.fixes;
     return true;
   }
+
+  /// 告诉 Agent 它上次写的布局被改了哪几处(发给模型的话,不翻译),下次照画布范围写对。
+  String _fixesNote() {
+    if (_fixes.isEmpty) return '';
+    String who(LayoutFix f) =>
+        '第 ${f.item} 项${f.name.isEmpty ? '' : '「${f.name}」'}';
+    final clipped = [
+      for (final f in _fixes)
+        if (f.clipped) who(f),
+    ];
+    final dropped = [
+      for (final f in _fixes)
+        if (!f.clipped) who(f),
+    ];
+    return '\n你上次写的布局放到画板时,程序改了几处:'
+        '${clipped.isEmpty ? '' : '${clipped.join('、')}超出画布,已截到画布里;'}'
+        '${dropped.isEmpty ? '' : '${dropped.join('、')}的 bbox 读不了或没有面积,已去掉;'}'
+        '用户要接着改这些块时,照上面的范围重写。\n';
+  }
+
+  /// 最近一次 [apply] 时替 Agent 改掉的地方;画板再有别的改动就清空。
+  List<LayoutFix> get fixes => _fixes;
+  List<LayoutFix> _fixes = const [];
 
   File? get _file => dir == null
       ? null

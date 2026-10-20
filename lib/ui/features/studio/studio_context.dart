@@ -220,11 +220,15 @@ extension StudioContext on StudioViewModel {
     final made = splitLayout(splitNewSkill(_messages.last.text).prose);
     if (!made.complete || made.json == null) return;
     if (!board.apply(made.json!)) return;
+    final clipped = board.fixes.where((f) => f.clipped).length;
+    final dropped = board.fixes.length - clipped;
     _updateReply(
       (m) => m.copyWith(
         toolSummary: [
           ?m.toolSummary,
           tr('已放到区域控制工作台 · {0} 个框', [board.layout.boxes.length]),
+          if (clipped > 0) tr('{0} 个超出画布,已截掉', [clipped]),
+          if (dropped > 0) tr('{0} 个读不了,已去掉', [dropped]),
         ].join(' · '),
       ),
     );
@@ -534,6 +538,7 @@ const _layoutAgentPrompt =
     '只有连主体是什么都没说时才问一句。\n'
     '- 用户要改,就在【布局画板】现有的布局上改:没提到的块位置、大小、描述都不动。'
     '他用名字说"哪一块"时,对照 name 找。\n'
+    '- 排位置前先定好主次、分组和前后,再选队形;"随便排"是换一种合理的新队形,不是随机撒点。\n'
     '- 要用户在几种排法里挑时,先用一两句中文说明每种的区别,在回复最后加 <options>,里面一行一个选项'
     '(每个不超过 12 个字),这条回复不写 <layout>。\n'
     '- 用户发了参考图,而图里看得出透视时,照技能里说的估出地平线和消失点,写 <perspective> 调好画板上的透视线,'

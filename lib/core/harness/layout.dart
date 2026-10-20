@@ -8,8 +8,10 @@ import 'perspective.dart';
 export 'perspective.dart';
 
 /// MOSS-Image 布局提示词(Layout Prompt):画面整体描述 + 一组带位置框的元素,
-/// 写成官方的 JSON。框在这里按常规的左上角原点、整数像素存,出 JSON 时才换成
+/// 写成官方的 JSON。框在这里按常规的左上角原点、整数像素存,交出去时才换成
 /// `abs_centralized`(画布中心为原点)和 `yxyx`([y_min, x_min, y_max, x_max])。
+/// 和 Agent 来回用的是官方的草稿格式(`abs` + `xyxy`,左上角原点):
+/// 照官方 enhancer 技能的做法,坐标换算交给程序,不让模型心算。
 
 const layoutLabels = ['object', 'character', 'text'];
 const layoutCanvases = ['single', 'multi_panel', 'collage'];
@@ -178,15 +180,19 @@ int _side(Object? v, int fallback) =>
     v is num ? v.round().clamp(minLayoutSide, maxLayoutSide) : fallback;
 
 /// 写成 MOSS-Image 的布局 JSON。换算照官方 compile_prompt.py:减去宽高的一半(整除);
-/// 画布尺寸不写进去(生成时另设)。[names] 为真时每一块带上 `name` 和 `layer`:
-/// 那是给 Agent 看的,官方格式不认,交出去的不带。
-String mossLayoutJson(Layout l, {bool names = false}) {
+/// 画布尺寸不写进去(生成时另设)。
+///
+/// [draft] 为真时是给 Agent 看的草稿格式:带画布尺寸,坐标是左上角原点的
+/// `[x_min, y_min, x_max, y_max]`,每一块还带上 `name` 和 `layer`(官方格式不认,交出去的不带)。
+String mossLayoutJson(Layout l, {bool draft = false}) {
   final w2 = l.width ~/ 2, h2 = l.height ~/ 2;
   final meta = [
     for (final m in l.meta.split(RegExp('[,,、]')))
       if (m.trim().isNotEmpty) m.trim(),
   ];
   return const JsonEncoder.withIndent('  ').convert({
+    if (draft) 'width': l.width,
+    if (draft) 'height': l.height,
     'summary': {
       if (meta.isNotEmpty) 'meta': meta,
       'canvas': l.canvas,
@@ -195,23 +201,41 @@ String mossLayoutJson(Layout l, {bool names = false}) {
     'items': [
       for (final b in l.boxes)
         {
-          if (names && b.name.trim().isNotEmpty) 'name': b.name.trim(),
-          if (names) 'layer': b.layer,
+          if (draft && b.name.trim().isNotEmpty) 'name': b.name.trim(),
+          if (draft) 'layer': b.layer,
           'label': b.label,
           'caption': b.caption.trim(),
           if (b.label == 'text' && b.text.trim().isNotEmpty)
             'text': b.text.trim(),
-          'bbox': [b.top - h2, b.left - w2, b.bottom - h2, b.right - w2],
+          'bbox': draft
+              ? [b.left, b.top, b.right, b.bottom]
+              : [b.top - h2, b.left - w2, b.bottom - h2, b.right - w2],
         },
     ],
-    'bbox_coord_space': 'abs_centralized',
-    'bbox_format': 'yxyx',
+    'bbox_coord_space': draft ? 'abs' : 'abs_centralized',
+    'bbox_format': draft ? 'xyxy' : 'yxyx',
   });
 }
 
+/// 读布局时程序替模型改掉的一处:[item] 是它在 items 里排第几(从 1 数),
+/// [clipped] 为真是超出画布、截到了画布里,为假是读不了或没有面积、去掉了。
+typedef LayoutFix = ({int item, String name, bool clipped});
+
 /// 读回一份布局 JSON(Agent 写的,或用户贴的),放到 [width]×[height] 的画布上。
 /// 框超出画布的截掉,上下、左右写反的摆正,截完没有面积的不要。读不了返回 null。
-Layout? parseMossLayout(String raw, {required int width, required int height}) {
+Layout? parseMossLayout(
+  String raw, {
+  required int width,
+  required int height,
+}) => readMossLayout(raw, width: width, height: height)?.layout;
+
+/// 同 [parseMossLayout],另外交回替模型改掉的地方(超出画布截掉的、去掉的块)。
+/// `bbox_coord_space` 是 `abs` 时坐标从左上角量(官方草稿格式),否则从画布中心量。
+({Layout layout, List<LayoutFix> fixes})? readMossLayout(
+  String raw, {
+  required int width,
+  required int height,
+}) {
   // 模型常把 JSON 套进代码块。
   final text = raw
       .trim()
@@ -229,21 +253,31 @@ Layout? parseMossLayout(String raw, {required int width, required int height}) {
   // 模型漏写 summary 的右括号时,items 这几项会落进 summary 里:从那里也找。
   Object? field(String key) => root[key] ?? summary[key];
   final xyxy = field('bbox_format') == 'xyxy';
-  final w2 = width ~/ 2, h2 = height ~/ 2;
+  final abs = field('bbox_coord_space') == 'abs';
+  final dx = abs ? 0 : width ~/ 2, dy = abs ? 0 : height ~/ 2;
   final boxes = <LayoutBox>[];
+  final fixes = <LayoutFix>[];
   final items = field('items');
-  for (final item in items is List ? items : const []) {
-    if (item is! Map || item['bbox'] is! List) continue;
+  for (final (i, item) in (items is List ? items : const []).indexed) {
+    if (item is! Map) continue;
+    final name = item['name'] is String ? item['name'] as String : '';
     final v = [
-      for (final n in item['bbox'] as List)
+      for (final n in item['bbox'] is List ? item['bbox'] as List : const [])
         if (n is num) n.toDouble(),
     ];
-    if (v.length != 4) continue;
+    if (v.length != 4) {
+      fixes.add((item: i + 1, name: name, clipped: false));
+      continue;
+    }
     final (y0, x0, y1, x1) = xyxy
         ? (v[1], v[0], v[3], v[2])
         : (v[0], v[1], v[2], v[3]);
-    int x(double n) => (n + w2).round().clamp(0, width);
-    int y(double n) => (n + h2).round().clamp(0, height);
+    // 超出一个像素以内是取整的误差,不算。
+    final out =
+        [x0, x1].any((n) => n + dx < -1 || n + dx > width + 1) ||
+        [y0, y1].any((n) => n + dy < -1 || n + dy > height + 1);
+    int x(double n) => (n + dx).round().clamp(0, width);
+    int y(double n) => (n + dy).round().clamp(0, height);
     final box = LayoutBox(
       left: math.min(x(x0), x(x1)),
       top: math.min(y(y0), y(y1)),
@@ -252,13 +286,18 @@ Layout? parseMossLayout(String raw, {required int width, required int height}) {
       label: _pick(item['label'], layoutLabels),
       caption: item['caption'] is String ? item['caption'] as String : '',
       text: item['text'] is String ? item['text'] as String : '',
-      name: item['name'] is String ? item['name'] as String : '',
+      name: name,
       layer: _layer(item['layer']),
     );
-    if (box.width > 0 && box.height > 0) boxes.add(box);
+    if (box.width > 0 && box.height > 0) {
+      boxes.add(box);
+      if (out) fixes.add((item: i + 1, name: name, clipped: true));
+    } else {
+      fixes.add((item: i + 1, name: name, clipped: false));
+    }
   }
   final meta = summary['meta'];
-  return Layout(
+  final layout = Layout(
     width: width,
     height: height,
     caption: summary['caption'] is String ? summary['caption'] as String : '',
@@ -270,7 +309,58 @@ Layout? parseMossLayout(String raw, {required int width, required int height}) {
     canvas: _pick(summary['canvas'], layoutCanvases),
     boxes: List.unmodifiable(boxes),
   );
+  return (layout: layout, fixes: List.unmodifiable(fixes));
 }
+
+/// 新写的布局 [fresh] 漏了 name、layer 时,从原来的 [old] 里接上。
+/// 先按名字对号;没写名字的,块数没变时接离它中心最近、还没被认领的那块
+/// (Agent 常把先后换了,按下标接会接错)。[keepLayers] 为真时 layer 也照原来的。
+List<LayoutBox> inheritNames(
+  List<LayoutBox> old,
+  List<LayoutBox> fresh, {
+  required bool keepLayers,
+}) {
+  final taken = <int>{};
+  final match = List<int?>.filled(fresh.length, null);
+  for (final (i, b) in fresh.indexed) {
+    final name = b.name.trim();
+    if (name.isEmpty) continue;
+    final at = old.indexWhere((o) => o.name.trim() == name);
+    if (at >= 0 && taken.add(at)) match[i] = at;
+  }
+  if (old.length == fresh.length) {
+    // 两块中心距离的平方(乘 2 的坐标,比大小够用)。
+    int gap(LayoutBox a, LayoutBox b) {
+      final dx = (a.left + a.right) - (b.left + b.right);
+      final dy = (a.top + a.bottom) - (b.top + b.bottom);
+      return dx * dx + dy * dy;
+    }
+
+    for (final (i, b) in fresh.indexed) {
+      if (match[i] != null || b.name.trim().isNotEmpty) continue;
+      int? best;
+      for (var j = 0; j < old.length; j++) {
+        if (taken.contains(j)) continue;
+        if (best == null || gap(b, old[j]) < gap(b, old[best])) best = j;
+      }
+      if (best != null && taken.add(best)) match[i] = best;
+    }
+  }
+  return [
+    for (final (i, b) in fresh.indexed)
+      switch (match[i]) {
+        null => b,
+        final j => b.copyWith(
+          name: b.name.trim().isEmpty ? old[j].name : null,
+          layer: keepLayers ? old[j].layer : null,
+        ),
+      },
+  ];
+}
+
+/// MOSS-Image 要画布的宽高都是 16 的倍数:取最近的一个,并留在边长范围里。
+int snapLayoutSide(int v) =>
+    ((v / 16).round() * 16).clamp(minLayoutSide, maxLayoutSide);
 
 /// 模型写的 JSON 常差一点:从第一个 `{` 开始取,去掉 `}`、`]` 前多余的逗号,
 /// 末尾缺的右括号按顺序补上。字符串里的字一个不动。

@@ -277,12 +277,26 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = board.layout;
     void resize(int? w, int? h) {
-      if (!board.setSize(w ?? l.width, h ?? l.height)) {
+      final want = (width: w ?? l.width, height: h ?? l.height);
+      if (want.width < minLayoutSide ||
+          want.width > maxLayoutSide ||
+          want.height < minLayoutSide ||
+          want.height > maxLayoutSide) {
         showToast(
           context,
           tr('边长要在 {0} 到 {1} 之间', [minLayoutSide, maxLayoutSide]),
           warn: true,
         );
+        return;
+      }
+      // MOSS-Image 要 16 的倍数:对齐到最近的一个,并说一声。
+      final got = (
+        width: snapLayoutSide(want.width),
+        height: snapLayoutSide(want.height),
+      );
+      board.setSize(got.width, got.height);
+      if (got != want) {
+        showToast(context, tr('已对齐到 16 的倍数:{0}×{1}', [got.width, got.height]));
       }
     }
 
