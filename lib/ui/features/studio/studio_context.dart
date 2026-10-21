@@ -272,10 +272,11 @@ extension StudioContext on StudioViewModel {
     }
     if (ask.name.isNotEmpty) agent.renameSeries(agent.series, ask.name);
     final image = _lastImage;
-    // 参考图和画布一横一竖:开了自动审批就先把画布对调(这边没法问用户)。
-    if (image != null && config.config.autoApprove) {
-      if (await board.swapFor(image.bytes!) != null) board.swap();
-    }
+    // 参考图和画布一横一竖:先把画布对调。上面已经换到新系列的空白页,
+    // 用户原来的页不受影响,所以不用等自动审批。
+    final flipped = image != null && await board.swapFor(image.bytes!) != null;
+    if (flipped) board.swap();
+    final size = '${board.layout.width}×${board.layout.height}';
     final before = board.layout;
     try {
       await agent.sendAndWait(
@@ -313,12 +314,16 @@ extension StudioContext on StudioViewModel {
       );
     }
     final name = seriesName(series);
+    final turned = flipped ? ',画布照参考图的横竖对调成了 $size' : '';
     return (
       text:
-          '区域控制的 Agent 已排好布局($count 个框),JSON 已放进成稿区新建的系列「$name」,'
+          '区域控制的 Agent 已排好布局($count 个框$turned),JSON 已放进成稿区新建的系列「$name」,'
           '区域控制工作台上也有一份。用一两句话告诉用户排了什么、放在哪里;'
           '不要写 <draft> 或 <layout>,也不要贴 JSON。',
-      note: tr('区域控制排好了 · {0} 个框 · 已放进「{1}」', [count, name]),
+      note: [
+        tr('区域控制排好了 · {0} 个框 · 已放进「{1}」', [count, name]),
+        if (flipped) tr('画布已换成 {0}', [size]),
+      ].join(' · '),
     );
   }
 
@@ -518,7 +523,8 @@ const _askLayoutPrompt =
     '交给区域控制工作台的 Agent。这条回复只输出一个标签,不写 <draft>:\n'
     '<ask-layout name="两到六个字的系列名">任务说明</ask-layout>\n'
     '任务说明要写全,它看不到这边的对话和成稿:要排的画面内容(转 JSON 时把【当前成稿】的提示词原样贴进去)、'
-    '用户对哪样东西放在哪、画面里要写什么字的要求;用户发了参考图就写"照参考图",图会一起转过去。'
+    '用户对哪样东西放在哪、画面里要写什么字的要求;用户说了横构图、竖构图也要写上。'
+    '用户发了参考图就写"照参考图",图会一起转过去,画布会照图的横竖自动对调。'
     '程序会等它排好,把 JSON 放进成稿区新建的系列,再把结果告诉你。';
 
 /// 布局页对话的系统提示开头:它只排布局,不写成稿。

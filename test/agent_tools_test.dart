@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:penna/core/harness/attachment.dart';
 import 'package:penna/core/harness/layout.dart';
 import 'package:penna/core/harness/local/local_tools.dart';
@@ -198,6 +199,62 @@ void main() {
       );
       expect(vm.messages.last.text, '排好了,放在「双人海报」里。');
       expect(vm.isStreaming, isFalse);
+    });
+
+    test('转过去时参考图是横的:不用开自动审批,新系列的画布照图对调', () async {
+      final config = tempConfig()
+        ..update(
+          const AppConfig().putLlm(
+            const LlmProfile(
+              id: 'a',
+              name: 'A',
+              baseUrl: 'http://x',
+              model: 'm',
+            ),
+          ),
+        );
+      expect(config.config.autoApprove, isFalse);
+      final board = LayoutBoard();
+      final asked = <LlmRequest>[];
+      final layoutChat = StudioViewModel(
+        config: config,
+        streamChat: (req) {
+          asked.add(req);
+          return Stream.value(
+            '<layout>{"width": 1216, "height": 832, "items": ['
+            '{"name": "人", "bbox": [700, 60, 1020, 832]}],'
+            ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}</layout>',
+          );
+        },
+        layout: board,
+        layoutOnly: true,
+      );
+      var round = 0;
+      final vm = StudioViewModel(
+        config: config,
+        skills: tempSkills(),
+        layout: board,
+        streamChat: (_) => Stream.value(
+          round++ == 0 ? '<ask-layout name="横版">照参考图</ask-layout>' : '排好了。',
+        ),
+      )..layoutAgent = layoutChat;
+      final wide = Attachment.image(
+        name: 'wide.png',
+        mime: 'image/png',
+        bytes: img.encodePng(img.Image(width: 300, height: 200)),
+      );
+
+      vm.send('照这张排个布局', attachments: [wide]);
+      await pumpEventQueue(times: 50);
+
+      expect((board.layout.width, board.layout.height), (1216, 832));
+      expect(board.layout.boxes.single.right, 1020);
+      // 那边发图的那条里带着对调后的画布尺寸。
+      expect(asked.single.messages.last['content'], contains('画布是 1216×832'));
+      expect(
+        vm.messages.firstWhere((m) => m.tool).toolSummary,
+        contains('画布已换成 1216×832'),
+      );
     });
 
     test('拆 <ask-layout>:名字可空,半截的不显示', () {
