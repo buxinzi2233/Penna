@@ -458,14 +458,24 @@ const _askOpen = '<ask-layout';
   return (prose: prose.trim(), asks: asks);
 }
 
-final _block = RegExp(r'<layout>([\s\S]*?)</layout>');
+final _block = RegExp(r'<layout(\s[^>]*)?>([\s\S]*?)</layout>');
 const _open = '<layout>';
+
+/// 开始标签(可以带属性),后面跟着空白、`>` 或者还没写出来。
+final _openTag = RegExp(r'<layout(?=[\s>]|$)');
+final _layoutAttr = RegExp(r'([a-z]+)\s*=\s*"([^"\n]*)"');
 
 /// 发给模型的旧回复里,整个 `<layout>…</layout>` 换成一句话:用户之后可能拖过框、改过字,
 /// 旧坐标留在上文里,模型会照抄回去。画板现在的样子只看系统提示里的【布局画板】。
 /// 这句话不带标签:带着 `<layout>` 的话,模型会照样子把这句话当成布局写回来。
-String forgetLayouts(String reply) =>
-    reply.replaceAll(_block, '(这里写过一份布局 JSON,已放到画板上,内容省略;现在的样子看【布局画板】)');
+/// [placed] 为假是这条回复里的布局没放上画板(写在查角色库、查标签的那条回复里,
+/// 程序不收):照实说,不然模型以为已经放好,下一条就只说话不写布局。
+String forgetLayouts(String reply, {bool placed = true}) => reply.replaceAll(
+  _block,
+  placed
+      ? '〔程序注:这里原有一份布局,已放到画板上,内容省略;现在的样子看【布局画板】。这是程序写的记号,不要照抄〕'
+      : '〔程序注:这里原有一份布局,写在查资料的回复里,没有放到画板上;要放就重新写完整的布局〕',
+);
 
 final _layersTag = RegExp(r'<layers>([\s\S]*?)</layers>');
 const _layersOpen = '<layers>';
@@ -535,14 +545,29 @@ String forgetLayers(String reply) =>
 
 /// 把回复里的 `<layout>` 拆出来(有好几个时取最后一个):[json] 是里面的布局,
 /// [prose] 是去掉它之后给人看的话;还没写完的那一个先不显示,[complete] 为假。
-({String prose, String? json, bool complete}) splitLayout(String reply) {
+/// 开始标签上可以带 `page`(写进这个系列的第几页,或 `新系列`)、`name`(页名)、
+/// `series`(系列名),同成稿的 `<draft>`。
+({
+  String prose,
+  String? json,
+  bool complete,
+  String? page,
+  String? name,
+  String? series,
+})
+splitLayout(String reply) {
   final done = _block.allMatches(reply).lastOrNull;
+  final attrs = {
+    for (final a in _layoutAttr.allMatches(done?[1] ?? '')) a[1]!: a[2]!.trim(),
+  };
   var prose = reply.replaceAll(_block, '');
-  String? json = done?[1]!.trim();
+  String? json = done?[2]!.trim();
   var complete = done != null;
-  final half = prose.indexOf(_open);
+  final half = _openTag.firstMatch(prose)?.start ?? -1;
   if (half >= 0) {
-    json = prose.substring(half + _open.length).trim();
+    // 开始标签的属性可能还没写完:`>` 之后才是布局。
+    final body = prose.indexOf('>', half);
+    json = body < 0 ? '' : prose.substring(body + 1).trim();
     complete = false;
     prose = prose.substring(0, half);
   } else {
@@ -554,7 +579,14 @@ String forgetLayers(String reply) =>
       }
     }
   }
-  return (prose: prose.trim(), json: json, complete: complete);
+  return (
+    prose: prose.trim(),
+    json: json,
+    complete: complete,
+    page: complete ? attrs['page'] : null,
+    name: complete ? attrs['name'] : null,
+    series: complete ? attrs['series'] : null,
+  );
 }
 
 /// 布局 JSON 里的一个功能区:`summary`(整体,[item] 为 -1)或 `items` 里的第 [item] 块。

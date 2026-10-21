@@ -29,6 +29,7 @@ export 'chat_message.dart';
 part 'studio_chat.dart';
 part 'studio_context.dart';
 part 'studio_draft.dart';
+part 'studio_layout_pages.dart';
 part 'studio_pages.dart';
 part 'studio_rewrite.dart';
 part 'studio_storage.dart';
@@ -103,7 +104,14 @@ class StudioViewModel extends ChangeNotifier {
   }) : _blocks = List.unmodifiable(blocks),
        _messages = List.unmodifiable(messages) {
     if (saveFile != null) addListener(_scheduleSave);
+    if (layoutOnly) layout?.addListener(_boardListener);
   }
+
+  /// 区域控制那场对话(`layoutOnly`)里每一页的成稿就是一张布局,画板摆的是眼前这一页
+  /// (见 [StudioLayoutPages])。[_boardText] 是画板和眼前这页最近一次对上时的内容,
+  /// 还没对过是 null。
+  String? _boardText;
+  void _boardListener() => _pullBoard();
 
   /// 替模型查 Danbooru 标签的函数;为 null 时模型要查也不理(测试里换成假的)。
   final TagSearcher? tagSearch;
@@ -173,7 +181,10 @@ class StudioViewModel extends ChangeNotifier {
   /// 起过名字的系列;没起的显示成「系列 N」。
   Map<int, String> _seriesNames = const {};
 
-  void _changed() => notifyListeners();
+  void _changed() {
+    if (layoutOnly) _syncBoard();
+    notifyListeners();
+  }
 
   /// 操作记录,新的在前;只留在内存里,关掉程序就没了。
   // ponytail: 不存盘,关掉程序就不能回滚了;打字不记,所以回滚到某一步之前时,
@@ -336,6 +347,7 @@ class StudioViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    if (layoutOnly) layout?.removeListener(_boardListener);
     // 还有没落盘的改动就趁现在存掉。
     if (_saveTimer?.isActive ?? false) {
       _saveTimer!.cancel();

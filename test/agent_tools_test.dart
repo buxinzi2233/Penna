@@ -176,8 +176,13 @@ void main() {
       expect(system, contains('<ask-layout'));
       expect(system, isNot(contains('怎么写描述')));
 
-      // 区域控制那边:新开一场对话,收到任务和图,写出的布局放到画板上。
-      expect(layoutChat.pastChats, hasLength(1));
+      // 区域控制那边:另起一个系列(有自己的对话),收到任务和图,写出的布局放到画板上;
+      // 原来那个系列和它的对话都留着。
+      expect(layoutChat.pages, hasLength(2));
+      expect(layoutChat.seriesName(layoutChat.series), '双人海报');
+      layoutChat.openPage(0);
+      expect(layoutChat.messages.single.text, '上次的话');
+      layoutChat.openPage(1);
       final task = layoutChat.messages.first;
       expect(task.text, contains('【主工作区转来的任务】左边十四行诗,右边维尔汀'));
       expect(task.attachments.single.name, 'a.png');

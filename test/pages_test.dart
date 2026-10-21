@@ -7,6 +7,7 @@ import 'package:penna/core/harness/draft_block.dart';
 import 'package:penna/core/harness/providers/openai_provider.dart';
 import 'package:penna/data/models/app_config.dart';
 import 'package:penna/ui/features/studio/markdown_text.dart';
+import 'package:penna/ui/features/studio/studio_page.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 import 'package:penna/ui/shell.dart';
 
@@ -34,7 +35,11 @@ StudioViewModel _studio({
   );
 }
 
-Finder _tab(int n) => find.byTooltip('第 $n 页 · 双击改名 · 右键更多');
+Finder _tab(int n) => _inStudio(find.byTooltip('第 $n 页 · 双击改名 · 右键更多'));
+
+/// 区域控制页也有一排页签:找工作台的要限定在它里面。
+Finder _inStudio(Finder f) =>
+    find.descendant(of: find.byType(StudioPage), matching: f);
 
 void main() {
   group('成稿标签', () {
@@ -334,22 +339,22 @@ void main() {
       ),
     );
 
-    expect(find.text('系列 1'), findsOneWidget);
+    expect(_inStudio(find.text('系列 1')), findsOneWidget);
     // 页签的宽度跟着字走,不会被撑开。
     expect(tester.getSize(_tab(1)).width, lessThan(40));
     // 只有一页时没有「保存系列」。
     expect(find.text('保存系列'), findsNothing);
 
-    await tester.tap(find.byTooltip('在这个系列里加一页'));
+    await tester.tap(_inStudio(find.byTooltip('在这个系列里加一页')));
     await tester.pumpAndSettle();
     expect(vm.pageIndex, 1);
     expect(_tab(2), findsOneWidget);
     expect(find.text('保存系列'), findsOneWidget);
 
-    await tester.tap(find.text('新系列'));
+    await tester.tap(_inStudio(find.text('新系列')));
     await tester.pumpAndSettle();
     expect(vm.pages.map((p) => p.series), [0, 0, 1]);
-    expect(find.text('系列 2'), findsOneWidget);
+    expect(_inStudio(find.text('系列 2')), findsOneWidget);
     // 每个系列的页码都从 1 数。
     expect(_tab(1), findsNWidgets(2));
 
@@ -364,17 +369,17 @@ void main() {
     await tester.tap(find.text('删除这一页'));
     await tester.pumpAndSettle();
     expect(vm.pages, hasLength(2));
-    expect(find.text('系列 2'), findsNothing);
+    expect(_inStudio(find.text('系列 2')), findsNothing);
 
     // 右键系列名:改名。
-    await tester.tap(find.text('系列 1'), buttons: kSecondaryButton);
+    await tester.tap(_inStudio(find.text('系列 1')), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('改名'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, '狐狸');
     await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();
-    expect(find.text('狐狸'), findsOneWidget);
+    expect(_inStudio(find.text('狐狸')), findsOneWidget);
 
     // 双击页签、系列名:直接改名。
     await tester.tap(_tab(1));
@@ -385,9 +390,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(vm.pages.first.name, '远景');
     // 系列名用的是 Flutter 自带的双击:两下之间至少隔 40 毫秒才算。
-    await tester.tap(find.text('狐狸'));
+    await tester.tap(_inStudio(find.text('狐狸')));
     await tester.pump(const Duration(milliseconds: 60));
-    await tester.tap(find.text('狐狸'));
+    await tester.tap(_inStudio(find.text('狐狸')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, '狐');
     await tester.tap(find.text('确定'));

@@ -160,7 +160,7 @@ extension StudioChat on StudioViewModel {
               ? _layoutSystemPrompt(cfg, preset)
               : _systemPrompt(cfg, preset),
         },
-        for (final m in sent)
+        for (final (i, m) in sent.indexed)
           {
             'role': m.fromUser ? 'user' : 'assistant',
             'content': switch (_withReferences(m, {
@@ -168,8 +168,14 @@ extension StudioChat on StudioViewModel {
                 if (!cfg.disabledSkills.contains(s.id)) s.id,
             })) {
               // 自己以前写的布局、透视不重发:画板可能已被用户改过。
+              // 后面紧跟着工具结果的是查资料的那条,里面的布局没放上画板。
               final text when !m.fromUser => forgetPerspectives(
-                forgetLayers(forgetLayouts(text)),
+                forgetLayers(
+                  forgetLayouts(
+                    text,
+                    placed: i + 1 >= sent.length || !sent[i + 1].tool,
+                  ),
+                ),
               ),
               final text => text,
             },

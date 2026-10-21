@@ -212,32 +212,6 @@ extension StudioContext on StudioViewModel {
     );
   }
 
-  /// 回复里写了布局(`<layout>`):放到布局画板上,并在这条回复上记一笔。
-  /// 读不了的不记:这一栏前面是个对勾,读不了由布局卡片自己标红。
-  void _deliverLayout() {
-    final board = layout;
-    if (board == null || _messages.isEmpty) return;
-    final made = splitLayout(splitNewSkill(_messages.last.text).prose);
-    if (!made.complete || made.json == null) return;
-    final before = (board.layout.width, board.layout.height);
-    if (!board.apply(made.json!)) return;
-    final l = board.layout;
-    final clipped = board.fixes.where((f) => f.clipped).length;
-    final dropped = board.fixes.length - clipped;
-    _updateReply(
-      (m) => m.copyWith(
-        toolSummary: [
-          ?m.toolSummary,
-          tr('已放到区域控制工作台 · {0} 个框', [l.boxes.length]),
-          if ((l.width, l.height) != before)
-            tr('画布换成 {0}×{1}', [l.width, l.height]),
-          if (clipped > 0) tr('{0} 个超出画布,已截掉', [clipped]),
-          if (dropped > 0) tr('{0} 个读不了,已去掉', [dropped]),
-        ].join(' · '),
-      ),
-    );
-  }
-
   /// 回复里调了图层(`<layers>`):在画板上换先后、改名字和前中后景,并记一笔。
   void _deliverLayers() {
     final board = layout;
@@ -281,7 +255,22 @@ extension StudioContext on StudioViewModel {
     if (board == null || agent.isStreaming) {
       return (text: '区域控制的 Agent 正在忙,告诉用户等它说完再试。', note: tr('区域控制的 Agent 正在忙'));
     }
-    if (agent.messages.isNotEmpty) agent.newChat();
+    // 在那边另起一个系列来排(有自己的对话),用户在区域控制工作台上的页原样留着;
+    // 那边只有一张空白页、还没聊过时直接用它。
+    final blank =
+        agent.seriesLength == 1 &&
+        agent.body.trim().isEmpty &&
+        agent.messages.isEmpty;
+    if (!blank) {
+      final problem = agent.addPage(newSeries: true);
+      if (problem != null) {
+        return (
+          text: '区域控制工作台放不下新的一页了($problem)。照实告诉用户,让他先删掉几页。',
+          note: tr('区域控制没写出布局'),
+        );
+      }
+    }
+    if (ask.name.isNotEmpty) agent.renameSeries(agent.series, ask.name);
     final image = _lastImage;
     // 参考图和画布一横一竖:开了自动审批就先把画布对调(这边没法问用户)。
     if (image != null && config.config.autoApprove) {
@@ -333,9 +322,6 @@ extension StudioContext on StudioViewModel {
     );
   }
 
-  /// 把一份布局 JSON 放到布局画板上(聊天里布局卡片上的按钮)。读不了返回 false。
-  bool adoptLayout(String json) => layout?.apply(json) ?? false;
-
   String get _layoutPrompt => layout?.prompt ?? '';
 
   /// 工作台对话的系统提示:Preset、成稿格式、各个 Skill 和当前成稿。
@@ -378,6 +364,7 @@ extension StudioContext on StudioViewModel {
       builtinSkillList.firstWhere((s) => s.id == 'character-lib').body,
       _characterPrompt,
     ],
+    _layoutPagesPrompt,
     _layoutPrompt,
   ].where((s) => s.isNotEmpty).join('\n\n');
 
@@ -543,6 +530,14 @@ const _layoutAgentPrompt =
     '- 用户要改,就在【布局画板】现有的布局上改:没提到的块位置、大小、描述都不动。'
     '他用名字说"哪一块"时,对照 name 找。\n'
     '- 排位置前先定好主次、分组和前后,再选队形;"随便排"是换一种合理的新队形,不是随机撒点。\n'
+    '- <layout> 默认写进眼前这一页、换掉它。用户换了新主题(换了角色、换了参考图、要另一张画,'
+    '和【当前系列】已有的页不是一回事)时不要盖掉眼前这页:写成 '
+    '<layout page="新系列" name="两到四个字的页名" series="新主题的名字">,程序会另起一个系列,原来的页原样留着;'
+    '同一主题要另一版时写 <layout page="新" name="页名">,在这个系列里新开一页;'
+    '改眼前这页时标签上什么都不加。\n'
+    '- 要先查角色库、查标签时,那条回复只写查询的标签,不写 <layout>:那条里的布局不会放到画板上,查完再写。\n'
+    '- 上文里〔程序注:…〕是程序替你省略的记号,不要照抄。要改画板就写出完整的 <layout>;'
+    '只说话不写布局,画板不会变。\n'
     '- 用户要横构图、竖构图或换比例时,<layout> 的 width / height 写新尺寸,画布会跟着换,'
     '不用让用户自己去改;框照技能里横构图那一条重新排。\n'
     '- 要用户在几种排法里挑时,先用一两句中文说明每种的区别,在回复最后加 <options>,里面一行一个选项'

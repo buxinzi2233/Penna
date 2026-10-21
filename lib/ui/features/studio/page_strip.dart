@@ -32,9 +32,15 @@ const _darkSeriesTints = <_Tint>[
 /// 成稿正文上方的页签:每个系列一个彩色框,框里先是系列的名字,再是它的各页
 /// (页码每个系列都从 1 数)。双击改名,右键更多操作,按住页签可以在系列里拖着调顺序。
 class PageStrip extends StatelessWidget {
-  const PageStrip({super.key, required this.vm});
+  const PageStrip({super.key, required this.vm, this.label, this.tips = true});
 
   final StudioViewModel vm;
+
+  /// 页签前面的小标题;不给是「成稿正文」。
+  final String? label;
+
+  /// 小标题后面带不带问号(悬停列出成稿里藏着的操作)。
+  final bool tips;
 
   void _do(BuildContext context, String? problem) {
     if (problem != null) showToast(context, problem, warn: true);
@@ -123,23 +129,25 @@ class PageStrip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                tr('成稿正文'),
+                label ?? tr('成稿正文'),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: PennaColors.slate500,
                 ),
               ),
-              SizedBox(width: 3),
-              Tooltip(
-                message: _bodyTips,
-                waitDuration: Duration.zero,
-                child: Icon(
-                  Icons.help_outline,
-                  size: 13,
-                  color: PennaColors.slate400,
+              if (tips) ...[
+                SizedBox(width: 3),
+                Tooltip(
+                  message: _bodyTips,
+                  waitDuration: Duration.zero,
+                  child: Icon(
+                    Icons.help_outline,
+                    size: 13,
+                    color: PennaColors.slate400,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

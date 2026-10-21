@@ -14,6 +14,7 @@ import '../../core/widgets.dart';
 import '../archive/archive_page.dart';
 import '../settings/settings_sections.dart';
 import '../studio/chat_pane.dart';
+import '../studio/page_strip.dart';
 import '../studio/studio_view_model.dart';
 import 'layout_board.dart';
 import 'layout_canvas.dart';
@@ -213,13 +214,32 @@ class _LayoutPageState extends State<LayoutPage> {
                     ),
                   ),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: LayoutCanvas(
-                        board: board,
-                        onPick: _reveal,
-                        onEdit: (i) => _reveal(i, edit: true),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 各系列、各页,同工作台的成稿区;每页是一张布局。
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                          child: ListenableBuilder(
+                            listenable: widget.chat,
+                            builder: (context, _) => PageStrip(
+                              vm: widget.chat,
+                              label: tr('布局'),
+                              tips: false,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: LayoutCanvas(
+                              board: board,
+                              onPick: _reveal,
+                              onEdit: (i) => _reveal(i, edit: true),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Container(

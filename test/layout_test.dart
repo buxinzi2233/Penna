@@ -229,6 +229,154 @@ void main() {
     expect(half.prose, '排好了。');
     expect(half.complete, isFalse);
     expect(splitLayout('排好了。<lay').prose, '排好了。');
+
+    // 开始标签上可以带页、页名、系列名,同 <draft>;属性没写完时也不露出来。
+    final paged = splitLayout(
+      '换了主题。<layout page="新系列" name="海报" series="小绿">{"items": []}</layout>',
+    );
+    expect(paged.prose, '换了主题。');
+    expect(paged.json, '{"items": []}');
+    expect((paged.page, paged.name, paged.series), ('新系列', '海报', '小绿'));
+    final opening = splitLayout('换了主题。<layout page="新系');
+    expect(
+      (opening.prose, opening.json, opening.complete),
+      ('换了主题。', '', false),
+    );
+
+    // 发回给模型时整个换成一句话;查资料那条里的照实说没放上去。
+    final reply = '<layout page="2">{"items": []}</layout>';
+    expect(forgetLayouts(reply), contains('已放到画板上'));
+    expect(forgetLayouts(reply, placed: false), contains('没有放到画板上'));
+    expect(forgetLayouts(reply), isNot(contains('<layout')));
+  });
+
+  test('区域控制分页:每页一张布局,换页换画板;Agent 换主题时另起系列,旧的布局留着', () async {
+    // 旧版只有一张画板:头一回对上时收进眼前这一页。
+    final board = LayoutBoard()
+      ..addBox(
+        const LayoutBox(left: 0, top: 0, right: 100, bottom: 100, name: '旧'),
+      );
+    final service = tempConfig();
+    service.update(
+      service.config.putLlm(
+        const LlmProfile(id: 'a', name: 'A', baseUrl: 'http://a', model: 'm'),
+      ),
+    );
+    final seen = <List<Map<String, String>>>[];
+    final replies = [
+      '换成小绿。<layout page="新系列" name="海报" series="小绿">'
+          '{"width": 832, "height": 1216, "items": [{"name": "小绿", "bbox": [100, 100, 500, 1100]}],'
+          ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}</layout>',
+      '再来一版。<layout page="新">'
+          '{"width": 832, "height": 1216, "items": [{"name": "另一版", "bbox": [0, 0, 400, 400]}],'
+          ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}</layout>',
+    ];
+    final chat = StudioViewModel(
+      config: service,
+      layout: board,
+      layoutOnly: true,
+      streamChat: (request) {
+        seen.add(request.messages);
+        return Stream.value(replies[seen.length - 1]);
+      },
+    );
+
+    expect(chat.send('角色换成小绿'), isNull);
+    await pumpEventQueue();
+    expect(seen.first.first['content'], contains('【分页】'));
+    expect(chat.pages, hasLength(2));
+    expect(chat.pages.first.blocks.single.text, contains('"name":"旧"'));
+    expect(chat.seriesName(chat.series), '小绿');
+    expect(chat.pages[chat.pageIndex].name, '海报');
+    expect(board.layout.boxes.single.name, '小绿');
+    expect(chat.messages.last.toolSummary, contains('「小绿」第 1 页'));
+    // 换主题的对话跟着到了新系列。
+    expect(chat.messages.first.text, '角色换成小绿');
+
+    expect(chat.send('再来一版'), isNull);
+    await pumpEventQueue();
+    expect(chat.seriesLength, 2);
+    expect(board.layout.boxes.single.name, '另一版');
+    // 同系列的其他页列给 Agent 看。
+    expect(seen.last.first['content'], contains('小绿'));
+
+    // 画板上改的写回眼前这一页;换页时画板换成那一页的布局。
+    board.updateBox(0, board.layout.boxes.single.copyWith(right: 300));
+    chat.openPage(0);
+    expect(board.layout.boxes.single.name, '旧');
+    chat.openPage(2);
+    expect(board.layout.boxes.single.right, 300);
+
+    // 存盘读回,页里的布局都在。
+    final again = StudioViewModel(
+      config: service,
+      layout: board,
+      layoutOnly: true,
+      streamChat: (_) => const Stream.empty(),
+    )..restore(jsonDecode(jsonEncode(chat.toJson())) as Map<String, dynamic>);
+    again.openPage(1);
+    expect(board.layout.boxes.single.name, '小绿');
+  });
+
+  test('读旧版的布局对话存档(页是空的):画板上已有的布局收进眼前这页,不被清掉', () {
+    final board = LayoutBoard()
+      ..addBox(
+        const LayoutBox(left: 0, top: 0, right: 10, bottom: 10, name: '旧'),
+      );
+    final chat =
+        StudioViewModel(
+          config: tempConfig(),
+          layout: board,
+          layoutOnly: true,
+          streamChat: (_) => const Stream.empty(),
+        )..restore({
+          'pages': [
+            {'series': 0, 'blocks': []},
+          ],
+          'page': 0,
+        });
+    expect(board.layout.boxes.single.name, '旧');
+    expect(chat.body, contains('"name":"旧"'));
+  });
+
+  test('写在查资料那条回复里的布局,发回给模型时说没放上去', () async {
+    final service = tempConfig();
+    service.update(
+      service.config.putLlm(
+        const LlmProfile(id: 'a', name: 'A', baseUrl: 'http://a', model: 'm'),
+      ),
+    );
+    final seen = <List<Map<String, String>>>[];
+    final t = DateTime(2026);
+    final chat = StudioViewModel(
+      config: service,
+      layout: LayoutBoard(),
+      layoutOnly: true,
+      messages: [
+        ChatMessage(fromUser: true, text: '换成阿米娅', time: t),
+        ChatMessage(
+          fromUser: false,
+          text: '<search-character>阿米娅</search-character><layout>{"items": []}</layout>',
+          time: t,
+        ),
+        ChatMessage(fromUser: true, text: '【角色库查询结果】…', time: t, tool: true),
+        ChatMessage(
+          fromUser: false,
+          text: '<layout>{"items": []}</layout>',
+          time: t,
+        ),
+      ],
+      streamChat: (request) {
+        seen.add(request.messages);
+        return Stream.value('好的。');
+      },
+    );
+    expect(chat.send('没在画布上啊'), isNull);
+    await pumpEventQueue();
+    final sent = seen.single;
+    expect(sent[2]['content'], contains('没有放到画板上'));
+    expect(sent[4]['content'], contains('已放到画板上'));
+    expect(sent.first['content'], contains('不要照抄'));
   });
 
   test('画板:换尺寸时框跟着缩放,对调,存尺寸,存盘读回', () async {
@@ -674,7 +822,8 @@ void main() {
     expect(seen.last.last['content'], contains('布局里的这一块'));
     expect(seen.last.first['content'], contains('"name": "标题"'));
     expect(board.layout.boxes.first.name, '标题');
-    expect(chat.body, isEmpty);
+    // 区域控制那场对话的每一页存的就是这一页的布局。
+    expect(chat.body, contains('"name":"标题"'));
     // 交出去的 JSON 不带 name:官方格式不认。
     expect(board.json, isNot(contains('"name"')));
   });
