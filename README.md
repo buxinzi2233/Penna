@@ -4,11 +4,13 @@
 
 <p align="center"><b>羽毛笔</b> · Windows 桌面端的文生图提示词工作台</p>
 
+<p align="center"><a href="README.en.md">English</a> · <b>简体中文</b></p>
+
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261021--5--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261021--6--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -92,6 +94,10 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 在画布上框出各个区域并逐块描述,生成 MOSS-Image 布局 JSON;右侧有独立的布局对话。布局可以保存到档案库的「区域控制」分区,从档案库放回时回到区域控制工作台。
 
+- 布局按系列和分页组织,Agent 换主题时自动另起一个系列。
+- 各块以图层列表呈现,分前景、中景、后景,拖动调整前后;支持一点、两点、三点透视辅助线。
+- 参考图与画布一横一竖时,画布可随之横竖对调;Agent 按其他比例写的布局等比缩放后摆进画布正中。
+
 ### Danbooru 标签
 
 - 内置约 7.6 万个常用标签,附使用次数和中文含义,离线可查。
@@ -100,7 +106,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 ### 角色库
 
-- 内置约 6.9 万个 Danbooru 角色,可按英文名或中文、日文译名搜索。
+- 内置约 7.4 万个 Danbooru 角色,按热门程度排列,可按英文名或中文、日文译名搜索。
 - 每个角色的特征词分为「外貌」和「服装与其他」两组,可单独取用外貌特征。
 - 可以保存自己的角色:名称、提示词和一张图。
 - Agent 在对话中可以查询角色库,也可以把角色存进去。
