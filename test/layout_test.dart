@@ -186,7 +186,7 @@ void main() {
     expect(board.prompt, isNot(contains('超出画布')));
   });
 
-  test('画板:Agent 在 JSON 里写了别的画布宽高(换横竖构图)时画布跟着换,对齐到 16', () {
+  test('画板:Agent 写的画布宽高和画板一横一竖时对调;别的比例不认,框缩放到画布上', () {
     final board = LayoutBoard()..setPerspective(1);
     expect(board.prompt, contains('竖构图'));
     expect(
@@ -204,20 +204,44 @@ void main() {
     expect(board.layout.perspective!.horizon, 416);
     expect(board.prompt, contains('横构图'));
 
-    // 不是 16 的倍数的对齐过去,框按比例缩放。
+    // 写了别的比例:画布不变,框从它写的尺寸缩放过来。
     board.apply(
       '{"width": 1000, "height": 1000, "items": [{"bbox": [0, 0, 500, 1000]}],'
       ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
     );
-    expect((board.layout.width, board.layout.height), (1008, 1008));
-    expect(board.layout.boxes.single.right, 504);
+    expect((board.layout.width, board.layout.height), (1216, 832));
+    expect(
+      (board.layout.boxes.single.right, board.layout.boxes.single.bottom),
+      (608, 832),
+    );
+
+    // 照参考图写成 1216×684、框却是 0–1000 的比例坐标(Gemini 看图的习惯):
+    // 画布不变,按 1000×1000 换算,不截掉。
+    board.apply(
+      '{"width": 1216, "height": 684, "items": ['
+      '{"name": "人", "bbox": [374, 34, 628, 850]},'
+      '{"name": "桌", "bbox": [583, 626, 999, 999]}],'
+      ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+    );
+    expect((board.layout.width, board.layout.height), (1216, 832));
+    expect(board.fixes, isEmpty);
+    final desk = board.layout.boxes.firstWhere((b) => b.name == '桌');
+    expect((desk.right, desk.bottom), (1215, 831));
+
+    // 只稍微画出界的照常截掉,不当成比例坐标。
+    board.apply(
+      '{"width": 1216, "height": 832, "items": [{"bbox": [0, 0, 300, 860]}],'
+      ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+    );
+    expect(board.layout.boxes.single.bottom, 832);
+    expect(board.fixes.single.clipped, isTrue);
 
     // 没写或写得离谱时用画板原来的尺寸。
     board.apply(
       '{"width": 5, "height": 832, "items": [{"bbox": [0, 0, 10, 10]}],'
       ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
     );
-    expect((board.layout.width, board.layout.height), (1008, 1008));
+    expect((board.layout.width, board.layout.height), (1216, 832));
   });
 
   test('拆 <layout>:写完的取出来,写到一半的不显示', () {

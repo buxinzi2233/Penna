@@ -231,8 +231,9 @@ Layout? parseMossLayout(
 
 /// 同 [parseMossLayout],另外交回替模型改掉的地方(超出画布截掉的、去掉的块)。
 /// `bbox_coord_space` 是 `abs` 时坐标从左上角量(官方草稿格式),否则从画布中心量。
-/// [ownSize] 为真时,JSON 里写了画布宽高(草稿格式带着)就用它的,不用 [width]×[height]:
-/// Agent 换横竖构图、换比例时这样换;边长对齐到 16 的倍数,框跟着缩放。
+/// [ownSize] 为真时看 JSON 里写的画布宽高(草稿格式带着):框按它读,再缩放到画布上;
+/// 它和 [width]×[height] 一横一竖时画布对调(Agent 换横竖构图)。别的比例不认:
+/// 画布尺寸由用户定,Agent 照参考图写出 1216×684 这种时,画布还是 1216×832。
 ({Layout layout, List<LayoutFix> fixes})? readMossLayout(
   String raw, {
   required int width,
@@ -256,21 +257,40 @@ Layout? parseMossLayout(
   // 模型漏写 summary 的右括号时,items 这几项会落进 summary 里:从那里也找。
   Object? field(String key) => root[key] ?? summary[key];
   final own = ownSize ? _ownSize(field('width'), field('height')) : null;
-  // 框按 JSON 里的坐标读进 w×h 的画布,最后再缩到对齐过的尺寸。
-  final w = own?.width ?? width, h = own?.height ?? height;
+  // 画布只对调,不换比例。
+  final flip =
+      own != null &&
+      own.width != own.height &&
+      width != height &&
+      (own.width > own.height) != (width > height);
+  final tw = flip ? height : width, th = flip ? width : height;
   final xyxy = field('bbox_format') == 'xyxy';
   final abs = field('bbox_coord_space') == 'abs';
+  final items = field('items');
+  List<double> bbox(Object? item) => [
+    for (final n
+        in item is Map && item['bbox'] is List
+            ? item['bbox'] as List
+            : const [])
+      if (n is num) n.toDouble(),
+  ];
+  final all = [
+    for (final item in items is List ? items : const [])
+      if (bbox(item).length == 4) bbox(item),
+  ];
+  // 框按 JSON 里写的宽高读进 w×h,最后再缩放到画布上。
+  var w = own?.width ?? tw, h = own?.height ?? th;
+  // Gemini 看图时习惯写 0–1000 的比例坐标:有框远远超出写的宽高(多出一成以上),
+  // 而所有数都在 0 到 1000 之间,就按 1000×1000 读。
+  // 只在它自己写了宽高时这样认(照着参考图写的);没写宽高的出界照常截掉。
+  if (abs && own != null && _perMille(all, xyxy, w, h)) w = h = 1000;
   final dx = abs ? 0 : w ~/ 2, dy = abs ? 0 : h ~/ 2;
   final boxes = <LayoutBox>[];
   final fixes = <LayoutFix>[];
-  final items = field('items');
   for (final (i, item) in (items is List ? items : const []).indexed) {
     if (item is! Map) continue;
     final name = item['name'] is String ? item['name'] as String : '';
-    final v = [
-      for (final n in item['bbox'] is List ? item['bbox'] as List : const [])
-        if (n is num) n.toDouble(),
-    ];
+    final v = bbox(item);
     if (v.length != 4) {
       fixes.add((item: i + 1, name: name, clipped: false));
       continue;
@@ -303,11 +323,9 @@ Layout? parseMossLayout(
     }
   }
   final meta = summary['meta'];
-  final sw = own == null ? w : snapLayoutSide(w);
-  final sh = own == null ? h : snapLayoutSide(h);
   final layout = Layout(
-    width: sw,
-    height: sh,
+    width: tw,
+    height: th,
     caption: summary['caption'] is String ? summary['caption'] as String : '',
     meta: meta is List
         ? meta.whereType<String>().join(', ')
@@ -316,10 +334,24 @@ Layout? parseMossLayout(
         : '',
     canvas: _pick(summary['canvas'], layoutCanvases),
     boxes: List.unmodifiable([
-      for (final b in boxes) sw == w && sh == h ? b : b.scaled(sw / w, sh / h),
+      for (final b in boxes) tw == w && th == h ? b : b.scaled(tw / w, th / h),
     ]),
   );
   return (layout: layout, fixes: List.unmodifiable(fixes));
+}
+
+/// 这些框(左上角原点)是不是 0–1000 的比例坐标:有框在 [w]×[h] 外面多出一成以上,
+/// 而所有的数都在 0 到 1000 之间。只是稍微画出界的不算,照常截掉。
+bool _perMille(List<List<double>> boxes, bool xyxy, int w, int h) {
+  if (boxes.isEmpty || boxes.expand((b) => b).any((n) => n < 0 || n > 1000)) {
+    return false;
+  }
+  return boxes.any((b) {
+    final (xs, ys) = xyxy
+        ? ([b[0], b[2]], [b[1], b[3]])
+        : ([b[1], b[3]], [b[0], b[2]]);
+    return xs.any((n) => n > w * 1.1) || ys.any((n) => n > h * 1.1);
+  });
 }
 
 /// JSON 里写的画布宽高;没写、不是数或超出边长范围时为 null。
