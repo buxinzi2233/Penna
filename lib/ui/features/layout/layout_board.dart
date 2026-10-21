@@ -82,6 +82,7 @@ class LayoutBoard extends ChangeNotifier {
   /// (排序后它的位置可能变了)。框的先后变了时输入框要重建,和 [rebuild] 一样。
   void _set(Layout layout, {bool rebuild = false, LayoutBox? follow}) {
     _fixes = const [];
+    _refit = null;
     final boxes = stacked(layout.boxes);
     final reordered = [
       for (final (i, b) in boxes.indexed) identical(b, layout.boxes[i]),
@@ -294,12 +295,20 @@ class LayoutBoard extends ChangeNotifier {
       rebuild: true,
     );
     _fixes = read.fixes;
+    _refit = read.refit;
     return true;
   }
 
   /// 告诉 Agent 它上次写的布局被改了哪几处(发给模型的话,不翻译),下次照画布范围写对。
   String _fixesNote() {
-    if (_fixes.isEmpty) return '';
+    final l = _layout, size = _refit;
+    final refit = size == null
+        ? ''
+        : '\n你上次写的 width / height 是 ${size.width}×${size.height},'
+              '和画布 ${l.width}×${l.height} 对不上(大概是照着参考图的比例写的):'
+              '程序把整份布局等比摆进了画布正中,贴边的框撑到画布边。'
+              '参考图只看内容和横竖,下次直接按 ${l.width}×${l.height} 排。\n';
+    if (_fixes.isEmpty) return refit;
     String who(LayoutFix f) =>
         '第 ${f.item} 项${f.name.isEmpty ? '' : '「${f.name}」'}';
     final clipped = [
@@ -313,8 +322,13 @@ class LayoutBoard extends ChangeNotifier {
     return '\n你上次写的布局放到画板时,程序改了几处:'
         '${clipped.isEmpty ? '' : '${clipped.join('、')}超出画布,已截到画布里;'}'
         '${dropped.isEmpty ? '' : '${dropped.join('、')}的 bbox 读不了或没有面积,已去掉;'}'
-        '用户要接着改这些块时,照上面的范围重写。\n';
+        '用户要接着改这些块时,照上面的范围重写。\n$refit';
   }
+
+  /// 最近一次 [apply] 时 Agent 写的画布宽高:比例和画布对不上、等比摆进来的;
+  /// 对得上是 null。画板再有别的改动就清空。
+  ({int width, int height})? get refit => _refit;
+  ({int width, int height})? _refit;
 
   /// 最近一次 [apply] 时替 Agent 改掉的地方;画板再有别的改动就清空。
   List<LayoutFix> get fixes => _fixes;

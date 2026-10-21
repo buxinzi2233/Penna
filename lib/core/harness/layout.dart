@@ -234,7 +234,8 @@ Layout? parseMossLayout(
 /// [ownSize] 为真时看 JSON 里写的画布宽高(草稿格式带着):框按它读,再缩放到画布上;
 /// 它和 [width]×[height] 一横一竖时画布对调(Agent 换横竖构图)。别的比例不认:
 /// 画布尺寸由用户定,Agent 照参考图写出 1216×684 这种时,画布还是 1216×832。
-({Layout layout, List<LayoutFix> fixes})? readMossLayout(
+({Layout layout, List<LayoutFix> fixes, ({int width, int height})? refit})?
+readMossLayout(
   String raw, {
   required int width,
   required int height,
@@ -283,7 +284,8 @@ Layout? parseMossLayout(
   // Gemini 看图时习惯写 0–1000 的比例坐标:有框远远超出写的宽高(多出一成以上),
   // 而所有数都在 0 到 1000 之间,就按 1000×1000 读。
   // 只在它自己写了宽高时这样认(照着参考图写的);没写宽高的出界照常截掉。
-  if (abs && own != null && _perMille(all, xyxy, w, h)) w = h = 1000;
+  final perMille = abs && own != null && _perMille(all, xyxy, w, h);
+  if (perMille) w = h = 1000;
   final dx = abs ? 0 : w ~/ 2, dy = abs ? 0 : h ~/ 2;
   final boxes = <LayoutBox>[];
   final fixes = <LayoutFix>[];
@@ -323,6 +325,8 @@ Layout? parseMossLayout(
     }
   }
   final meta = summary['meta'];
+  // 写的宽高比例和画布不一样(照着参考图写的):不压扁拉长,见 [_fit]。
+  final refit = own != null && !perMille && (w, h) != (tw, th) ? own : null;
   final layout = Layout(
     width: tw,
     height: th,
@@ -334,10 +338,28 @@ Layout? parseMossLayout(
         : '',
     canvas: _pick(summary['canvas'], layoutCanvases),
     boxes: List.unmodifiable([
-      for (final b in boxes) tw == w && th == h ? b : b.scaled(tw / w, th / h),
+      for (final b in boxes)
+        tw == w && th == h
+            ? b
+            : refit != null
+            ? _fit(b, w, h, tw, th)
+            : b.scaled(tw / w, th / h),
     ]),
   );
-  return (layout: layout, fixes: List.unmodifiable(fixes));
+  return (layout: layout, fixes: List.unmodifiable(fixes), refit: refit);
+}
+
+/// 把 [w]×[h] 上的框摆到 [tw]×[th] 的画布上:等比缩放、放在正中,形状不变;
+/// 贴着边的框撑到画布的边(背景、横贯的标题还是铺满)。
+LayoutBox _fit(LayoutBox b, int w, int h, int tw, int th) {
+  final s = math.min(tw / w, th / h);
+  final ox = (tw - w * s) / 2, oy = (th - h * s) / 2;
+  return b.copyWith(
+    left: b.left <= 0 ? 0 : (b.left * s + ox).round(),
+    top: b.top <= 0 ? 0 : (b.top * s + oy).round(),
+    right: b.right >= w ? tw : (b.right * s + ox).round(),
+    bottom: b.bottom >= h ? th : (b.bottom * s + oy).round(),
+  );
 }
 
 /// 这些框(左上角原点)是不是 0–1000 的比例坐标:有框在 [w]×[h] 外面多出一成以上,

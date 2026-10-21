@@ -177,6 +177,13 @@ extension StudioChat on StudioViewModel {
                   ),
                 ),
               ),
+              // 布局页里刚发的这条带着参考图:就在这里提醒画布多大,
+              // 模型看了图常照图的比例写宽高(系统提示里说了也会忘)。
+              final text
+                  when layoutOnly &&
+                      i == sent.length - 1 &&
+                      m.attachments.any((a) => a.isImage) =>
+                '$text${_canvasReminder()}',
               final text => text,
             },
           },

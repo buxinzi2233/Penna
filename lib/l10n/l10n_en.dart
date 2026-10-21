@@ -814,6 +814,7 @@ const en = <String, String>{
   '已关掉透视辅助': 'Perspective guides turned off',
   '画布换成 {0}×{1}': 'Canvas changed to {0}×{1}',
   '布局': 'Layout',
+  '按画布比例摆放:{0}×{1} → {2}×{3}': 'Fitted to canvas: {0}×{1} → {2}×{3}',
   '布局没放上:{0}': 'Layout not placed: {0}',
   '「{0}」第 {1} 页': '"{0}" page {1}',
   '已调整透视 · {0} 点透视': 'Perspective adjusted · {0}-point',

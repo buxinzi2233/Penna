@@ -3,6 +3,8 @@
 用法(在项目根目录):
     python tool/make_character_dict.py [放着 danbooru_character_dedup*.csv 的文件夹,默认 dataset]
     python tool/make_character_dict.py dataset --review   # 另外打印两类词各有哪些,用来检查分得对不对
+    python tool/make_character_dict.py dataset/danbooru_characters_interim_20261021_1224.csv
+        # 已经分好的整表(列是 name, series, looks, outfit, alias)直接打包,不再分词
 
 每行输出「角色名 \t 作品 \t 外貌 \t 服装与其他 \t 别名」,按图的数量从多到少排;名字里的下划线换成空格。
 别名(中文、日文译名)来自同一个文件夹里的 danbooru_character_tags.csv,没有这个文件就留空;
@@ -150,6 +152,31 @@ def main(folder: str, review: bool) -> None:
             print(', '.join(t for t, _ in seen[looks].most_common(260)))
 
 
+FINISHED = ['name', 'series', 'looks', 'outfit', 'alias']
+
+
+def from_table(path: str) -> None:
+    """已经分好外貌、服装的整表(列是 FINISHED 那五个,按热门程度排好)直接打包。"""
+    lines = []
+    with io.open(path, encoding='utf-8-sig', newline='') as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames != FINISHED:
+            sys.exit(f'{path} 的列应该是 {", ".join(FINISHED)}')
+        for row in reader:
+            name = clean(row['name'])
+            if name:
+                lines.append('\t'.join([
+                    name, clean(row['series']), clean(row['looks']),
+                    clean(row['outfit']), cut(row['alias'])]))
+    out = os.path.join('assets', 'danbooru_characters.tsv.gz')
+    with io.open(out, 'wb') as f:
+        f.write(gzip.compress('\n'.join(lines).encode('utf-8'), 9))
+    print(len(lines), 'characters ->', out, round(os.path.getsize(out) / 1e6, 2), 'MB')
+
+
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    main(args[0] if args else 'dataset', '--review' in sys.argv)
+    if args and args[0].lower().endswith('.csv'):
+        from_table(args[0])
+    else:
+        main(args[0] if args else 'dataset', '--review' in sys.argv)

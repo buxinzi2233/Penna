@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:penna/core/harness/attachment.dart';
 import 'package:penna/core/harness/layout.dart';
 import 'package:penna/data/models/app_config.dart';
 import 'package:penna/ui/features/layout/layout_board.dart';
@@ -361,6 +362,60 @@ void main() {
         });
     expect(board.layout.boxes.single.name, '旧');
     expect(chat.body, contains('"name":"旧"'));
+  });
+
+  test('参考图:Agent 照图写了别的比例时等比摆进画布正中,贴边的撑满;发图那条带上画布尺寸', () async {
+    final board = LayoutBoard();
+    final service = tempConfig();
+    service.update(
+      service.config.putLlm(
+        const LlmProfile(id: 'a', name: 'A', baseUrl: 'http://a', model: 'm'),
+      ),
+    );
+    final seen = <List<Map<String, String>>>[];
+    final chat = StudioViewModel(
+      config: service,
+      layout: board,
+      layoutOnly: true,
+      streamChat: (request) {
+        seen.add(request.messages);
+        return Stream.value(
+          seen.length > 1
+              ? '好的。'
+              : '<layout>{"width": 832, "height": 1056, "items": ['
+                    '{"name": "人", "bbox": [200, 150, 800, 950]},'
+                    '{"name": "背景", "layer": "back", "bbox": [0, 0, 832, 1056]}],'
+                    ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}</layout>',
+        );
+      },
+    );
+    final image = Attachment.image(
+      name: 'ref.png',
+      mime: 'image/png',
+      bytes: Uint8List.fromList([1, 2, 3]),
+    );
+    expect(chat.send('参考这张', attachments: [image]), isNull);
+    await pumpEventQueue();
+    // 发图的那条后面带着画布尺寸;存下来的消息不带。
+    expect(seen.first.last['content'], contains('程序提示:画布是 832×1216'));
+    expect(chat.messages.first.text, '参考这张');
+
+    // 画布不变;人等比放进正中(上下各让出 80),背景撑满。
+    expect((board.layout.width, board.layout.height), (832, 1216));
+    final person = board.layout.boxes.firstWhere((b) => b.name == '人');
+    expect(
+      (person.left, person.top, person.right, person.bottom),
+      (200, 230, 800, 1030),
+    );
+    final back = board.layout.boxes.firstWhere((b) => b.name == '背景');
+    expect((back.top, back.bottom), (0, 1216));
+    expect(chat.messages.last.toolSummary, contains('832×1056 → 832×1216'));
+
+    // 下一轮告诉 Agent 它上次写的尺寸不对;不带图的消息不加提示。
+    expect(chat.send('再改改'), isNull);
+    await pumpEventQueue();
+    expect(seen.last.first['content'], contains('832×1056,和画布 832×1216 对不上'));
+    expect(seen.last.last['content'], '再改改');
   });
 
   test('写在查资料那条回复里的布局,发回给模型时说没放上去', () async {

@@ -80,6 +80,13 @@ extension StudioLayoutPages on StudioViewModel {
           tr('「{0}」第 {1} 页', [seriesName(series), pageNumber(_page)]),
         if ((l.width, l.height) != before)
           tr('画布换成 {0}×{1}', [l.width, l.height]),
+        if (board.refit case final r?)
+          tr('按画布比例摆放:{0}×{1} → {2}×{3}', [
+            r.width,
+            r.height,
+            l.width,
+            l.height,
+          ]),
         if (clipped > 0) tr('{0} 个超出画布,已截掉', [clipped]),
         if (dropped > 0) tr('{0} 个读不了,已去掉', [dropped]),
       ].join(' · '),
@@ -113,6 +120,17 @@ extension StudioLayoutPages on StudioViewModel {
       renameSeries(series, seriesTitle);
     }
     return (moved: _page != from || page != null, problem: null);
+  }
+
+  /// 接在带参考图的那条用户消息后面(只发给模型,不存):画布多大、只能怎么写宽高。
+  String _canvasReminder() {
+    final l = layout?.layout;
+    if (l == null) return '';
+    final (w, h) = (l.width, l.height);
+    return '\n\n(程序提示:画布是 $w×$h。参考图只看画面内容和横竖,不照它的比例:'
+        '<layout> 的 width / height 写 $w×$h'
+        '${w == h ? '' : ',用户要横竖对调时写 $h×$w'};'
+        'bbox 用这块画布的像素,不用 0–1000 的比例坐标。)';
   }
 
   /// 在最后一条回复的记录上添一笔。
