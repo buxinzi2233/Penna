@@ -297,9 +297,10 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // 中线:abs_centralized 的原点在这里。
+          // 中心的小十字:abs_centralized 的原点在这里。不画贯穿全画布的中线,
+          // 那条横线和透视的地平线长得一样,关了透视还以为没关掉。
           Positioned.fill(
-            child: CustomPaint(painter: _CenterLines(PennaColors.border)),
+            child: CustomPaint(painter: _CenterMark(PennaColors.slate400)),
           ),
           if (l.boxes.isEmpty && _drawing == null)
             Center(
@@ -440,8 +441,11 @@ String layoutLayerName(String layer) => switch (layer) {
   _ => tr('中景'),
 };
 
-class _CenterLines extends CustomPainter {
-  _CenterLines(this.color);
+/// 中心十字每条臂的长度(屏幕像素)。
+const _markArm = 7.0;
+
+class _CenterMark extends CustomPainter {
+  _CenterMark(this.color);
 
   final Color color;
 
@@ -450,19 +454,12 @@ class _CenterLines extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..strokeWidth = 1;
+    final c = size.center(Offset.zero);
     canvas
-      ..drawLine(
-        Offset(size.width / 2, 0),
-        Offset(size.width / 2, size.height),
-        paint,
-      )
-      ..drawLine(
-        Offset(0, size.height / 2),
-        Offset(size.width, size.height / 2),
-        paint,
-      );
+      ..drawLine(c.translate(-_markArm, 0), c.translate(_markArm, 0), paint)
+      ..drawLine(c.translate(0, -_markArm), c.translate(0, _markArm), paint);
   }
 
   @override
-  bool shouldRepaint(_CenterLines old) => old.color != color;
+  bool shouldRepaint(_CenterMark old) => old.color != color;
 }

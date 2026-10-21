@@ -186,6 +186,40 @@ void main() {
     expect(board.prompt, isNot(contains('超出画布')));
   });
 
+  test('画板:Agent 在 JSON 里写了别的画布宽高(换横竖构图)时画布跟着换,对齐到 16', () {
+    final board = LayoutBoard()..setPerspective(1);
+    expect(board.prompt, contains('竖构图'));
+    expect(
+      board.apply(
+        '{"width": 1216, "height": 832, "items": ['
+        '{"name": "签名", "bbox": [980, 690, 1160, 780]},'
+        '{"name": "人", "bbox": [480, 10, 1216, 832]}],'
+        ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+      ),
+      isTrue,
+    );
+    expect((board.layout.width, board.layout.height), (1216, 832));
+    expect(board.layout.boxes, hasLength(2));
+    expect(board.fixes, isEmpty);
+    expect(board.layout.perspective!.horizon, 416);
+    expect(board.prompt, contains('横构图'));
+
+    // 不是 16 的倍数的对齐过去,框按比例缩放。
+    board.apply(
+      '{"width": 1000, "height": 1000, "items": [{"bbox": [0, 0, 500, 1000]}],'
+      ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+    );
+    expect((board.layout.width, board.layout.height), (1008, 1008));
+    expect(board.layout.boxes.single.right, 504);
+
+    // 没写或写得离谱时用画板原来的尺寸。
+    board.apply(
+      '{"width": 5, "height": 832, "items": [{"bbox": [0, 0, 10, 10]}],'
+      ' "bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+    );
+    expect((board.layout.width, board.layout.height), (1008, 1008));
+  });
+
   test('拆 <layout>:写完的取出来,写到一半的不显示', () {
     final done = splitLayout('排好了。<layout>{"items": []}</layout>');
     expect(done.prose, '排好了。');
@@ -281,9 +315,9 @@ void main() {
     expect(board.prompt, contains('【透视辅助】现在关着'));
   });
 
-  test('<perspective>:按百分比读,能放到画面外,off 是关掉;写到一半的不显示', () {
+  test('<perspective>:按画布像素读 [x, y] 的点,能放到画面外,off 是关掉;写到一半的不显示', () {
     final p = parsePerspective(
-      '{"horizon": 50, "vanishing": [10, 95], "third": [50, -40]}',
+      '{"vanishing": [[100, 1000], [950, 1000]], "third": [500, -800]}',
       1000,
       2000,
     )!;
@@ -291,21 +325,35 @@ void main() {
     expect(p.value!.horizon, 1000);
     expect(p.value!.xs, [100, 950]);
     expect(p.value!.third, (x: 500, y: -800));
-    // 太远的截到 -300% / 400%。
+    expect(Perspective.fromJson(p.value!.toJson())!.spec, p.value!.spec);
+    // 两个点写得不一样高,地平线取平均。
     expect(
       parsePerspective(
-        '{"horizon": 50, "vanishing": [9999]}',
-        100,
-        100,
-      )!.value!.xs,
+        '{"vanishing": [[0, 100], [10, 200]]}',
+        1000,
+        1000,
+      )!.value!.horizon,
+      150,
+    );
+    // 只有一个点时可以不套外面那层;带 horizon 的一串数是地平线上各点的 x。
+    final one = parsePerspective('{"vanishing": [450, 85]}', 832, 1216)!;
+    expect((one.value!.xs.single, one.value!.horizon), (450, 85));
+    final flat = parsePerspective(
+      '{"horizon": 600, "vanishing": [10, 800]}',
+      832,
+      1216,
+    )!;
+    expect(flat.value!.xs, [10, 800]);
+    expect(flat.value!.horizon, 600);
+    // 太远的截到画布边长的 -3 / 4 倍。
+    expect(
+      parsePerspective('{"vanishing": [[99999, 50]]}', 100, 100)!.value!.xs,
       [400],
     );
     expect(parsePerspective(' off ', 100, 100)!.off, isTrue);
     expect(parsePerspective('{"horizon": 50}', 100, 100), isNull);
-    expect(
-      parsePerspective('{"horizon": 50, "vanishing": []}', 100, 100),
-      isNull,
-    );
+    expect(parsePerspective('{"vanishing": []}', 100, 100), isNull);
+    expect(parsePerspective('{"vanishing": [1, 2, 3]}', 100, 100), isNull);
 
     final done = splitPerspective('调好了。<perspective>off</perspective>');
     expect((done.prose, done.spec), ('调好了。', 'off'));
@@ -324,7 +372,7 @@ void main() {
       ),
     );
     final replies = [
-      '照参考图调了透视。<perspective>{"horizon": 75, "vanishing": [20, 80]}</perspective>',
+      '照参考图调了透视。<perspective>{"vanishing": [[166, 912], [666, 912]]}</perspective>',
       '好的。',
     ];
     final chat = StudioViewModel(
@@ -345,10 +393,13 @@ void main() {
 
     expect(chat.send('再说说'), isNull);
     await pumpEventQueue();
-    expect(seen.last[2]['content'], isNot(contains('"horizon"')));
+    expect(seen.last[2]['content'], isNot(contains('"vanishing"')));
     expect(seen.last[2]['content'], isNot(contains('<perspective>')));
     expect(seen.last.first['content'], contains('2 点透视'));
-    expect(seen.last.first['content'], contains('"horizon":75'));
+    expect(
+      seen.last.first['content'],
+      contains('"vanishing":[[166,912],[666,912]]'),
+    );
   });
 
   test('图层顺序:第 1 个在最前;拖动换前后时前中后景跟着落点变;改层时选中跟着走', () {
@@ -650,6 +701,33 @@ void main() {
     expect(sent.single, contains('【布局画板】画布 832×1216'));
     expect(board.layout.boxes, hasLength(2));
     expect(vm.messages.last.toolSummary, contains('2'));
+    expect(vm.messages.last.toolSummary, isNot(contains('画布换成')));
+  });
+
+  test('Agent 换了横构图:画布跟着换,回复的记录上写一句', () async {
+    final board = LayoutBoard();
+    final service = tempConfig();
+    service.update(
+      service.config.putLlm(
+        const LlmProfile(id: 'a', name: 'A', baseUrl: 'http://a', model: 'm'),
+      ),
+    );
+    final vm = StudioViewModel(
+      config: service,
+      layout: board,
+      layoutOnly: true,
+      streamChat: (_) => Stream.value(
+        '换成横的了。<layout>{"width": 1216, "height": 832, "items": '
+        '[{"bbox": [700, 60, 1020, 832]}], "bbox_coord_space": "abs", '
+        '"bbox_format": "xyxy"}</layout>',
+      ),
+    );
+    expect(vm.send('横构图'), isNull);
+    await pumpEventQueue();
+    expect((board.layout.width, board.layout.height), (1216, 832));
+    expect(board.layout.boxes.single.right, 1020);
+    expect(vm.messages.last.toolSummary, contains('画布换成 1216×832'));
+    expect(vm.messages.last.toolSummary, isNot(contains('截掉')));
   });
 }
 

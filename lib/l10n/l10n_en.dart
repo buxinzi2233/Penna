@@ -812,6 +812,7 @@ const en = <String, String>{
   '正式版': 'Stable',
   '测试版': 'Dev',
   '已关掉透视辅助': 'Perspective guides turned off',
+  '画布换成 {0}×{1}': 'Canvas changed to {0}×{1}',
   '已调整透视 · {0} 点透视': 'Perspective adjusted · {0}-point',
   '图层': 'Layers',
   '拖动换前后': 'Drag to reorder',

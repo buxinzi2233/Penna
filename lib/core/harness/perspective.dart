@@ -70,16 +70,14 @@ class Perspective {
     );
   }
 
-  /// 写成 Agent 用的 `<perspective>` 里那份 JSON(位置都是占画布的百分比),
+  /// 写成 Agent 用的 `<perspective>` 里那份 JSON(画布像素,每个点是 [x, y]),
   /// 让它照着现在的数改。
-  String toSpec(int width, int height) {
-    int pct(int v, int side) => (v * 100 / side).round();
-    return jsonEncode({
-      'horizon': pct(horizon, height),
-      'vanishing': [for (final x in xs) pct(x, width)],
-      if (third != null) 'third': [pct(third!.x, width), pct(third!.y, height)],
-    });
-  }
+  String get spec => jsonEncode({
+    'vanishing': [
+      for (final x in xs) [x, horizon],
+    ],
+    if (third != null) 'third': [third!.x, third!.y],
+  });
 
   /// 说给模型听:几点透视、地平线和各消失点在画面哪里、这意味着什么机位。
   String describe(int width, int height) {
@@ -92,31 +90,35 @@ class Perspective {
         : '地平线在中间附近,平视';
     final vps = [
       for (final (i, x) in xs.indexed)
-        '${xs.length == 1 ? '消失点' : '消失点 ${i + 1}'}在横向 ${pct(x, width)}、纵向 ${pct(horizon, height)}',
+        '${xs.length == 1 ? '消失点' : '消失点 ${i + 1}'}在 ($x, $horizon)'
+            '(横向 ${pct(x, width)})',
     ];
     final t = third;
     final vertical = t == null
         ? ''
-        : '第三个消失点在横向 ${pct(t.x, width)}、纵向 ${pct(t.y, height)},'
+        : '第三个消失点在 (${t.x}, ${t.y})(横向 ${pct(t.x, width)}、纵向 ${pct(t.y, height)}),'
               '${t.y < horizon ? '竖直的线往上收拢,越高的地方越窄,是从下往上看的仰视' : '竖直的线往下收拢,是从上往下看的俯视'}。';
-    return '【透视辅助】用户在画板上拉了透视线(位置从画布左上角量,0% 是左边或顶上):'
-        '$points 点透视。地平线在纵向 ${pct(horizon, height)},$eye。'
+    return '【透视辅助】用户在画板上拉了透视线(坐标和 bbox 一样是画布像素,从左上角量):'
+        '$points 点透视。地平线在 y=$horizon(纵向 ${pct(horizon, height)}),$eye。'
         '${vps.join(';')}。$vertical'
         '照这个透视写:summary.caption 写清机位高低、视角和透视的强弱;'
         '每一块的 caption 写它朝哪个消失点延伸、近大远小的方向,'
         '人物写清从这个视角看到的样子(仰视看得到下巴和下侧,俯视看得到头顶和肩)。'
         '框的位置和大小也要顺着透视:离消失点越近的东西越小。'
-        '现在的写法是 <perspective>${toSpec(width, height)}</perspective>。';
+        '现在的写法是 <perspective>$spec</perspective>。';
   }
 }
 
-/// 消失点最远能放到画面外多远(占画布的百分比):参考图里的消失点常在画面外。
-const _minPct = -300.0, _maxPct = 400.0;
+/// 消失点最远能放到画面外多远(画布边长的倍数):参考图里的消失点常在画面外。
+const _minSides = -3.0, _maxSides = 4.0;
 
 /// 读 Agent 写的 `<perspective>` 里的内容,放到 [width]×[height] 的画布上。
-/// `off` 是关掉([off] 为真);否则是 JSON,位置都是占画布的百分比(从左上角量,
-/// 可以小于 0 或大于 100,表示在画面外):
-/// `{"horizon": 62, "vanishing": [10, 95], "third": [50, -40]}`。
+/// `off` 是关掉([off] 为真);否则是 JSON,坐标和 bbox 一样是画布像素(从左上角量,
+/// 可以小于 0 或大于宽高,表示在画面外),每个点写成 [x, y]:
+/// `{"vanishing": [[120, 750], [790, 750]], "third": [416, -480]}`。
+/// 地平线是 vanishing 那几个点的高度(写得不一样高就取平均)。
+/// 也认只有一个点的 `"vanishing": [416, 600]`,和带 horizon 的
+/// `{"horizon": 750, "vanishing": [120, 790]}`(vanishing 是地平线上各点的 x)。
 /// 读不了返回 null。
 ({bool off, Perspective? value})? parsePerspective(
   String spec,
@@ -131,23 +133,33 @@ const _minPct = -300.0, _maxPct = 400.0;
   } on FormatException {
     return null;
   }
-  if (j is! Map || j['horizon'] is! num || j['vanishing'] is! List) return null;
-  int px(Object v, int side) =>
-      ((v as num).toDouble().clamp(_minPct, _maxPct) * side / 100).round();
-  final xs = [
-    for (final x in j['vanishing'] as List)
-      if (x is num) px(x, width),
-  ];
-  if (xs.isEmpty || xs.length > 2) return null;
-  final t = j['third'];
+  if (j is! Map || j['vanishing'] is! List) return null;
+  int px(num v, int side) =>
+      v.toDouble().clamp(_minSides * side, _maxSides * side).round();
+  ({int x, int y})? point(Object? p) =>
+      p is List && p.length == 2 && p[0] is num && p[1] is num
+      ? (x: px(p[0] as num, width), y: px(p[1] as num, height))
+      : null;
+  final list = j['vanishing'] as List;
+  final h = j['horizon'];
+  final List<({int x, int y})> points;
+  if (list.isNotEmpty && list.every((v) => v is num)) {
+    // 一串数:带 horizon 是地平线上各点的 x,不带是一个点的 [x, y]。
+    points = h is num
+        ? [for (final x in list) (x: px(x as num, width), y: px(h, height))]
+        : [?point(list)];
+  } else {
+    points = [for (final p in list) ?point(p)];
+  }
+  if (points.isEmpty || points.length > 2) return null;
+  final horizon =
+      points.map((p) => p.y).reduce((a, b) => a + b) ~/ points.length;
   return (
     off: false,
     value: Perspective(
-      horizon: px(j['horizon'] as num, height),
-      xs: List.unmodifiable(xs),
-      third: t is List && t.length == 2 && t[0] is num && t[1] is num
-          ? (x: px(t[0] as num, width), y: px(t[1] as num, height))
-          : null,
+      horizon: horizon,
+      xs: List.unmodifiable([for (final p in points) p.x]),
+      third: point(j['third']),
     ),
   );
 }

@@ -231,10 +231,13 @@ Layout? parseMossLayout(
 
 /// 同 [parseMossLayout],另外交回替模型改掉的地方(超出画布截掉的、去掉的块)。
 /// `bbox_coord_space` 是 `abs` 时坐标从左上角量(官方草稿格式),否则从画布中心量。
+/// [ownSize] 为真时,JSON 里写了画布宽高(草稿格式带着)就用它的,不用 [width]×[height]:
+/// Agent 换横竖构图、换比例时这样换;边长对齐到 16 的倍数,框跟着缩放。
 ({Layout layout, List<LayoutFix> fixes})? readMossLayout(
   String raw, {
   required int width,
   required int height,
+  bool ownSize = false,
 }) {
   // 模型常把 JSON 套进代码块。
   final text = raw
@@ -252,9 +255,12 @@ Layout? parseMossLayout(
   final summary = root['summary'] is Map ? root['summary'] as Map : const {};
   // 模型漏写 summary 的右括号时,items 这几项会落进 summary 里:从那里也找。
   Object? field(String key) => root[key] ?? summary[key];
+  final own = ownSize ? _ownSize(field('width'), field('height')) : null;
+  // 框按 JSON 里的坐标读进 w×h 的画布,最后再缩到对齐过的尺寸。
+  final w = own?.width ?? width, h = own?.height ?? height;
   final xyxy = field('bbox_format') == 'xyxy';
   final abs = field('bbox_coord_space') == 'abs';
-  final dx = abs ? 0 : width ~/ 2, dy = abs ? 0 : height ~/ 2;
+  final dx = abs ? 0 : w ~/ 2, dy = abs ? 0 : h ~/ 2;
   final boxes = <LayoutBox>[];
   final fixes = <LayoutFix>[];
   final items = field('items');
@@ -274,10 +280,10 @@ Layout? parseMossLayout(
         : (v[0], v[1], v[2], v[3]);
     // 超出一个像素以内是取整的误差,不算。
     final out =
-        [x0, x1].any((n) => n + dx < -1 || n + dx > width + 1) ||
-        [y0, y1].any((n) => n + dy < -1 || n + dy > height + 1);
-    int x(double n) => (n + dx).round().clamp(0, width);
-    int y(double n) => (n + dy).round().clamp(0, height);
+        [x0, x1].any((n) => n + dx < -1 || n + dx > w + 1) ||
+        [y0, y1].any((n) => n + dy < -1 || n + dy > h + 1);
+    int x(double n) => (n + dx).round().clamp(0, w);
+    int y(double n) => (n + dy).round().clamp(0, h);
     final box = LayoutBox(
       left: math.min(x(x0), x(x1)),
       top: math.min(y(y0), y(y1)),
@@ -297,9 +303,11 @@ Layout? parseMossLayout(
     }
   }
   final meta = summary['meta'];
+  final sw = own == null ? w : snapLayoutSide(w);
+  final sh = own == null ? h : snapLayoutSide(h);
   final layout = Layout(
-    width: width,
-    height: height,
+    width: sw,
+    height: sh,
     caption: summary['caption'] is String ? summary['caption'] as String : '',
     meta: meta is List
         ? meta.whereType<String>().join(', ')
@@ -307,9 +315,19 @@ Layout? parseMossLayout(
         ? meta
         : '',
     canvas: _pick(summary['canvas'], layoutCanvases),
-    boxes: List.unmodifiable(boxes),
+    boxes: List.unmodifiable([
+      for (final b in boxes) sw == w && sh == h ? b : b.scaled(sw / w, sh / h),
+    ]),
   );
   return (layout: layout, fixes: List.unmodifiable(fixes));
+}
+
+/// JSON 里写的画布宽高;没写、不是数或超出边长范围时为 null。
+({int width, int height})? _ownSize(Object? width, Object? height) {
+  bool ok(Object? v) =>
+      v is num && v.round() >= minLayoutSide && v.round() <= maxLayoutSide;
+  if (!ok(width) || !ok(height)) return null;
+  return (width: (width as num).round(), height: (height as num).round());
 }
 
 /// 新写的布局 [fresh] 漏了 name、layer 时,从原来的 [old] 里接上。

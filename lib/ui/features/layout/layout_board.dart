@@ -49,9 +49,16 @@ class LayoutBoard extends ChangeNotifier {
             '横向 ${pct(b.left, l.width)}–${pct(b.right, l.width)},'
             '纵向 ${pct(b.top, l.height)}–${pct(b.bottom, l.height)}',
     ].join('\n');
-    return '【布局画板】画布 ${l.width}×${l.height}(宽×高)。'
+    final shape = l.width > l.height
+        ? '横构图'
+        : l.width < l.height
+        ? '竖构图'
+        : '方图';
+    return '【布局画板】画布 ${l.width}×${l.height}(宽×高,$shape)。'
         'bbox 从左上角量,写成 [x_min, y_min, x_max, y_max],'
         'x 从 0 到 ${l.width},y 从 0 到 ${l.height};换成官方坐标由程序来做。'
+        '用户要换构图(横构图、竖构图、方图、某个比例)时,<layout> 的 width / height 写新的尺寸,'
+        '程序会把画布换过去,bbox 按新尺寸写;不换就照抄这两个数。'
         '${_fixesNote()}'
         '${l.isEmpty ? '现在是空的。' : '下面是画板此刻的样子:用户可能刚拖过框、改过字或类别,'
                   '一切以这里为准,上文对话里的旧布局不算数'
@@ -255,25 +262,32 @@ class LayoutBoard extends ChangeNotifier {
     _set(layout, rebuild: true);
   }
 
-  /// 换成一份布局 JSON(Agent 写的),用当前的画布尺寸。读不了返回 false。
+  /// 换成一份布局 JSON(Agent 写的)。JSON 里写了画布宽高就换成它的
+  /// (Agent 换横竖构图时),没写用当前的画布尺寸。读不了返回 false。
   bool apply(String json) {
     final read = readMossLayout(
       json,
       width: _layout.width,
       height: _layout.height,
+      ownSize: true,
     );
     if (read == null) return false;
     final parsed = read.layout;
+    final old = _layout;
+    final sx = parsed.width / old.width, sy = parsed.height / old.height;
     // Agent 常把 name、layer 漏掉:按名字或位置把原来的接上(见 inheritNames)。
     final boxes = inheritNames(
-      _layout.boxes,
+      [for (final b in old.boxes) b.scaled(sx, sy)],
       parsed.boxes,
       keepLayers: !json.contains('"layer"'),
     );
     _selected = null;
-    // 透视线是用户拉的,JSON 里没有它:留着。
+    // 透视线是用户拉的,JSON 里没有它:留着,画布换了尺寸就跟着缩放。
     _set(
-      parsed.copyWith(boxes: boxes, perspective: () => _layout.perspective),
+      parsed.copyWith(
+        boxes: boxes,
+        perspective: () => old.perspective?.scaled(sx, sy),
+      ),
       rebuild: true,
     );
     _fixes = read.fixes;
