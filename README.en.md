@@ -229,7 +229,6 @@ Every part of Penna is built on the work of the open-source community.
 | Source | Used for | License |
 | --- | --- | --- |
 | [Danbooru](https://danbooru.donmai.us) and its taggers | The origin of all tag and character data | — |
-| [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) | Built-in character library: names, aliases, looks and outfit tags | MIT |
 | [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | Original character tag data | Apache-2.0 |
 | [DanbooruSearch](https://sakizuki-danboorusearch.hf.space) | MCP service for online semantic tag search | — |
 
@@ -243,8 +242,6 @@ Every part of Penna is built on the work of the open-source community.
 | [SmilingWolf WD14 Tagger](https://huggingface.co/SmilingWolf) | Local taggers (downloaded on use) | Apache-2.0 |
 | [PixAI Tagger](https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx), [CL Tagger](https://huggingface.co/Nonene/cl_tagger), [OppaiOracle](https://huggingface.co/Grio43/OppaiOracle) | Local taggers (downloaded on use) | See each model page |
 | [Gemma 4](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF), [ToriiGate](https://huggingface.co/DraconicDragon/ToriiGate-0.5-GGUF), [JoyCaption](https://huggingface.co/concedo/llama-joycaption-beta-one-hf-llava-mmproj-gguf), [Florence-2](https://huggingface.co/onnx-community/Florence-2-base-ft) | Local vision models (downloaded on use) | See each model page |
-
-Local interrogation draws on the author's two other projects, [NLapt](https://github.com/storyAura/NLapt) and [BooruDatasetTagManagerPlus](https://github.com/storyAura/BooruDatasetTagManagerPlus).
 
 ### Fonts
 

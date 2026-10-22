@@ -226,7 +226,6 @@ Penna 的每一部分都建立在开源社区的成果之上。
 | 来源 | 用途 | 许可 |
 | --- | --- | --- |
 | [Danbooru](https://danbooru.donmai.us) 及其标注者 | 全部标签与角色数据的源头 | — |
-| [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) | 内置角色库:角色名单、别名、外貌与服装特征词 | MIT |
 | [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | 角色特征词的原始数据 | Apache-2.0 |
 | [DanbooruSearch](https://sakizuki-danboorusearch.hf.space) | 在线语义搜索标签的 MCP 服务 | — |
 
@@ -240,8 +239,6 @@ Penna 的每一部分都建立在开源社区的成果之上。
 | [SmilingWolf WD14 Tagger](https://huggingface.co/SmilingWolf) | 本地打标模型(使用时下载) | Apache-2.0 |
 | [PixAI Tagger](https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx)、[CL Tagger](https://huggingface.co/Nonene/cl_tagger)、[OppaiOracle](https://huggingface.co/Grio43/OppaiOracle) | 本地打标模型(使用时下载) | 见各模型页 |
 | [Gemma 4](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF)、[ToriiGate](https://huggingface.co/DraconicDragon/ToriiGate-0.5-GGUF)、[JoyCaption](https://huggingface.co/concedo/llama-joycaption-beta-one-hf-llava-mmproj-gguf)、[Florence-2](https://huggingface.co/onnx-community/Florence-2-base-ft) | 本地看图模型(使用时下载) | 见各模型页 |
-
-本地反推的做法参考了作者的另外两个项目 [NLapt](https://github.com/storyAura/NLapt) 与 [BooruDatasetTagManagerPlus](https://github.com/storyAura/BooruDatasetTagManagerPlus)。
 
 ### 字体
 
