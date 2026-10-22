@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261021--6--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261022--1--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -195,7 +195,7 @@ pwsh tool/build_release.ps1      # 打包正式版
 
 ```bash
 python tool/make_tag_dict.py <CSV 所在文件夹>            # 标签词库
-python tool/make_character_dict.py dataset --review     # 角色库
+python tool/make_character_dict.py dataset/danbooru_character_appearance.csv   # 角色库
 python tool/l10n.py keys                                 # 各语言译文缺了哪些
 ```
 
@@ -226,7 +226,8 @@ Penna 的每一部分都建立在开源社区的成果之上。
 | 来源 | 用途 | 许可 |
 | --- | --- | --- |
 | [Danbooru](https://danbooru.donmai.us) 及其标注者 | 全部标签与角色数据的源头 | — |
-| [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | 内置角色库中每个角色的外貌与服装特征词 | Apache-2.0 |
+| [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) | 内置角色库:角色名单、别名、外貌与服装特征词 | MIT |
+| [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | 角色特征词的原始数据 | Apache-2.0 |
 | [DanbooruSearch](https://sakizuki-danboorusearch.hf.space) | 在线语义搜索标签的 MCP 服务 | — |
 
 ### 软件与模型
@@ -257,7 +258,7 @@ Penna 的源代码以 [MIT](LICENSE) 许可发布。
 
 随程序分发的第三方内容保留各自的许可:
 
-- `assets/danbooru_characters.tsv.gz`:由 [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki)(Apache-2.0)合并、筛选而成,特征词重新分成了「外貌」与「服装与其他」两组。
+- `assets/danbooru_characters.tsv.gz`:由 [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) 的 `danbooru_character_appearance.csv` 打包而成。该表在 [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki)(Apache-2.0)的基础上扩充,扩充部分为 MIT,原有标签遵循 Apache-2.0。
 - `font/MapleMono-Regular.ttf`:SIL OFL 1.1,见 [font/MapleMono-LICENSE.txt](font/MapleMono-LICENSE.txt)。
 - `font/LXGW975YuanSC-500W.ttf`:SIL OFL 1.1,见 [font/LXGW975Yuan-LICENSE.txt](font/LXGW975Yuan-LICENSE.txt)。
 - `onnxruntime.dll`:[ONNX Runtime](https://github.com/microsoft/onnxruntime),MIT。

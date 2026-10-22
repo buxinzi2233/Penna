@@ -198,7 +198,7 @@ Regenerate the built-in data (only when the source tables or the classification 
 
 ```bash
 python tool/make_tag_dict.py <folder with the CSVs>      # tag dictionary
-python tool/make_character_dict.py dataset --review     # character library
+python tool/make_character_dict.py dataset/danbooru_character_appearance.csv   # character library
 python tool/l10n.py keys                                 # missing translations per language
 ```
 
@@ -229,7 +229,8 @@ Every part of Penna is built on the work of the open-source community.
 | Source | Used for | License |
 | --- | --- | --- |
 | [Danbooru](https://danbooru.donmai.us) and its taggers | The origin of all tag and character data | — |
-| [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | Looks and outfit tags for each character in the built-in library | Apache-2.0 |
+| [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) | Built-in character library: names, aliases, looks and outfit tags | MIT |
+| [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) | Original character tag data | Apache-2.0 |
 | [DanbooruSearch](https://sakizuki-danboorusearch.hf.space) | MCP service for online semantic tag search | — |
 
 ### Software and models
@@ -260,7 +261,7 @@ Penna's source code is released under the [MIT](LICENSE) license.
 
 Third-party content shipped with the app keeps its own license:
 
-- `assets/danbooru_characters.tsv.gz`: merged and filtered from [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) (Apache-2.0), with feature tags regrouped into "Looks" and "Outfit and other".
+- `assets/danbooru_characters.tsv.gz`: packed from `danbooru_character_appearance.csv` in [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv). That table extends [Laxhar/noob-wiki](https://huggingface.co/datasets/Laxhar/noob-wiki) (Apache-2.0); the extensions are MIT and the original tags remain under Apache-2.0.
 - `font/MapleMono-Regular.ttf`: SIL OFL 1.1, see [font/MapleMono-LICENSE.txt](font/MapleMono-LICENSE.txt).
 - `font/LXGW975YuanSC-500W.ttf`: SIL OFL 1.1, see [font/LXGW975Yuan-LICENSE.txt](font/LXGW975Yuan-LICENSE.txt).
 - `onnxruntime.dll`: [ONNX Runtime](https://github.com/microsoft/onnxruntime), MIT.

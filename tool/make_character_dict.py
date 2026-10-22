@@ -3,8 +3,9 @@
 用法(在项目根目录):
     python tool/make_character_dict.py [放着 danbooru_character_dedup*.csv 的文件夹,默认 dataset]
     python tool/make_character_dict.py dataset --review   # 另外打印两类词各有哪些,用来检查分得对不对
-    python tool/make_character_dict.py dataset/danbooru_characters_interim_20261021_1224.csv
-        # 已经分好的整表(列是 name, series, looks, outfit, alias)直接打包,不再分词
+    python tool/make_character_dict.py dataset/danbooru_character_appearance.csv
+        # 已经分好的整表(列是 name, series, looks, outfit, alias)直接打包,不再分词;
+        # 现在内置的就是这张,来自 https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv
 
 每行输出「角色名 \t 作品 \t 外貌 \t 服装与其他 \t 别名」,按图的数量从多到少排;名字里的下划线换成空格。
 别名(中文、日文译名)来自同一个文件夹里的 danbooru_character_tags.csv,没有这个文件就留空;
