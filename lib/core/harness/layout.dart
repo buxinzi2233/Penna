@@ -3,8 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import 'camera.dart';
 import 'perspective.dart';
 
+export 'camera.dart';
 export 'perspective.dart';
 
 /// MOSS-Image 布局提示词(Layout Prompt):画面整体描述 + 一组带位置框的元素,
@@ -29,7 +31,7 @@ const minLayoutSide = 64, maxLayoutSide = 4096;
 /// [text] 是要画出来的文字(只有 text 类用)。坐标是左上角原点的像素。
 /// [name] 是给这一块起的名字,[layer] 是它在哪一层(见 [layoutLayers]),
 /// 两样都只在 Penna 里用(用户和 Agent 靠它们说"哪一块"、谁挡着谁),
-/// 官方格式不认,交出去的 JSON 里没有。
+/// 官方格式不认,交出去的 JSON 里没有。[body] 是它在 3D 视图里的体块(文字块没有)。
 @immutable
 class LayoutBox {
   const LayoutBox({
@@ -42,13 +44,25 @@ class LayoutBox {
     this.text = '',
     this.name = '',
     this.layer = defaultLayer,
+    this.body,
   });
 
   final int left, top, right, bottom;
   final String label, caption, text, name, layer;
+  final Body? body;
 
   int get width => right - left;
   int get height => bottom - top;
+
+  /// 转镜头时整个跑到了镜头外面(框缩成了没有面积):交出去的 JSON 里不带它。
+  bool get offscreen => width <= 0 || height <= 0;
+
+  Span get span => (
+    left: left.toDouble(),
+    top: top.toDouble(),
+    right: right.toDouble(),
+    bottom: bottom.toDouble(),
+  );
 
   LayoutBox copyWith({
     int? left,
@@ -60,6 +74,7 @@ class LayoutBox {
     String? text,
     String? name,
     String? layer,
+    Body? Function()? body,
   }) => LayoutBox(
     left: left ?? this.left,
     top: top ?? this.top,
@@ -70,6 +85,7 @@ class LayoutBox {
     text: text ?? this.text,
     name: name ?? this.name,
     layer: layer ?? this.layer,
+    body: body == null ? this.body : body(),
   );
 
   /// 按比例缩到另一块画布上(换画布尺寸时用)。
@@ -87,6 +103,7 @@ class LayoutBox {
     'text': text,
     'name': name,
     'layer': layer,
+    'body': ?body?.toJson(),
   };
 
   static LayoutBox? fromJson(Object? j) {
@@ -103,6 +120,7 @@ class LayoutBox {
       text: j['text'] as String? ?? '',
       name: j['name'] as String? ?? '',
       layer: _layer(j['layer']),
+      body: Body.fromJson(j['body']),
     );
   }
 }
@@ -118,6 +136,7 @@ class Layout {
     this.canvas = 'single',
     this.boxes = const [],
     this.perspective,
+    this.camera = const Camera(),
   });
 
   final int width, height;
@@ -126,6 +145,9 @@ class Layout {
 
   /// 透视辅助线;null 是没开。
   final Perspective? perspective;
+
+  /// 3D 视图的摄像机;没转过是默认的(正对着画布)。
+  final Camera camera;
 
   bool get isEmpty => boxes.isEmpty && caption.trim().isEmpty;
 
@@ -137,6 +159,7 @@ class Layout {
     String? canvas,
     List<LayoutBox>? boxes,
     Perspective? Function()? perspective,
+    Camera? camera,
   }) => Layout(
     width: width ?? this.width,
     height: height ?? this.height,
@@ -145,6 +168,7 @@ class Layout {
     canvas: canvas ?? this.canvas,
     boxes: boxes == null ? this.boxes : List.unmodifiable(boxes),
     perspective: perspective == null ? this.perspective : perspective(),
+    camera: camera ?? this.camera,
   );
 
   Map<String, Object> toJson() => {
@@ -155,6 +179,7 @@ class Layout {
     'canvas': canvas,
     'boxes': [for (final b in boxes) b.toJson()],
     'perspective': ?perspective?.toJson(),
+    if (!camera.isDefault) 'camera': camera.toJson(),
   };
 
   static Layout fromJson(Map<String, dynamic> j) => Layout(
@@ -167,6 +192,7 @@ class Layout {
       for (final b in j['boxes'] as List? ?? const []) ?LayoutBox.fromJson(b),
     ]),
     perspective: Perspective.fromJson(j['perspective']),
+    camera: Camera.fromJson(j['camera']),
   );
 }
 
@@ -183,9 +209,11 @@ int _side(Object? v, int fallback) =>
 /// 画布尺寸不写进去(生成时另设)。
 ///
 /// [draft] 为真时是给 Agent 看的草稿格式:带画布尺寸,坐标是左上角原点的
-/// `[x_min, y_min, x_max, y_max]`,每一块还带上 `name` 和 `layer`(官方格式不认,交出去的不带)。
+/// `[x_min, y_min, x_max, y_max]`,每一块还带上 `name`、`layer` 和体块 `body`
+/// (见 [bodyHintJson];官方格式不认,交出去的不带)。转镜头转到镜头外面的块两种都不带。
 String mossLayoutJson(Layout l, {bool draft = false}) {
   final w2 = l.width ~/ 2, h2 = l.height ~/ 2;
+  final view = CameraView(l.camera, l.width, l.height);
   final meta = [
     for (final m in l.meta.split(RegExp('[,,、]')))
       if (m.trim().isNotEmpty) m.trim(),
@@ -200,17 +228,19 @@ String mossLayoutJson(Layout l, {bool draft = false}) {
     },
     'items': [
       for (final b in l.boxes)
-        {
-          if (draft && b.name.trim().isNotEmpty) 'name': b.name.trim(),
-          if (draft) 'layer': b.layer,
-          'label': b.label,
-          'caption': b.caption.trim(),
-          if (b.label == 'text' && b.text.trim().isNotEmpty)
-            'text': b.text.trim(),
-          'bbox': draft
-              ? [b.left, b.top, b.right, b.bottom]
-              : [b.top - h2, b.left - w2, b.bottom - h2, b.right - w2],
-        },
+        if (!b.offscreen)
+          {
+            if (draft && b.name.trim().isNotEmpty) 'name': b.name.trim(),
+            if (draft) 'layer': b.layer,
+            if (draft && b.body != null) 'body': bodyHintJson(b.body!, view),
+            'label': b.label,
+            'caption': b.caption.trim(),
+            if (b.label == 'text' && b.text.trim().isNotEmpty)
+              'text': b.text.trim(),
+            'bbox': draft
+                ? [b.left, b.top, b.right, b.bottom]
+                : [b.top - h2, b.left - w2, b.bottom - h2, b.right - w2],
+          },
     ],
     'bbox_coord_space': draft ? 'abs' : 'abs_centralized',
     'bbox_format': draft ? 'xyxy' : 'yxyx',
@@ -234,7 +264,12 @@ Layout? parseMossLayout(
 /// [ownSize] 为真时看 JSON 里写的画布宽高(草稿格式带着):框按它读,再缩放到画布上;
 /// 它和 [width]×[height] 一横一竖时画布对调(Agent 换横竖构图)。别的比例不认:
 /// 画布尺寸由用户定,Agent 照参考图写出 1216×684 这种时,画布还是 1216×832。
-({Layout layout, List<LayoutFix> fixes, ({int width, int height})? refit})?
+({
+  Layout layout,
+  List<LayoutFix> fixes,
+  ({int width, int height})? refit,
+  Map<int, BodyHint> hints,
+})?
 readMossLayout(
   String raw, {
   required int width,
@@ -289,6 +324,8 @@ readMossLayout(
   final dx = abs ? 0 : w ~/ 2, dy = abs ? 0 : h ~/ 2;
   final boxes = <LayoutBox>[];
   final fixes = <LayoutFix>[];
+  // Agent 写的体块(按 boxes 里的第几块记),换成画板上的体块要等知道镜头之后。
+  final hints = <int, BodyHint>{};
   for (final (i, item) in (items is List ? items : const []).indexed) {
     if (item is! Map) continue;
     final name = item['name'] is String ? item['name'] as String : '';
@@ -318,6 +355,9 @@ readMossLayout(
       layer: _layer(item['layer']),
     );
     if (box.width > 0 && box.height > 0) {
+      if (parseBodyHint(item['body']) case final hint?) {
+        hints[boxes.length] = hint;
+      }
       boxes.add(box);
       if (out) fixes.add((item: i + 1, name: name, clipped: true));
     } else {
@@ -346,7 +386,12 @@ readMossLayout(
             : b.scaled(tw / w, th / h),
     ]),
   );
-  return (layout: layout, fixes: List.unmodifiable(fixes), refit: refit);
+  return (
+    layout: layout,
+    fixes: List.unmodifiable(fixes),
+    refit: refit,
+    hints: Map.unmodifiable(hints),
+  );
 }
 
 /// 把 [w]×[h] 上的框摆到 [tw]×[th] 的画布上:等比缩放、放在正中,形状不变;
@@ -384,7 +429,8 @@ bool _perMille(List<List<double>> boxes, bool xyxy, int w, int h) {
   return (width: (width as num).round(), height: (height as num).round());
 }
 
-/// 新写的布局 [fresh] 漏了 name、layer 时,从原来的 [old] 里接上。
+/// 新写的布局 [fresh] 漏了 name、layer 时,从原来的 [old] 里接上;体块(JSON 里没有)
+/// 也接上原来那块的。
 /// 先按名字对号;没写名字的,块数没变时接离它中心最近、还没被认领的那块
 /// (Agent 常把先后换了,按下标接会接错)。[keepLayers] 为真时 layer 也照原来的。
 List<LayoutBox> inheritNames(
@@ -425,6 +471,7 @@ List<LayoutBox> inheritNames(
         final j => b.copyWith(
           name: b.name.trim().isEmpty ? old[j].name : null,
           layer: keepLayers ? old[j].layer : null,
+          body: () => old[j].body,
         ),
       },
   ];

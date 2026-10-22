@@ -20,19 +20,25 @@ extension StudioLayoutPages on StudioViewModel {
     board.replace(_layoutOf(text, board.layout));
   }
 
-  /// 画板 → 页:画板变了就写进眼前这页。只在页从空变成有、或从有变成空时通知界面
-  /// (页签要变样);拖框时每一帧都在变,其余的只排一次存盘。
+  /// 画板 → 页:画板变了就写进眼前这页。只在页从空变成有、或从有变成空、
+  /// 或记了一笔操作时通知界面(页签、操作记录要变样);拖框时每一帧都在变,
+  /// 其余的只排一次存盘。画板标了这是哪一步操作([LayoutBoard.mark])就记进操作记录,
+  /// 拖动时只有第一帧带着它。
   void _pullBoard() {
-    final l = layout!.layout;
+    final board = layout!;
+    final action = board.takeAction();
+    final l = board.layout;
     final text = l.isEmpty ? '' : jsonEncode(l.toJson());
     if (text == _boardText) return;
     _boardText = text;
     final was = _pageText;
     if (text == was) return;
+    // 要在改之前记:顺手拍下的是这页原来的样子,回滚就回到这里。
+    if (action != null) _log(tr('{0}({1})', [action, _here]));
     _blocks = text.isEmpty
         ? const []
         : List.unmodifiable([(text: text, pinned: false)]);
-    if (was.isEmpty != text.isEmpty) return _changed();
+    if (action != null || was.isEmpty != text.isEmpty) return _changed();
     _scheduleSave();
   }
 

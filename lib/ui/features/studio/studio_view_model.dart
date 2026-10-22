@@ -247,7 +247,8 @@ class StudioViewModel extends ChangeNotifier {
     _actions = List.unmodifiable(_actions.skip(index + 1));
     _undo = List.unmodifiable(_undo.skip(index + 1));
     _log(tr('回滚到「{0}」之前', [undone]), before: now);
-    notifyListeners();
+    // 区域控制那场对话要把回滚后的这页摆回画板上。
+    _changed();
     return null;
   }
 

@@ -1,0 +1,262 @@
+import 'dart:convert';
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:penna/core/harness/layout.dart';
+import 'package:penna/core/harness/layout_3d.dart';
+import 'package:penna/ui/features/layout/layout_board.dart';
+import 'package:penna/ui/features/layout/layout_camera.dart';
+import 'package:penna/ui/features/layout/layout_canvas.dart';
+import 'package:penna/ui/features/studio/studio_view_model.dart';
+
+import 'fixtures.dart';
+
+const _w = 832, _h = 1216;
+const Span _box = (left: 100.0, top: 300.0, right: 400.0, bottom: 1000.0);
+
+void _near(Span? got, Span want, {double tol = 1.5}) {
+  expect(got, isNotNull);
+  expect(got!.left, closeTo(want.left, tol));
+  expect(got.top, closeTo(want.top, tol));
+  expect(got.right, closeTo(want.right, tol));
+  expect(got.bottom, closeTo(want.bottom, tol));
+}
+
+LayoutBox _boxAt(int l, int t, int r, int b, {String name = ''}) =>
+    LayoutBox(left: l, top: t, right: r, bottom: b, name: name);
+
+void main() {
+  group('摄像机和体块', () {
+    final view = CameraView(const Camera(), _w, _h);
+
+    test('立起来的体块在没转过的镜头里投回原来的框', () {
+      for (final hint in [
+        (distance: 0.5, depth: 0.5, yaw: 0.0),
+        (distance: 3.0, depth: 1.5, yaw: 40.0),
+      ]) {
+        _near(projectBody(liftBody(_box, view, hint), view), _box);
+      }
+    });
+
+    test('镜头平移时近的挪得比远的多', () {
+      final near = liftBody(_box, view, (distance: 0.6, depth: 0.5, yaw: 0));
+      final far = liftBody(_box, view, (distance: 3, depth: 0.5, yaw: 0));
+      final turned = CameraView(const Camera(panX: 0.2), _w, _h);
+      final a = projectBody(near, turned)!, b = projectBody(far, turned)!;
+      expect(
+        (a.left - _box.left).abs(),
+        greaterThan((b.left - _box.left).abs()),
+      );
+    });
+
+    test('框挪了、放大了,体块跟着调到投影正好是新框', () {
+      const turned = Camera(orbit: 30, pitch: 20);
+      final v = CameraView(turned, _w, _h);
+      final body = liftBody(_box, v, (distance: 1.2, depth: 1, yaw: 10));
+      const moved = (left: 160.0, top: 250.0, right: 520.0, bottom: 1100.0);
+      _near(projectBody(fitBody(body, moved, v)!, v), moved, tol: 2);
+    });
+
+    test('转到镜头后面的投不出来', () {
+      final body = liftBody(_box, view, (distance: 1, depth: 0.5, yaw: 0));
+      // 镜头推过主体,还朝前看:主体在它身后。
+      final behind = CameraView(const Camera(panZ: 1.5, distance: 0.1), _w, _h);
+      expect(projectBody(body, behind), isNull);
+    });
+
+    test('摄像机读写一圈不变,超出范围的收回来', () {
+      const c = Camera(orbit: 120, pitch: -30, roll: 5, distance: 2, fov: 35);
+      expect(Camera.fromJson(jsonDecode(jsonEncode(c.toJson()))), c);
+      expect(const Camera().copyWith(orbit: 200).orbit, -160);
+      expect(const Camera().copyWith(pitch: 120).pitch, 89);
+      expect(Camera.fromJson('x'), const Camera());
+    });
+  });
+
+  group('布局里的体块', () {
+    test('体块和镜头跟着布局存下来,交出去的 JSON 里没有', () {
+      final l = Layout(
+        width: _w,
+        height: _h,
+        camera: const Camera(orbit: 30),
+        boxes: [
+          liftBox(_boxAt(100, 300, 400, 1000, name: '小红'), const Layout()),
+        ],
+      );
+      final back = Layout.fromJson(
+        jsonDecode(jsonEncode(l.toJson())) as Map<String, dynamic>,
+      );
+      expect(back.camera, l.camera);
+      expect(back.boxes.single.body!.z, closeTo(l.boxes.single.body!.z, 1e-3));
+      expect(mossLayoutJson(l), isNot(contains('body')));
+      expect(mossLayoutJson(l, draft: true), contains('"distance"'));
+    });
+
+    test('Agent 写的 body 读成每块的体块提示', () {
+      final read = readMossLayout(
+        '{"width": 832, "height": 1216, "items": ['
+        '{"name": "甲", "label": "character", "bbox": [0, 0, 300, 900], '
+        '"body": {"distance": 0.8, "depth": 0.5, "yaw": -30}},'
+        '{"name": "乙", "bbox": [400, 100, 800, 500]}],'
+        '"bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+        width: _w,
+        height: _h,
+        ownSize: true,
+      )!;
+      expect(read.hints.keys, [0]);
+      expect(read.hints[0]!.distance, 0.8);
+      expect(read.hints[0]!.yaw, -30);
+    });
+
+    test('文字块不立体块', () {
+      final text = liftBox(
+        const LayoutBox(
+          left: 0,
+          top: 0,
+          right: 400,
+          bottom: 100,
+          label: 'text',
+        ),
+        const Layout(),
+      );
+      expect(text.body, isNull);
+    });
+  });
+
+  group('画板转镜头', () {
+    LayoutBoard board() => LayoutBoard()
+      ..replace(
+        Layout(
+          width: _w,
+          height: _h,
+          boxes: [
+            liftBox(
+              _boxAt(100, 300, 400, 1000, name: '前').copyWith(layer: 'front'),
+              const Layout(),
+              (distance: 0.7, depth: 0.5, yaw: 0),
+            ),
+            liftBox(
+              _boxAt(450, 200, 700, 800, name: '后').copyWith(layer: 'back'),
+              const Layout(),
+              (distance: 2.5, depth: 0.5, yaw: 0),
+            ),
+          ],
+        ),
+      );
+
+    test('转回正面时框回到原处', () {
+      final b = board();
+      final before = [for (final x in b.layout.boxes) x.span];
+      b.setCamera(const Camera(orbit: 35, pitch: 15));
+      expect(b.layout.boxes.first.left, isNot(100));
+      b.setCamera(const Camera());
+      for (final (i, x) in b.layout.boxes.indexed) {
+        _near(x.span, before[i]);
+      }
+    });
+
+    test('绕到背后时前后对调', () {
+      // 拉远一点再绕:离得太近时远景会落到镜头后面。
+      final b = board()..setCamera(const Camera(orbit: 180, distance: 4));
+      expect(b.layout.boxes.first.name, '后');
+      expect(b.layout.boxes.first.layer, 'front');
+      expect(b.layout.boxes.last.layer, 'back');
+      expect(b.cameraMoved, isTrue);
+    });
+
+    test('Agent 没写 body 时沿用原来那块的', () {
+      final b = board();
+      final z = b.layout.boxes.last.body!.z;
+      expect(
+        b.apply(
+          '{"width": 832, "height": 1216, "items": ['
+          '{"name": "前", "bbox": [100, 300, 400, 1000]},'
+          '{"name": "后", "bbox": [450, 200, 700, 800]}],'
+          '"bbox_coord_space": "abs", "bbox_format": "xyxy"}',
+        ),
+        isTrue,
+      );
+      expect(b.layout.boxes.last.body!.z, closeTo(z, 1e-6));
+      expect(b.guessedBodies, isFalse);
+    });
+
+    test('自己画的框先猜一个体块', () {
+      final b = LayoutBoard()..addBox(_boxAt(10, 10, 200, 300));
+      expect(b.layout.boxes.single.body!.guessed, isTrue);
+      expect(b.guessedBodies, isTrue);
+    });
+  });
+
+  test('区域控制的改动记进操作记录,能回滚', () {
+    final board = LayoutBoard();
+    final chat = StudioViewModel(
+      config: tempConfig(),
+      streamChat: (_) => const Stream.empty(),
+      layout: board,
+      layoutOnly: true,
+    );
+    board.addBox(_boxAt(10, 10, 200, 300, name: '小红'));
+    board.mark('移动「小红」');
+    board.updateBox(
+      0,
+      board.layout.boxes.single.copyWith(left: 20, right: 210),
+    );
+    board.updateBox(
+      0,
+      board.layout.boxes.single.copyWith(left: 30, right: 220),
+    );
+    expect(chat.actions, hasLength(2));
+    expect(chat.actions.first.text, startsWith('移动「小红」'));
+    expect(chat.rollback(1), isNull);
+    expect(board.layout.boxes, isEmpty);
+  });
+
+  testWidgets('3D 视图:右键拖画布转镜头,面板上的箭头一步一步调', (tester) async {
+    final board = LayoutBoard()
+      ..addBox(_boxAt(100, 300, 400, 1000, name: '小红'))
+      ..setThreeD(true);
+    var redescribed = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              SizedBox(
+                width: 300,
+                height: 500,
+                child: LayoutCanvas(board: board),
+              ),
+              ListenableBuilder(
+                listenable: board,
+                builder: (context, _) => SingleChildScrollView(
+                  child: CameraPanel(
+                    board: board,
+                    onRedescribe: () => redescribed++,
+                    onEstimate: () {},
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final at = tester.getCenter(find.byType(LayoutCanvas));
+    final g = await tester.startGesture(at, buttons: kSecondaryMouseButton);
+    await g.moveBy(const Offset(50, 0));
+    await g.up();
+    await tester.pump();
+    expect(board.layout.camera.orbit, greaterThan(0));
+    final orbit = board.layout.camera.orbit;
+    await tester.tap(find.byIcon(Icons.chevron_right).first);
+    await tester.pump();
+    expect(board.layout.camera.orbit, closeTo(orbit + 15, 1e-9));
+    await tester.tap(find.text('按视角改描述'));
+    expect(redescribed, 1);
+    await tester.tap(find.byIcon(Icons.restart_alt));
+    await tester.pump();
+    expect(board.layout.camera.isDefault, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+}

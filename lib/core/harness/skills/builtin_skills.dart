@@ -209,7 +209,7 @@ MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。
 
 用户要把【当前成稿】"转成 JSON"时:照成稿的内容排出布局(主体、各个元素各放在哪由你按画面安排),描述按下面的要求改写成英文句子,成稿里没有的东西不要加;成稿本身不动。
 
-格式照官方的草稿格式:坐标从画布左上角量,程序会换成官方的坐标再交出去。字段名不要改;除了下面说的 name、layer,不要加别的字段。下面是一张 1024×1024 海报的例子,描述的详细程度照它来:
+格式照官方的草稿格式:坐标从画布左上角量,程序会换成官方的坐标再交出去。字段名不要改;除了下面说的 name、layer、body,不要加别的字段。下面是一张 1024×1024 海报的例子,描述的详细程度照它来:
 
 <layout>
 {
@@ -222,7 +222,7 @@ MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。
   },
   "items": [
     {"name": "主标题", "layer": "front", "label": "text", "caption": "Very large bold geometric sans-serif capitals in dark navy blue, a single centered line with wide letter spacing, flat solid fill with no outline or shadow, the clear headline of the poster sitting on the bare cream background.", "text": "EXPLORE", "bbox": [128, 96, 896, 224]},
-    {"name": "雪山", "layer": "back", "label": "object", "caption": "A stylized mountain range made of three stacked flat-color layers, pale sky blue at the back, mid blue in the middle and deep cobalt in front, with crisp white snowcaps on the central peak and a small soft-orange sun peeking from behind its left slope; clean vector edges and a subtle printed grain.", "bbox": [224, 320, 800, 896]}
+    {"name": "雪山", "layer": "back", "body": {"distance": 4, "depth": 0.6, "yaw": 0}, "label": "object", "caption": "A stylized mountain range made of three stacked flat-color layers, pale sky blue at the back, mid blue in the middle and deep cobalt in front, with crisp white snowcaps on the central peak and a small soft-orange sun peeking from behind its left slope; clean vector edges and a subtle printed grain.", "bbox": [224, 320, 800, 896]}
   ],
   "bbox_coord_space": "abs",
   "bbox_format": "xyxy"
@@ -239,6 +239,12 @@ layer 是这一块在哪一层:front(前景)、middle(中景)、back(后景),也
 - name、layer 要改才写,不写就照旧。前景排在中景前面,中景排在后景前面。
 - 没写到的块按原来的先后接在最后。
 - 前后变了,描述里的前后关系(in the foreground 这些)也要跟着变时,就写完整的 <layout>,不用 <layers>。
+
+body 是这一块在立体空间里的体块,也只在 Penna 里用,交出去之前会去掉。区域控制工作台有 3D 视图,用户能转镜头,程序照 body 算出每块在新镜头里的框。除了 text,每一块都写上 body:
+- distance:离镜头多远。1 是主体所在的那一层;前景小于 1(0.5 到 0.9),远景大于 1(1.5 到 5),远山、天空这类可以写到 10。和 layer、框的大小对得上:前景的块近,后景的块远。
+- depth:前后的厚度是它宽度的几倍。正对镜头站着的人约 0.5,侧身站的人约 2,桌椅、箱子约 1,墙上的画、招牌这种薄片写 0.05。
+- yaw:正面朝哪边转了多少度。0 是正对镜头,正数往画面左边转,负数往右边转,90 是侧身朝左,180 是背对镜头。照描述里写的朝向来写。
+- 【布局画板】里已有的块,body 照抄;用户要你估体块,或要挪远近、转朝向时才改。text 不写 body:文字贴在画面上,不跟镜头转。
 
 画板上可以开透视辅助线,现在的样子看系统提示里的【透视辅助】。开着时照它写机位高低、视角和每一块的透视方向,框的大小也顺着近大远小来排。
 

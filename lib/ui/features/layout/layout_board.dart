@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 
 import '../../../core/harness/layout.dart';
+import '../../../core/harness/layout_3d.dart';
 import '../../../l10n/l10n.dart';
 
 /// 存下来的一个画布尺寸。
@@ -31,11 +32,39 @@ class LayoutBoard extends ChangeNotifier {
   int _revision = 0;
   Timer? _saveTimer;
 
+  /// 3D 视图开着没有(默认是平面视图,不存盘)。体块和摄像机两种视图下都留着。
+  bool _threeD = false;
+
+  /// 描述是照哪个镜头写的:Agent 放上布局、换页时记下。镜头转过之后和它不一样,
+  /// 界面上就给出「按视角改描述」。
+  Camera _described = const Camera();
+
+  /// 下一次改动算哪一步操作(记进操作记录);见 [mark]。
+  String? _action;
+
   Layout get layout => _layout;
   List<LayoutSize> get sizes => _sizes;
   int? get selected => _selected;
   int get revision => _revision;
   String get json => mossLayoutJson(_layout);
+  bool get threeD => _threeD;
+
+  /// 镜头转过了,描述还是照原来的镜头写的。
+  bool get cameraMoved => _layout.camera != _described;
+
+  /// 有体块是程序猜的,还没让 Agent 估过。
+  bool get guessedBodies => _layout.boxes.any((b) => b.body?.guessed ?? false);
+
+  /// 记下接下来这次改动算哪一步(画布开始拖、开始转镜头时),[text] 为 null 是作废。
+  /// 拖动时每一帧都在改,只有第一帧记一笔。
+  void mark(String? text) => _action = text;
+
+  /// 取走要记的那一步(区域控制那场对话收到改动时记进操作记录)。
+  String? takeAction() {
+    final a = _action;
+    _action = null;
+    return a;
+  }
 
   /// 告诉模型画布尺寸和现有的布局,它写 `<layout>` 时坐标才对得上。
   String get prompt {
@@ -46,8 +75,8 @@ class LayoutBoard extends ChangeNotifier {
       for (final (i, b) in l.boxes.indexed)
         '${i + 1}. ${b.name.isEmpty ? '(没起名)' : b.name}'
             '(${b.label},${_layerNames[b.layer]}):'
-            '横向 ${pct(b.left, l.width)}–${pct(b.right, l.width)},'
-            '纵向 ${pct(b.top, l.height)}–${pct(b.bottom, l.height)}',
+            '${b.offscreen ? '转到镜头外了,不在 JSON 里,不用管它' : '横向 ${pct(b.left, l.width)}–${pct(b.right, l.width)},'
+                      '纵向 ${pct(b.top, l.height)}–${pct(b.bottom, l.height)}'}',
     ].join('\n');
     final shape = l.width > l.height
         ? '横构图'
@@ -75,12 +104,19 @@ class LayoutBoard extends ChangeNotifier {
                   '只换前后、改名字、换前中后景时写 <layers> 就够了。'
                   '各块在画布上的范围(从左上角量,0% 是左边或顶上):\n$where\n'
                   '<current-layout>\n${mossLayoutJson(l, draft: true)}\n</current-layout>'}'
-        '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}';
+        '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}'
+        '\n\n${describeCamera(l, threeD: _threeD)}';
   }
 
   /// 换成 [layout]:框先按前后排好(见 [stacked])。[follow] 是要跟着选中的那一块
   /// (排序后它的位置可能变了)。框的先后变了时输入框要重建,和 [rebuild] 一样。
-  void _set(Layout layout, {bool rebuild = false, LayoutBox? follow}) {
+  void _set(
+    Layout layout, {
+    bool rebuild = false,
+    LayoutBox? follow,
+    String? action,
+  }) {
+    if (action != null) _action = action;
     _fixes = const [];
     _refit = null;
     final boxes = stacked(layout.boxes);
@@ -111,13 +147,15 @@ class LayoutBoard extends ChangeNotifier {
     final l = _layout;
     if (width == l.width && height == l.height) return true;
     final sx = width / l.width, sy = height / l.height;
+    final next = l.copyWith(
+      width: width,
+      height: height,
+      boxes: [for (final b in l.boxes) b.scaled(sx, sy)],
+      perspective: () => l.perspective?.scaled(sx, sy),
+    );
     _set(
-      l.copyWith(
-        width: width,
-        height: height,
-        boxes: [for (final b in l.boxes) b.scaled(sx, sy)],
-        perspective: () => l.perspective?.scaled(sx, sy),
-      ),
+      next.copyWith(boxes: [for (final b in next.boxes) refitBody(b, next)]),
+      action: tr('画布换成 {0}×{1}', [width, height]),
     );
     return true;
   }
@@ -129,6 +167,7 @@ class LayoutBoard extends ChangeNotifier {
           ? null
           : Perspective.preset(points, _layout.width, _layout.height),
     ),
+    action: tr('切换透视辅助'),
   );
 
   /// 拖动透视线(画布上拖消失点时用)。
@@ -157,6 +196,7 @@ class LayoutBoard extends ChangeNotifier {
         ],
       ),
       rebuild: true,
+      action: tr('Agent 调整图层'),
     );
     return true;
   }
@@ -166,7 +206,10 @@ class LayoutBoard extends ChangeNotifier {
   bool applyPerspective(String spec) {
     final parsed = parsePerspective(spec, _layout.width, _layout.height);
     if (parsed == null) return false;
-    _set(_layout.copyWith(perspective: () => parsed.value));
+    _set(
+      _layout.copyWith(perspective: () => parsed.value),
+      action: tr('Agent 调整透视'),
+    );
     return true;
   }
 
@@ -202,18 +245,56 @@ class LayoutBoard extends ChangeNotifier {
   void setSummary({String? caption, String? meta, String? canvas}) =>
       _set(_layout.copyWith(caption: caption, meta: meta, canvas: canvas));
 
+  /// 开 / 关 3D 视图。打开时还没有体块的块先按图层猜一个(之后可以让 Agent 估)。
+  void setThreeD(bool on) {
+    _threeD = on;
+    final missing = _layout.boxes.any(
+      (b) => b.body == null && b.label != 'text',
+    );
+    if (on && missing) {
+      return _set(_layout.copyWith(boxes: liftMissing(_layout)));
+    }
+    notifyListeners();
+  }
+
+  /// 换镜头:有体块的框照新镜头重新算,前后跟着远近排(见 [reprojectBoxes])。
+  void setCamera(Camera camera, {String? action}) {
+    if (camera == _layout.camera) return;
+    final l = _layout.copyWith(camera: camera);
+    final moved = reprojectBoxes(l);
+    final sel = _selected;
+    _set(
+      l.copyWith(boxes: [for (final m in moved) m.$2]),
+      rebuild: [for (final (i, m) in moved.indexed) m.$1 != i].contains(true),
+      follow: sel == null ? null : moved.firstWhere((m) => m.$1 == sel).$2,
+      action: action,
+    );
+  }
+
   /// 加一个框并选中它:放在它那一层的最前面(像 PS 新建的图层在最上面)。
+  /// 先按图层给它猜一个体块,3D 视图里马上就有。
   void addBox(LayoutBox box) {
+    box = liftBox(box, _layout);
     final at = _layout.boxes.indexWhere(
       (b) => _rank(b.layer) <= _rank(box.layer),
     );
     final boxes = [..._layout.boxes]
       ..insert(at < 0 ? _layout.boxes.length : at, box);
-    _set(_layout.copyWith(boxes: boxes), follow: box);
+    _set(
+      _layout.copyWith(boxes: boxes),
+      follow: box,
+      action: tr('画了一个框'),
+    );
   }
 
+  /// 换掉第 [i] 块。位置或大小变了时体块跟着调(见 [refitBody])。
   void updateBox(int i, LayoutBox box) {
     if (i < 0 || i >= _layout.boxes.length) return;
+    final old = _layout.boxes[i];
+    if ((box.left, box.top, box.right, box.bottom) !=
+        (old.left, old.top, old.right, old.bottom)) {
+      box = refitBody(box, _layout);
+    }
     _set(
       _layout.copyWith(
         boxes: [for (final (j, b) in _layout.boxes.indexed) j == i ? box : b],
@@ -237,7 +318,12 @@ class LayoutBoard extends ChangeNotifier {
       layer: layoutLayers[_rank(b.layer).clamp(below, above)],
     );
     boxes.insert(at, moved);
-    _set(_layout.copyWith(boxes: boxes), rebuild: true, follow: moved);
+    _set(
+      _layout.copyWith(boxes: boxes),
+      rebuild: true,
+      follow: moved,
+      action: tr('调整「{0}」的前后', [boxName(b, from)]),
+    );
   }
 
   void removeBox(int i) {
@@ -251,18 +337,28 @@ class LayoutBoard extends ChangeNotifier {
         ],
       ),
       rebuild: true,
+      action: tr('删除「{0}」', [boxName(_layout.boxes[i], i)]),
     );
   }
 
-  /// 清掉描述和所有的框,画布尺寸留着。
+  /// 清掉描述和所有的框,画布尺寸和镜头留着。
   void clear() {
     _selected = null;
-    _set(Layout(width: _layout.width, height: _layout.height), rebuild: true);
+    _set(
+      Layout(
+        width: _layout.width,
+        height: _layout.height,
+        camera: _layout.camera,
+      ),
+      rebuild: true,
+      action: tr('清空画板'),
+    );
   }
 
-  /// 整个换成 [layout](从档案库放回来的),画布尺寸也跟着换。
+  /// 整个换成 [layout](换页、回滚、从档案库放回来的),画布尺寸和镜头也跟着换。
   void replace(Layout layout) {
     _selected = null;
+    _described = layout.camera;
     _set(layout, rebuild: true);
   }
 
@@ -276,16 +372,33 @@ class LayoutBoard extends ChangeNotifier {
       ownSize: true,
     );
     if (read == null) return false;
-    final parsed = read.layout;
     final old = _layout;
+    // 镜头是用户转的,JSON 里没有它:留着,Agent 写的框就是从这个镜头看到的。
+    final parsed = read.layout.copyWith(camera: old.camera);
     final sx = parsed.width / old.width, sy = parsed.height / old.height;
     // Agent 常把 name、layer 漏掉:按名字或位置把原来的接上(见 inheritNames)。
-    final boxes = inheritNames(
-      [for (final b in old.boxes) b.scaled(sx, sy)],
+    // 转到镜头外的块 Agent 看不到,不参与对号,原样留在最后。
+    final inherited = inheritNames(
+      [
+        for (final b in old.boxes)
+          if (!b.offscreen) b.scaled(sx, sy),
+      ],
       parsed.boxes,
       keepLayers: !json.contains('"layer"'),
     );
+    // 体块:Agent 写了照它立;没写的沿用原来那块的(调到新框上);都没有就猜一个。
+    final boxes = [
+      for (final (i, b) in inherited.indexed)
+        switch (read.hints[i]) {
+          final hint? => liftBox(b, parsed, hint),
+          null when b.body != null && b.label != 'text' => refitBody(b, parsed),
+          null => liftBox(b, parsed),
+        },
+      for (final b in old.boxes)
+        if (b.offscreen) b,
+    ];
     _selected = null;
+    _described = old.camera;
     // 透视线是用户拉的,JSON 里没有它:留着,画布换了尺寸就跟着缩放。
     _set(
       parsed.copyWith(
@@ -293,6 +406,7 @@ class LayoutBoard extends ChangeNotifier {
         perspective: () => old.perspective?.scaled(sx, sy),
       ),
       rebuild: true,
+      action: tr('Agent 放上布局'),
     );
     _fixes = read.fixes;
     _refit = read.refit;
@@ -373,6 +487,7 @@ class LayoutBoard extends ChangeNotifier {
       final j = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final loaded = Layout.fromJson(j['layout'] as Map<String, dynamic>);
       _layout = loaded.copyWith(boxes: stacked(loaded.boxes));
+      _described = loaded.camera;
       _sizes = List.unmodifiable([
         for (final s in j['sizes'] as List? ?? const [])
           if (s is List &&
@@ -428,6 +543,10 @@ List<LayoutBox> stacked(List<LayoutBox> boxes) {
   mergeSort(out, compare: (a, b) => _rank(b.layer) - _rank(a.layer));
   return out;
 }
+
+/// 记操作时怎么叫第 [i] 块:有名字用名字。
+String boxName(LayoutBox b, int i) =>
+    b.name.trim().isEmpty ? tr('第 {0} 块', [i + 1]) : b.name.trim();
 
 /// 说给模型听的图层名。
 const _layerNames = {'back': '后景', 'middle': '中景', 'front': '前景'};

@@ -96,6 +96,8 @@ Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON
 - Layouts are organized into series and pages, and the Agent starts a new series when the topic changes.
 - Regions are listed as layers (foreground, middle ground, background) and dragged to reorder; one-, two- and three-point perspective guides are available.
 - When the reference image and the canvas differ in orientation, the canvas can swap width and height to match; layouts the Agent writes at another aspect ratio are scaled proportionally into the center of the canvas.
+- 3D view: every region carries a volume (distance, depth, facing) estimated by the Agent. The camera orbits, tilts, rolls, dollies and pans; boxes are recomputed for the new view, front-to-back order follows distance, and the Agent can rewrite captions for the new angle. Switching between the 2D and 3D views keeps each region's state.
+- The history lists each step — drawing, moving, turning the camera, the Agent placing a layout — and can roll back to before any of them.
 
 ### Danbooru tags
 

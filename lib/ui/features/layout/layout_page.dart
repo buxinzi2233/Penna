@@ -13,10 +13,12 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../archive/archive_page.dart';
 import '../settings/settings_sections.dart';
+import '../studio/activity_bar.dart';
 import '../studio/chat_pane.dart';
 import '../studio/page_strip.dart';
 import '../studio/studio_view_model.dart';
 import 'layout_board.dart';
+import 'layout_camera.dart';
 import 'layout_canvas.dart';
 import 'layout_json_view.dart';
 import '../../../l10n/l10n.dart';
@@ -158,6 +160,34 @@ class _LayoutPageState extends State<LayoutPage> {
     if (mounted) showToast(context, tr('画布已换成 {0}', [size]));
   }
 
+  /// 开 / 关 3D 视图。打开时有体块是程序猜的,问一句要不要让 Agent 估
+  /// (开了自动审批直接交给它)。
+  Future<void> _toggle3D() async {
+    final on = !board.threeD;
+    board.setThreeD(on);
+    if (!on || !board.guessedBodies) return;
+    if (!widget.config.config.autoApprove &&
+        !await confirmDelete(
+          context,
+          tr('让 Agent 估体块?'),
+          tr('有几块的远近、厚度、朝向是按图层猜的。'),
+          action: tr('估'),
+        )) {
+      return;
+    }
+    _estimate();
+  }
+
+  void _send(String text) {
+    final problem = widget.chat.send(text);
+    if (problem != null) showToast(context, problem, warn: true);
+  }
+
+  void _estimate() => _send(tr('给画板上每块估体块(body:远近、厚度、朝向),框的位置、描述和图层都不动'));
+
+  void _redescribe() =>
+      _send(tr('镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、谁挡着谁),框、体块和图层都不动'));
+
   /// 带着这一块去对话里:输入框上方出现它,接着打字说怎么改。
   void _discuss(int i) {
     final b = board.layout.boxes[i];
@@ -189,11 +219,20 @@ class _LayoutPageState extends State<LayoutPage> {
         color: PennaColors.editorBg,
         child: Column(
           children: [
-            _TopBar(board: board, archive: widget.archive),
+            _TopBar(
+              board: board,
+              archive: widget.archive,
+              onToggle3D: _toggle3D,
+            ),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // 操作记录:画板上的改动、换页都记在区域控制那场对话上,能回滚。
+                  ListenableBuilder(
+                    listenable: widget.chat,
+                    builder: (context, _) => ActivityBar(vm: widget.chat),
+                  ),
                   Container(
                     width: _propsWidth,
                     decoration: BoxDecoration(
@@ -230,13 +269,35 @@ class _LayoutPageState extends State<LayoutPage> {
                           ),
                         ),
                         Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: LayoutCanvas(
-                              board: board,
-                              onPick: _reveal,
-                              onEdit: (i) => _reveal(i, edit: true),
-                            ),
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: LayoutCanvas(
+                                    board: board,
+                                    onPick: _reveal,
+                                    onEdit: (i) => _reveal(i, edit: true),
+                                  ),
+                                ),
+                              ),
+                              if (board.threeD)
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  bottom: 8,
+                                  child: Align(
+                                    alignment: Alignment.topRight,
+                                    child: SingleChildScrollView(
+                                      child: CameraPanel(
+                                        board: board,
+                                        onRedescribe: _redescribe,
+                                        onEstimate: _estimate,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -272,10 +333,15 @@ class _LayoutPageState extends State<LayoutPage> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.board, required this.archive});
+  const _TopBar({
+    required this.board,
+    required this.archive,
+    required this.onToggle3D,
+  });
 
   final LayoutBoard board;
   final ArchiveStore archive;
+  final VoidCallback onToggle3D;
 
   /// 把整张布局(连同画布尺寸和各块的名字)存进档案库的「区域控制」分区。
   Future<void> _save(BuildContext context) async {
@@ -360,6 +426,15 @@ class _TopBar extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         _PerspectiveButton(board: board),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: board.threeD ? tr('回到平面视图') : tr('3D 视图'),
+          child: PennaChip(
+            label: '3D',
+            selected: board.threeD,
+            onTap: onToggle3D,
+          ),
+        ),
         const SizedBox(width: 6),
         Expanded(
           child: Align(

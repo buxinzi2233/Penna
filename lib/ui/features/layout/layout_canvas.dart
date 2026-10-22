@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/harness/layout.dart';
 import '../../core/theme.dart';
+import 'layout_bodies.dart';
 import 'layout_board.dart';
 import 'layout_perspective.dart';
 import '../../../l10n/l10n.dart';
@@ -23,6 +24,9 @@ const _boxColors = [
 
 Color layoutBoxColor(int i) => _boxColors[i % _boxColors.length];
 
+/// 右键拖镜头时每移动一个屏幕像素转多少度。
+const _orbitPerPx = 0.4, _pitchPerPx = 0.3;
+
 /// 比这个小(画布像素)的框不算,当成手抖。
 const _minBox = 8;
 
@@ -33,7 +37,8 @@ enum _Drag { draw, move, resize, vanish }
 
 /// 画布:按画布尺寸等比缩放显示。空白处拖出一个新框,拖框移动,拖右下角改大小,
 /// 点一下选中,双击改它的描述,Delete 删掉选中的。框按图层先后画,前景盖住后景。
-/// 开了透视辅助时画出透视线,消失点能拖。
+/// 开了透视辅助时画出透视线,消失点能拖。3D 视图里画出每块的体块,右键拖动转镜头,
+/// 中键或 Shift+右键拖动平移,滚轮推拉。
 class LayoutCanvas extends StatefulWidget {
   const LayoutCanvas({
     super.key,
@@ -73,6 +78,11 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
 
   /// 正在画的新框(画布像素)。
   Rect? _drawing;
+
+  /// 3D 视图里右键(转)或中键、Shift+右键(平移)拖镜头:按下的位置和那时的镜头。
+  Offset? _camFrom;
+  Camera? _camStart;
+  bool _panning = false;
 
   LayoutBoard get _board => widget.board;
 
@@ -133,6 +143,7 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
     ];
     for (final i in order) {
       final b = boxes[i];
+      if (b.offscreen) continue;
       final r = Rect.fromLTRB(
         b.left.toDouble(),
         b.top.toDouble(),
@@ -151,6 +162,7 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
       _drag = _Drag.vanish;
       _target = v;
       _from = p;
+      _board.mark(tr('拖动消失点'));
       return setState(() {});
     }
     final i = _hit(p, scale);
@@ -167,6 +179,13 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
       _target = i;
       _origin = b;
       _pick(i);
+      // 选中会通知一次,标记要放在它后面,留给接下来真正的改动。
+      final name = boxName(b, i);
+      _board.mark(
+        _drag == _Drag.resize
+            ? tr('调整「{0}」的大小', [name])
+            : tr('移动「{0}」', [name]),
+      );
     }
     _from = p;
     setState(() {});
@@ -221,11 +240,54 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
         );
       }
     }
+    _board.mark(null);
     setState(() {
       _drag = null;
       _drawing = null;
       _origin = null;
     });
+  }
+
+  void _cameraDown(PointerDownEvent e) {
+    if (!_board.threeD) return;
+    final right = e.buttons & kSecondaryMouseButton != 0;
+    final middle = e.buttons & kTertiaryButton != 0;
+    if (!right && !middle) return;
+    _panning = middle || HardwareKeyboard.instance.isShiftPressed;
+    _camFrom = e.localPosition;
+    _camStart = _board.layout.camera;
+    _board.mark(_panning ? tr('平移镜头') : tr('转动镜头'));
+  }
+
+  void _cameraMove(PointerMoveEvent e, double scale) {
+    final from = _camFrom, c = _camStart;
+    if (from == null || c == null) return;
+    final d = (e.localPosition - from) / scale;
+    final l = _board.layout;
+    _board.setCamera(
+      _panning
+          ? panned(c, d.dx, d.dy, l.width, l.height)
+          : c.copyWith(
+              orbit: c.orbit + d.dx * scale * _orbitPerPx,
+              pitch: c.pitch + d.dy * scale * _pitchPerPx,
+            ),
+    );
+  }
+
+  void _cameraUp() {
+    if (_camFrom == null) return;
+    _camFrom = null;
+    _camStart = null;
+    _board.mark(null);
+  }
+
+  /// 3D 视图里滚轮推拉镜头(不记进操作记录,滚一下就是一步太碎)。
+  void _zoom(PointerSignalEvent e) {
+    if (!_board.threeD || e is! PointerScrollEvent) return;
+    final c = _board.layout.camera;
+    _board.setCamera(
+      c.copyWith(distance: c.distance * math.exp(e.scrollDelta.dy / 600)),
+    );
   }
 
   @override
@@ -255,7 +317,12 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
                   onPointerDown: (e) {
                     _downAt = e.timeStamp;
                     _focus.requestFocus();
+                    _cameraDown(e);
                   },
+                  onPointerMove: (e) => _cameraMove(e, scale),
+                  onPointerUp: (_) => _cameraUp(),
+                  onPointerCancel: (_) => _cameraUp(),
+                  onPointerSignal: _zoom,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.precise,
                     child: GestureDetector(
@@ -310,12 +377,26 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
               ),
             ),
           for (final i in _paintOrder)
-            Positioned.fromRect(
-              rect: screen(l.boxes[i]),
-              child: _BoxView(
-                index: i,
-                box: l.boxes[i],
-                selected: _board.selected == i,
+            if (!l.boxes[i].offscreen)
+              Positioned.fromRect(
+                rect: screen(l.boxes[i]),
+                child: _BoxView(
+                  index: i,
+                  box: l.boxes[i],
+                  selected: _board.selected == i,
+                ),
+              ),
+          if (_board.threeD)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: BodiesPainter(
+                    l,
+                    scale,
+                    layoutBoxColor,
+                    _board.selected,
+                  ),
+                ),
               ),
             ),
           if (_drawing != null)
