@@ -167,7 +167,6 @@ const en = <String, String>{
   '我的 {0} 个{1}': 'Mine: {0}{1}',
   ' · 内置 {0} 个': ' · built-in {0}',
   '添加角色': 'Add character',
-  '按名字找:初音未来、甘雨、hatsune miku': 'Search by name: Hatsune Miku, Ganyu…',
   '我的': 'Mine',
   '还没有角色 · 点「添加角色」,或让 Agent 存':
       'No characters yet · click "Add character" or let the Agent save one',
@@ -879,4 +878,10 @@ const en = <String, String>{
   '先不改': 'Not now',
   '漫画分格': 'Comic panels',
   '一张图里排几格漫画:分格、气泡与台词归属、跨格一致,也能排成区域控制布局': 'Several comic panels in one image: panel layout, speech bubbles and speakers, consistency across panels; can be laid out in Region Control',
+  '按名字或系列找:初音未来、甘雨、genshin impact':
+      'Search by name or series: Hatsune Miku, Ganyu, genshin impact',
+  '最多存 {0} 个尺寸': 'Up to {0} sizes',
+  '在镜头外': 'Out of view',
+  '上一层': 'Previous row',
+  '下一层': 'Next row',
 };

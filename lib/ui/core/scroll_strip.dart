@@ -2,18 +2,21 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 /// 横着的一排小按钮:最多露出前 [visible] 个那么宽,多出来的横着滚
-/// (底下有滚动条,鼠标滚轮也能滚)。地方不够时照样缩窄、能滚。
+/// (底下有滚动条,鼠标滚轮也能滚;[bar] 为假时不画滚动条,只能用滚轮)。
+/// 地方不够时照样缩窄、能滚。
 class ScrollStrip extends StatefulWidget {
   const ScrollStrip({
     super.key,
     required this.children,
     required this.visible,
     this.gap = 6,
+    this.bar = true,
   });
 
   final List<Widget> children;
   final int visible;
   final double gap;
+  final bool bar;
 
   @override
   State<ScrollStrip> createState() => _ScrollStripState();
@@ -51,7 +54,7 @@ class _ScrollStripState extends State<ScrollStrip> {
 
   @override
   Widget build(BuildContext context) {
-    final scrolls = widget.children.length > widget.visible;
+    final scrolls = widget.bar && widget.children.length > widget.visible;
     // 底下留给滚动条,免得压在按钮上。
     final pad = EdgeInsets.only(bottom: scrolls ? 8 : 0);
     return Stack(

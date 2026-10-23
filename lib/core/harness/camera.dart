@@ -288,33 +288,52 @@ Span? projectBody(Body b, CameraView view) {
   return (left: l!, top: t!, right: r!, bottom: bt!);
 }
 
-/// 调整 [b] 的大小和位置,让它投到画布上正好是 [box]:左右一起缩放宽和厚,
-/// 上下缩放高,再平移,离镜头的远近和朝向不变。框没有面积或体块在镜头后面时是 null。
+/// 调整 [b] 的大小和位置,让它投到画布上正好是 [box],再平移;离镜头的远近和朝向不变。
+/// 宽、高、厚各按它在画面上朝哪个方向缩放(见 [_axisScale]):正面看时框变宽就是宽变大,
+/// 从上往下看时框变高是厚变大。框没有面积或体块在镜头后面时是 null。
 // ponytail: 只迭代三次,转得很斜、离镜头很近的体块会差一两个像素;不够准再加次数。
 Body? fitBody(Body b, Span box, CameraView view) {
   final bw = box.right - box.left, bh = box.bottom - box.top;
-  if (bw <= 0 || bh <= 0) return null;
+  if (bw <= 0 || bh <= 0 || projectBody(b, view) == null) return null;
+  // 每样尺寸最多变成原来的四倍或四分之一:斜着看时有的边几乎朝着镜头,
+  // 要把框拉到那么大只能把它拉得很长,一直拉会伸到镜头后面去。拉到头就停,
+  // 框照体块实际投出来的样子摆(见 layout_3d.dart 的 refitBody)。
+  double keep(double v, double from) => v.clamp(from / 4, from * 4);
   var body = b;
-  for (var k = 0; k < 3; k++) {
-    final p = projectBody(body, view);
-    if (p == null) return null;
+  for (var k = 0; k < 4; k++) {
+    final p = projectBody(body, view)!;
     final pw = p.right - p.left, ph = p.bottom - p.top;
-    if (pw <= 0 || ph <= 0) return null;
-    body = body.copyWith(
-      w: body.w * bw / pw,
-      d: body.d * bw / pw,
-      h: body.h * bh / ph,
+    if (pw <= 0 || ph <= 0) break;
+    final sx = bw / pw, sy = bh / ph;
+    final c = math.cos(_rad(body.yaw)), s = math.sin(_rad(body.yaw));
+    final next = body.copyWith(
+      w: keep(body.w * _axisScale((x: c, y: 0, z: -s), view, sx, sy), b.w),
+      h: keep(body.h * _axisScale((x: 0, y: 1, z: 0), view, sx, sy), b.h),
+      d: keep(body.d * _axisScale((x: s, y: 0, z: c), view, sx, sy), b.d),
     );
-    final q = projectBody(body, view);
-    if (q == null) return null;
-    final z = view.toCamera(body.center).z;
+    final q = projectBody(next, view);
+    if (q == null) break; // 这一步伸到了镜头后面:停在上一步
+    final z = view.toCamera(next.center).z;
     final du = (box.left + box.right - q.left - q.right) / 2;
     final dv = (box.top + box.bottom - q.top - q.bottom) / 2;
-    body = body.moved(
+    final moved = next.moved(
       _add(_mul(view.right, du / view.f * z), _mul(view.down, dv / view.f * z)),
     );
+    if (projectBody(moved, view) == null) break;
+    body = moved;
   }
   return body;
+}
+
+/// 体块的一条边([axis] 是它在世界里的方向)该放大几倍:看它在画面上朝左右多还是朝上下多,
+/// 按这个比例混合左右的倍数 [sx] 和上下的倍数 [sy]。几乎正对着镜头的那条边(画面上
+/// 只是一个点)两样各算一半。以前固定成"左右管宽和厚、上下管高",俯视时框一拉高,
+/// 体块的高就被拉成很长的一根。
+double _axisScale(Vec3 axis, CameraView view, double sx, double sy) {
+  final across = _dot(axis, view.right).abs(), up = _dot(axis, view.down).abs();
+  final t = across + up < 1e-6 ? 0.5 : across / (across + up);
+  // 每一轮最多放大缩小两倍,免得一下拉飞。
+  return (math.pow(sx, t) * math.pow(sy, 1 - t)).toDouble().clamp(0.5, 2.0);
 }
 
 /// 和 Agent 来回说体块时用的写法(相对眼前的镜头):[distance] 离镜头多远
@@ -405,10 +424,7 @@ Camera walk(Camera c, {double forward = 0, double right = 0, double up = 0}) {
   final v = CameraView(c, 1, 1);
   final t = _add(
     c.target,
-    _add(
-      _mul(v.fwd, forward),
-      _add(_mul(v.right, right), _mul(v.down, -up)),
-    ),
+    _add(_mul(v.fwd, forward), _add(_mul(v.right, right), _mul(v.down, -up))),
   );
   return c.copyWith(panX: t.x, panY: t.y, panZ: t.z - 1);
 }

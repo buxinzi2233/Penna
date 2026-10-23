@@ -229,10 +229,19 @@ class _BoxCard extends StatelessWidget {
         layoutLayerName(b.layer),
         style: TextStyle(fontSize: 11, color: PennaColors.slate500),
       ),
-      _icon(
-        shown ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-        shown ? tr('在画布上屏蔽') : tr('在画布上显示'),
-        () => board.setHidden(index, shown),
+      // 转到镜头外的块在画布上本来就看不见,眼睛闭着、点不动。
+      IconButton(
+        tooltip: b.offscreen
+            ? tr('在镜头外')
+            : shown
+            ? tr('在画布上屏蔽')
+            : tr('在画布上显示'),
+        iconSize: 16,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(
+          shown ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+        ),
+        onPressed: b.offscreen ? null : () => board.setHidden(index, shown),
       ),
       _icon(
         open ? Icons.expand_less : Icons.expand_more,

@@ -109,7 +109,7 @@ Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON
 
 ### Characters
 
-- About 74,000 Danbooru characters built in, ordered by popularity and searchable by English name or Chinese and Japanese aliases.
+- About 74,000 Danbooru characters built in, ordered by popularity and searchable by English name, Chinese and Japanese aliases, or series name.
 - Each character's feature tags are split into **Looks** and **Outfit and other**, so the appearance can be used on its own.
 - Save your own characters: a name, a prompt and a picture.
 - The Agent can search the character library during a chat and save characters to it.

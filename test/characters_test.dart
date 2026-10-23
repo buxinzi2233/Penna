@@ -63,6 +63,13 @@ void main() {
       expect(dict.search('查无此人'), isEmpty);
     });
 
+    test('按名字找系列:完全对上的最前,下划线和大小写不分', () {
+      expect(dict.searchSeries('GENSHIN_impact').single.name, 'genshin impact');
+      expect(dict.searchSeries('voca').single.name, 'vocaloid');
+      expect(dict.searchSeries('原神'), isEmpty);
+      expect(dict.searchSeries(' '), isEmpty);
+    });
+
     test('按系列分组:角色多的系列在前,系列里图多的角色在前', () {
       expect(dict.series, [
         (name: 'genshin impact', count: 2),

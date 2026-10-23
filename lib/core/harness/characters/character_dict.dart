@@ -53,6 +53,25 @@ class CharacterDict {
   List<CharacterHit> inSeries(String name, {int limit = 80}) =>
       _rows.where((r) => r.series == name).take(limit).toList();
 
+  /// 按名字找作品(系列):完全对上的排最前,其余名字里带着它的按角色多少排,
+  /// 最多 [limit] 个。和 [search] 一样不分下划线、空格和大小写。
+  // ponytail: 作品名只有英文(数据里没有作品的中文别名),"原神"这种查不到。
+  List<({String name, int count})> searchSeries(String query, {int limit = 10}) {
+    final q = _normalize(query);
+    if (q.isEmpty) return const [];
+    final exact = <({String name, int count})>[];
+    final loose = <({String name, int count})>[];
+    for (final s in series) {
+      final name = _normalize(s.name);
+      if (name == q) {
+        exact.add(s);
+      } else if (name.contains(q)) {
+        loose.add(s);
+      }
+    }
+    return [...exact, ...loose].take(limit).toList();
+  }
+
   /// 按名字找角色,最多 [limit] 个。名字完全对上的排最前,然后是去掉括号后对上的
   /// (`ganyu` 对上 `ganyu (genshin impact)`)和某个别名完全对上的(`甘雨`、`初音未来`),
   /// 再是每个词都出现在名字、作品或别名里的(`miku vocaloid`、`saber fate`);
@@ -60,11 +79,7 @@ class CharacterDict {
   // ponytail: 每次都把整张表扫一遍(7 万行,几毫秒),嫌慢再建索引。
   // 中文名靠数据里的别名,那边没收的叫法查不到。
   List<CharacterHit> search(String query, {int limit = 5}) {
-    final q = query
-        .toLowerCase()
-        .replaceAll(RegExp(r'[_\\]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final q = _normalize(query);
     if (q.isEmpty) return const [];
     final words = q.split(' ');
     final exact = <CharacterHit>[];
@@ -89,6 +104,13 @@ class CharacterDict {
     return [...exact, ...bare, ...loose].take(limit).toList();
   }
 }
+
+/// 查角色、查作品时把写法统一:小写,下划线和反斜杠当空格,连着的空白并成一个。
+String _normalize(String s) => s
+    .toLowerCase()
+    .replaceAll(RegExp(r'[_\\]'), ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
 
 /// 一个角色出图时用的触发词:「角色名, 作品」。
 String characterTrigger(CharacterHit c) =>

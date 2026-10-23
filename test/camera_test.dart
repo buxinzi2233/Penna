@@ -9,6 +9,7 @@ import 'package:penna/core/harness/layout_3d.dart';
 import 'package:penna/ui/features/layout/layout_board.dart';
 import 'package:penna/ui/features/layout/layout_camera.dart';
 import 'package:penna/ui/features/layout/layout_canvas.dart';
+import 'package:penna/ui/features/studio/page_strip.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 
 import 'fixtures.dart';
@@ -57,6 +58,29 @@ void main() {
       final body = liftBody(_box, v, (distance: 1.2, depth: 1, yaw: 10));
       const moved = (left: 160.0, top: 250.0, right: 520.0, bottom: 1100.0);
       _near(projectBody(fitBody(body, moved, v)!, v), moved, tol: 2);
+    });
+
+    test('俯视时把框拉高,体块不会被拉成伸到镜头后面的长棍', () {
+      // 正面立起一个站着的人,再从很陡的俯视角度把它的框往下拉长一倍。
+      final body = liftBody(_box, view, (distance: 1.2, depth: 0.5, yaw: 0));
+      final v = CameraView(const Camera(pitch: 75), _w, _h);
+      final p = projectBody(body, v)!;
+      final taller = (
+        left: p.left,
+        top: p.top,
+        right: p.right,
+        bottom: p.bottom + (p.bottom - p.top),
+      );
+      final fitted = fitBody(body, taller, v)!;
+      final q = projectBody(fitted, v)!;
+      expect(q.bottom - q.top, greaterThan((p.bottom - p.top) * 1.5));
+      for (final (a, b) in [
+        (fitted.w, body.w),
+        (fitted.h, body.h),
+        (fitted.d, body.d),
+      ]) {
+        expect(a, inInclusiveRange(b / 4 - 1e-9, b * 4 + 1e-9));
+      }
     });
 
     test('转到镜头后面的投不出来', () {
@@ -342,5 +366,61 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       expect(board.freeCam, isFalse);
     });
+  });
+
+  test('转到镜头外看不见的块算屏蔽着;常用尺寸最多存 8 个', () {
+    final b = LayoutBoard()
+      ..addBox(_boxAt(100, 300, 400, 1000, name: '小红'))
+      ..setThreeD(true);
+    expect(b.shown(0), isTrue);
+    // 镜头推过它、还朝前看:它在镜头后面。
+    b.setCamera(const Camera(panZ: 1.5, distance: 0.1));
+    expect(b.layout.boxes.single.offscreen, isTrue);
+    expect(b.shown(0), isFalse);
+
+    for (var i = 0; i < LayoutBoard.maxSizes + 2; i++) {
+      b.setSize(512 + 16 * i, 512);
+      b.saveSize();
+    }
+    expect(b.sizes, hasLength(LayoutBoard.maxSizes));
+    expect(b.saveSize(), isFalse);
+  });
+
+  testWidgets('系列多了分层:一层 5 个,左右翻;换了系列跟回眼前那一层', (tester) async {
+    final vm = StudioViewModel(
+      config: tempConfig(),
+      streamChat: (_) => const Stream.empty(),
+    );
+    for (var i = 0; i < 6; i++) {
+      vm.addPage(newSeries: true);
+    }
+    expect(vm.series, isNot(vm.pages.first.series));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1600,
+            child: ListenableBuilder(
+              listenable: vm,
+              builder: (context, _) => PageStrip(vm: vm),
+            ),
+          ),
+        ),
+      ),
+    );
+    // 眼前是第 7 个系列,停在第二层。
+    expect(find.text('系列 7'), findsOneWidget);
+    expect(find.text('系列 1'), findsNothing);
+    expect(find.text('2/2'), findsOneWidget);
+    await tester.tap(find.byTooltip('上一层'));
+    await tester.pump();
+    expect(find.text('系列 1'), findsOneWidget);
+    expect(find.text('系列 5'), findsOneWidget);
+    expect(find.text('系列 6'), findsNothing);
+    // 换了系列(这里是新建一个),又跟着眼前这个系列那一层走。
+    expect(vm.addPage(newSeries: true), isNull);
+    await tester.pump();
+    expect(find.text('系列 8'), findsOneWidget);
+    expect(find.text('系列 1'), findsNothing);
   });
 }

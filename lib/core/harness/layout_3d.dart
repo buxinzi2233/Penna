@@ -42,12 +42,14 @@ List<(int, LayoutBox)> reprojectBoxes(Layout l) {
 }
 
 /// 2D 里改了框(拖动、改大小、换画布):体块跟着调到投影正好是这个框,
-/// 远近和朝向不变。调不了(没有面积、在镜头后面)就原样。
+/// 远近和朝向不变。调不了(没有面积、在镜头后面)就原样;斜着看时拉到头了
+/// (见 [fitBody])框就贴着体块实际投出来的样子。
 LayoutBox refitBody(LayoutBox b, Layout l) {
   final body = b.body;
   if (body == null || b.offscreen) return b;
-  final fitted = fitBody(body, b.span, CameraView(l.camera, l.width, l.height));
-  return fitted == null ? b : b.copyWith(body: () => fitted);
+  final view = CameraView(l.camera, l.width, l.height);
+  final fitted = fitBody(body, b.span, view);
+  return fitted == null ? b : _snap(b.copyWith(body: () => fitted), view, l);
 }
 
 /// 给一块立起体块:照 Agent 写的 [hint],没写就按类别和图层猜一个(记成 guessed)。
@@ -55,14 +57,35 @@ LayoutBox refitBody(LayoutBox b, Layout l) {
 LayoutBox liftBox(LayoutBox b, Layout l, [BodyHint? hint]) {
   if (b.label == 'text') return b.copyWith(body: () => null);
   if (b.offscreen) return b;
-  return b.copyWith(
-    body: () => liftBody(
-      b.span,
-      CameraView(l.camera, l.width, l.height),
-      hint ?? guessBodyHint(b.label, b.layer),
-      guessed: hint == null,
-    ),
+  final view = CameraView(l.camera, l.width, l.height);
+  final body = liftBody(
+    b.span,
+    view,
+    hint ?? guessBodyHint(b.label, b.layer),
+    guessed: hint == null,
   );
+  return _snap(b.copyWith(body: () => body), view, l);
+}
+
+/// 框和体块的投影差出两个像素以上(体块拉到头了)时,框改成投影的样子,
+/// 免得框是一个样、体块是另一个样。截到画布里后没有面积就不改。
+LayoutBox _snap(LayoutBox b, CameraView view, Layout l) {
+  final p = b.body == null ? null : projectBody(b.body!, view);
+  if (p == null) return b;
+  final off = [
+    p.left - b.left,
+    p.top - b.top,
+    p.right - b.right,
+    p.bottom - b.bottom,
+  ].any((d) => d.abs() > 2);
+  if (!off) return b;
+  final snapped = b.copyWith(
+    left: p.left.round().clamp(0, l.width),
+    top: p.top.round().clamp(0, l.height),
+    right: p.right.round().clamp(0, l.width),
+    bottom: p.bottom.round().clamp(0, l.height),
+  );
+  return snapped.offscreen ? b : snapped;
 }
 
 /// 还没有体块的块(文字块除外)都猜一个。

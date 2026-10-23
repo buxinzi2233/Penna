@@ -152,11 +152,23 @@ class PageStrip extends StatelessWidget {
           ),
         ),
         Expanded(
-          // 页多了自己折行,不会挤出去。
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          // 一层最多放 _perLayer 个系列,多的用左右箭头翻;一层里放不下时自己折行。
+          child: _SeriesPager(
+            current: groups.indexWhere(
+              (g) => pages[g.first].series == vm.series,
+            ),
+            currentSeries: vm.series,
+            trailing: Tooltip(
+              message: tr('另起一个系列,对话和别的系列分开'),
+              child: PennaButton(
+                label: tr('新系列'),
+                icon: Icons.add,
+                borderColor: PennaColors.border,
+                onPressed: full
+                    ? null
+                    : () => _do(context, vm.addPage(newSeries: true)),
+              ),
+            ),
             children: [
               for (final (g, group) in groups.indexed)
                 _SeriesFrame(
@@ -201,18 +213,93 @@ class PageStrip extends StatelessWidget {
                     ),
                   ],
                 ),
-              Tooltip(
-                message: tr('另起一个系列,对话和别的系列分开'),
-                child: PennaButton(
-                  label: tr('新系列'),
-                  icon: Icons.add,
-                  borderColor: PennaColors.border,
-                  onPressed: full
-                      ? null
-                      : () => _do(context, vm.addPage(newSeries: true)),
-                ),
-              ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 页签上一层放几个系列。
+const _perLayer = 5;
+
+/// 系列多了分层:一层 [_perLayer] 个,左右箭头翻层。默认停在眼前这个系列那一层;
+/// 用户翻到别的层后,换了系列(新建、切过去)又跟回眼前这一层。
+class _SeriesPager extends StatefulWidget {
+  const _SeriesPager({
+    required this.children,
+    required this.current,
+    required this.currentSeries,
+    required this.trailing,
+  });
+
+  /// 每个系列一个框,按先后排。
+  final List<Widget> children;
+
+  /// 眼前这个系列是 [children] 里的第几个。
+  final int current;
+  final int currentSeries;
+
+  /// 跟在每一层最后的「新系列」按钮。
+  final Widget trailing;
+
+  @override
+  State<_SeriesPager> createState() => _SeriesPagerState();
+}
+
+class _SeriesPagerState extends State<_SeriesPager> {
+  /// 用户翻到的层,和翻的时候眼前是哪个系列。
+  int? _picked, _pickedFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final layers = (widget.children.length / _perLayer).ceil().clamp(
+      1,
+      1 << 20,
+    );
+    final home = widget.current < 0 ? 0 : widget.current ~/ _perLayer;
+    final layer =
+        ((_pickedFor == widget.currentSeries ? _picked : null) ?? home).clamp(
+          0,
+          layers - 1,
+        );
+    void go(int to) => setState(() {
+      _picked = to;
+      _pickedFor = widget.currentSeries;
+    });
+    Widget arrow(IconData icon, String tip, int? to) => IconButton(
+      tooltip: tip,
+      iconSize: 18,
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon),
+      onPressed: to == null ? null : () => go(to),
+    );
+    final row = Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ...widget.children.skip(layer * _perLayer).take(_perLayer),
+        widget.trailing,
+      ],
+    );
+    if (layers == 1) return row;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        arrow(Icons.chevron_left, tr('上一层'), layer > 0 ? layer - 1 : null),
+        Expanded(child: row),
+        arrow(
+          Icons.chevron_right,
+          tr('下一层'),
+          layer < layers - 1 ? layer + 1 : null,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 9, left: 2),
+          child: Text(
+            '${layer + 1}/$layers',
+            style: TextStyle(fontSize: 11, color: PennaColors.slate500),
           ),
         ),
       ],

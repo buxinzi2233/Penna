@@ -55,10 +55,11 @@ class LayoutBox {
   final Body? body;
   final bool? hidden;
 
-  /// 画布上画不画它:用户点过眼睛就照他的;没点过的,3D 视图里文字块默认屏蔽
-  /// (文字贴在画面上不跟镜头转,在 3D 里只会挡住别的块)。
+  /// 画布上画不画它:转到镜头外看不见了([offscreen])就算屏蔽着;用户点过眼睛
+  /// 就照他的;没点过的,3D 视图里文字块默认屏蔽(文字贴在画面上不跟镜头转,
+  /// 在 3D 里只会挡住别的块)。
   bool shownIn({required bool threeD}) =>
-      !(hidden ?? (threeD && label == 'text'));
+      !offscreen && !(hidden ?? (threeD && label == 'text'));
 
   int get width => right - left;
   int get height => bottom - top;

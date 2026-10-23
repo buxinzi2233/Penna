@@ -238,13 +238,19 @@ class LayoutBoard extends ChangeNotifier {
     return (width: l.height, height: l.width);
   }
 
-  void saveSize() {
+  /// 存下眼下的画布尺寸;已经存满 [maxSizes] 个时不存,返回 false。
+  bool saveSize() {
     final size = (width: _layout.width, height: _layout.height);
-    if (_sizes.contains(size)) return;
+    if (_sizes.contains(size)) return true;
+    if (_sizes.length >= maxSizes) return false;
     _sizes = List.unmodifiable([..._sizes, size]);
     notifyListeners();
     _scheduleSave();
+    return true;
   }
+
+  /// 最多存几个常用的画布尺寸(顶栏一排正好放得下)。
+  static const maxSizes = 8;
 
   void removeSize(LayoutSize size) {
     _sizes = List.unmodifiable(_sizes.where((s) => s != size));

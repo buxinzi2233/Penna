@@ -27,6 +27,9 @@ const _maxBuiltin = 30;
 /// 先摆出来的系列有几个(角色最多的那些)。
 const _maxSeries = 80;
 
+/// 搜索时最多列出几个名字对得上的系列。
+const _maxSeriesHits = 10;
+
 /// 系列的格子至少这么宽,窗口窄了就少排几列;格子之间隔这么远。
 const _seriesTileWidth = 220.0;
 const _seriesGap = 10.0;
@@ -49,6 +52,24 @@ class CharactersPage extends StatefulWidget {
 
 class _CharactersPageState extends State<CharactersPage> {
   var _query = '';
+
+  /// 搜索框:点了搜出来的系列要把它清空。
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// 打开一个系列看它名下的角色;从搜索结果点进来的,先把搜索清掉。
+  void _openSeries(String name) {
+    _search.clear();
+    setState(() {
+      _query = '';
+      _series = name;
+    });
+  }
 
   /// 正在看哪个系列里的内置角色;null 是在看各个系列。
   String? _series;
@@ -131,8 +152,33 @@ class _CharactersPageState extends State<CharactersPage> {
     }
   }
 
-  /// 「内置」那一块:在查名字就是结果;没在查时先列各个系列(角色多的在前),
-  /// 点一个系列看它名下的角色(图多的在前)。
+  /// 一格一个系列,格子一样大,排成整齐的几列(宽的时候 5 列)。
+  Widget _seriesGrid(Iterable<({String name, int count})> series) =>
+      LayoutBuilder(
+        builder: (context, box) {
+          final columns = (box.maxWidth / _seriesTileWidth).floor().clamp(2, 5);
+          final width = (box.maxWidth - _seriesGap * (columns - 1)) / columns;
+          return Wrap(
+            spacing: _seriesGap,
+            runSpacing: _seriesGap,
+            children: [
+              for (final s in series)
+                SizedBox(
+                  // 留一点余量:算出来的小数宽度加起来不能超过一行。
+                  width: width.floorToDouble(),
+                  child: _SeriesTile(
+                    name: s.name,
+                    count: s.count,
+                    onTap: () => _openSeries(s.name),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+
+  /// 「内置」那一块:在查就是结果(名字对得上的系列在前,再是角色);没在查时先列
+  /// 各个系列(角色多的在前),点一个系列看它名下的角色(图多的在前)。
   Widget _builtin(CharacterDict dict, String q, List<CharacterHit> found) {
     final series = _series;
     final hits = q.isNotEmpty
@@ -143,38 +189,19 @@ class _CharactersPageState extends State<CharactersPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (q.isNotEmpty)
-          _Heading(tr('内置'), tr('{0} 个', [found.length]))
-        else if (series == null) ...[
+        if (q.isNotEmpty) ...[
+          if (dict.searchSeries(q, limit: _maxSeriesHits) case final hits
+              when hits.isNotEmpty) ...[
+            _Heading(tr('系列'), tr('{0} 个', [hits.length])),
+            const SizedBox(height: 8),
+            _seriesGrid(hits),
+            const SizedBox(height: 14),
+          ],
+          _Heading(tr('内置'), tr('{0} 个', [found.length])),
+        ] else if (series == null) ...[
           _Heading(tr('内置'), tr('{0} 个系列', [dict.series.length])),
           const SizedBox(height: 8),
-          // 一格一个系列,格子一样大,排成整齐的几列(宽的时候 5 列)。
-          LayoutBuilder(
-            builder: (context, box) {
-              final columns = (box.maxWidth / _seriesTileWidth).floor().clamp(
-                2,
-                5,
-              );
-              final width =
-                  (box.maxWidth - _seriesGap * (columns - 1)) / columns;
-              return Wrap(
-                spacing: _seriesGap,
-                runSpacing: _seriesGap,
-                children: [
-                  for (final s in dict.series.take(_maxSeries))
-                    SizedBox(
-                      // 留一点余量:算出来的小数宽度加起来不能超过一行。
-                      width: width.floorToDouble(),
-                      child: _SeriesTile(
-                        name: s.name,
-                        count: s.count,
-                        onTap: () => setState(() => _series = s.name),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+          _seriesGrid(dict.series.take(_maxSeries)),
         ] else
           Row(
             children: [
@@ -269,6 +296,7 @@ class _CharactersPageState extends State<CharactersPage> {
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: TextField(
                           contextMenuBuilder: pennaTextMenu,
+                          controller: _search,
                           onChanged: (v) => setState(() => _query = v),
                           style: const TextStyle(fontSize: 13),
                           decoration: InputDecoration(
@@ -277,7 +305,7 @@ class _CharactersPageState extends State<CharactersPage> {
                               size: 17,
                               color: PennaColors.slate400,
                             ),
-                            hintText: tr('按名字找:初音未来、甘雨、hatsune miku'),
+                            hintText: tr('按名字或系列找:初音未来、甘雨、genshin impact'),
                             hintStyle: TextStyle(
                               fontSize: 12.5,
                               color: PennaColors.slate400,

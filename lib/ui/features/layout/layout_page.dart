@@ -32,8 +32,8 @@ const _propsWidth = 340.0;
 const _settleDelay = Duration(milliseconds: 1200);
 const _chatWidth = 420.0;
 
-/// 顶栏存的画布尺寸最多露出几个,多的横着滚。
-const _maxSizes = 4;
+/// 顶栏存的画布尺寸最多露出几个(也最多只能存这么多)。
+const _maxSizes = LayoutBoard.maxSizes;
 
 /// 区域控制工作台:左边写各块的属性,中间在画布上画框,右边和布局 Agent 对话,
 /// 得到 MOSS-Image 的布局 JSON。能存进档案库的「区域控制」分区。
@@ -541,7 +541,15 @@ class _TopBar extends StatelessWidget {
           iconSize: 16,
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.bookmark_add_outlined),
-          onPressed: board.saveSize,
+          onPressed: () {
+            if (!board.saveSize()) {
+              showToast(
+                context,
+                tr('最多存 {0} 个尺寸', [LayoutBoard.maxSizes]),
+                warn: true,
+              );
+            }
+          },
         ),
         const SizedBox(width: 4),
         _PerspectiveButton(board: board),
@@ -560,6 +568,7 @@ class _TopBar extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: ScrollStrip(
               visible: _maxSizes,
+              bar: false,
               children: [
                 for (final s in board.sizes)
                   Tooltip(
