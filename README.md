@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261023--6--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261023--7--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -96,7 +96,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 - 布局按系列和分页组织,Agent 换主题时自动另起一个系列。
 - 各块以图层列表呈现,分前景、中景、后景,拖动调整前后;支持一点、两点、三点透视辅助线。
-- 发给 Agent 时附带程序算出的位置关系(各块在画面中的位置、贴边裁切、前后遮挡及遮挡比例),Agent 据此把空间关系写进描述;给参考图时先分析图中的遮挡、裁切与机位再排布局。
+- 发给 Agent 时附带程序算出的位置关系(各块在画面中的位置、贴边裁切、前后遮挡及遮挡比例;3D 视图中按离镜头远近、体块的实际投影轮廓和可见的面计算),Agent 据此把空间关系写进描述;给参考图时先分析图中的遮挡、裁切与机位再排布局。
 - 参考图与画布一横一竖时,画布可随之横竖对调;Agent 按其他比例写的布局等比缩放后摆进画布正中。
 - 3D 视图:每块带有体块(远近、厚度、朝向),由 Agent 估计;摄像机可水平环绕、俯仰、滚转、推拉和平移,框随视角重新计算,前后顺序按远近重排,描述可交给 Agent 按新视角改写,镜头调整后会提示这一步。平面视图与 3D 视图之间切换时各块的状态保留。
 - 3D 视图的操作参照 Blender:中键拖动环绕,Shift+中键平移,Ctrl+中键或滚轮推拉;小键盘 1、3、7 切换正面、侧面、顶视,2、4、6、8 逐步旋转;Shift+` 进入自由镜头,WASD 走动、QE 升降。摄像机栏位于画布右侧,可收起为窄边;选中一块后,可在摄像机栏中直接调整它体块的位置、宽高厚与朝向。

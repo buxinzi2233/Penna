@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/layout.dart';
+import 'package:penna/core/harness/layout_3d.dart';
 import 'package:penna/core/harness/layout_relations.dart';
 import 'package:penna/ui/features/layout/layout_board.dart';
 
@@ -49,5 +50,65 @@ void main() {
     expect(board.prompt, contains('【位置关系】'));
     board.clear();
     expect(board.prompt, isNot(contains('【位置关系】')));
+  });
+
+  group('3D 视图开着时按 3D 场景算', () {
+    // 正面看:小红在前(近),背景板在后(远),小红挡住背景板的一部分。
+    Layout scene(Camera camera) {
+      const flat = Layout();
+      final base = Layout(
+        boxes: [
+          liftBox(_b('小红', 300, 300, 550, 1000, layer: 'front'), flat, (
+            distance: 0.8,
+            depth: 0.5,
+            yaw: 0,
+          )),
+          liftBox(_b('背景板', 100, 200, 732, 900, layer: 'back'), flat, (
+            distance: 2.5,
+            depth: 0.1,
+            yaw: 0,
+          )),
+          const LayoutBox(
+            left: 100,
+            top: 50,
+            right: 732,
+            bottom: 250,
+            label: 'text',
+            text: 'TITLE',
+            name: '标题',
+          ),
+        ],
+      );
+      final l = base.copyWith(camera: camera);
+      return l.copyWith(boxes: [for (final m in reprojectBoxes(l)) m.$2]);
+    }
+
+    test('正面:近的挡远的,看得到正面;文字压在什么上面', () {
+      final text = sceneRelations(scene(const Camera()));
+      expect(text, contains('3D 构图'));
+      expect(text, contains('「小红」:离镜头第 1 近'));
+      expect(text, contains('「小红」离镜头更近,挡住「背景板」的'));
+      expect(text, contains('看得到它的正面'));
+      expect(text, contains('「标题」压在「背景板」的'));
+    });
+
+    test('绕到背后:前后对调,看得到背面;俯视看得到顶面', () {
+      final behind = sceneRelations(
+        scene(const Camera(orbit: 180, distance: 4)),
+      );
+      expect(behind, contains('「背景板」:离镜头第 1 近'));
+      expect(behind, contains('「背景板」离镜头更近,挡住「小红」的'));
+      expect(behind, contains('背面'));
+      final above = sceneRelations(scene(const Camera(pitch: 60)));
+      expect(above, contains('顶面'));
+    });
+
+    test('3D 视图开着时发给 Agent 的是 3D 的关系', () {
+      final board = LayoutBoard()..replace(scene(const Camera()));
+      expect(board.prompt, contains('【位置关系】程序按框算'));
+      board.setThreeD(true);
+      expect(board.prompt, contains('【位置关系 · 3D 构图】'));
+      expect(board.prompt, isNot(contains('【位置关系】程序按框算')));
+    });
   });
 }
