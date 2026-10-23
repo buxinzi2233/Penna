@@ -189,6 +189,7 @@ class _CameraPanelState extends State<CameraPanel> {
                 ],
               ),
             ),
+            ?_bodySection(),
             if (board.cameraMoved || board.guessedBodies) ...[
               const Divider(height: 1),
               Padding(
@@ -216,6 +217,139 @@ class _CameraPanelState extends State<CameraPanel> {
           ],
         ),
       ),
+    );
+  }
+
+  /// 选中的那一块的体块:位置、宽高厚、朝向一行一个,改了框马上照它重新投出来。
+  /// 斜着看时靠拖框去改体块不好控制,这里直接改数。没选中、文字块没有体块时不显示。
+  Widget? _bodySection() {
+    final i = board.selected;
+    final box = i == null ? null : board.layout.boxes[i];
+    final b = box?.body;
+    if (i == null || box == null || b == null) return null;
+    final name = boxName(box, i);
+    double size(double v) => v < 0.01 ? 0.01 : v;
+    // 世界坐标的 y 向下,这里换成向上为正,和"往上挪"对得上。
+    final rows =
+        <
+          ({
+            String label,
+            String unit,
+            double value,
+            double step,
+            double perPx,
+            Body Function(double) apply,
+          })
+        >[
+          (
+            label: tr('位置 X'),
+            unit: '',
+            value: b.x,
+            step: 0.05,
+            perPx: 0.004,
+            apply: (v) => b.copyWith(x: v),
+          ),
+          (
+            label: tr('位置 Y'),
+            unit: '',
+            value: -b.y,
+            step: 0.05,
+            perPx: 0.004,
+            apply: (v) => b.copyWith(y: -v),
+          ),
+          (
+            label: tr('位置 Z'),
+            unit: '',
+            value: b.z,
+            step: 0.05,
+            perPx: 0.004,
+            apply: (v) => b.copyWith(z: v),
+          ),
+          (
+            label: tr('宽'),
+            unit: '',
+            value: b.w,
+            step: 0.05,
+            perPx: 0.003,
+            apply: (v) => b.copyWith(w: size(v)),
+          ),
+          (
+            label: tr('高'),
+            unit: '',
+            value: b.h,
+            step: 0.05,
+            perPx: 0.003,
+            apply: (v) => b.copyWith(h: size(v)),
+          ),
+          (
+            label: tr('厚'),
+            unit: '',
+            value: b.d,
+            step: 0.05,
+            perPx: 0.003,
+            apply: (v) => b.copyWith(d: size(v)),
+          ),
+          (
+            label: tr('朝向'),
+            unit: '°',
+            value: b.yaw,
+            step: 15,
+            perPx: 0.5,
+            apply: (v) => b.copyWith(yaw: wrapDegrees(v)),
+          ),
+        ];
+    String what(String label) => tr('调整「{0}」的{1}', [name, label]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 2),
+          child: Row(
+            children: [
+              Icon(
+                Icons.view_in_ar_outlined,
+                size: 14,
+                color: layoutBoxColor(i),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  tr('体块 · {0}', [name]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Column(
+            children: [
+              for (final r in rows)
+                _Dial(
+                  label: r.label,
+                  value: r.value,
+                  unit: r.unit,
+                  step: r.step,
+                  perPx: r.perPx,
+                  onStart: () => board.mark(what(r.label)),
+                  onEnd: () => board.mark(null),
+                  onChanged: (v, {required bool step}) => board.setBody(
+                    i,
+                    r.apply(v),
+                    action: step ? what(r.label) : null,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

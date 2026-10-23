@@ -240,7 +240,9 @@ void main() {
   testWidgets('3D 视图:右键拖画布转镜头,面板上的箭头一步一步调', (tester) async {
     final board = LayoutBoard()
       ..addBox(_boxAt(100, 300, 400, 1000, name: '小红'))
-      ..setThreeD(true);
+      ..setThreeD(true)
+      // 不选中:选中时摄像机栏下面多出体块那一截,按钮会被挤出测试窗口。
+      ..select(null);
     var redescribed = 0;
     await tester.pumpWidget(
       MaterialApp(
@@ -422,5 +424,46 @@ void main() {
     await tester.pump();
     expect(find.text('系列 8'), findsOneWidget);
     expect(find.text('系列 1'), findsNothing);
+  });
+
+  testWidgets('选中一块后在摄像机栏里直接改它的体块,框跟着重新投出来', (tester) async {
+    final board = LayoutBoard()
+      ..addBox(_boxAt(100, 300, 400, 1000, name: '小红'))
+      ..setThreeD(true)
+      ..select(0);
+    final before = board.layout.boxes.single;
+    expect(before.body!.guessed, isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 1200,
+            child: ListenableBuilder(
+              listenable: board,
+              builder: (context, _) => CameraPanel(
+                board: board,
+                onRedescribe: () {},
+                onEstimate: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('体块 · 小红'), findsOneWidget);
+    // 「位置 X」那一行的右箭头:往右挪一步。名字和数值在里面一层的 Row,
+    // 两个箭头在外面一层。
+    final row = find
+        .ancestor(of: find.text('位置 X'), matching: find.byType(Row))
+        .at(1);
+    await tester.tap(
+      find.descendant(of: row, matching: find.byIcon(Icons.chevron_right)),
+    );
+    await tester.pump();
+    final after = board.layout.boxes.single;
+    expect(after.body!.x, closeTo(before.body!.x + 0.05, 1e-9));
+    expect(after.body!.guessed, isFalse);
+    expect(after.left, greaterThan(before.left));
+    expect(tester.takeException(), isNull);
   });
 }

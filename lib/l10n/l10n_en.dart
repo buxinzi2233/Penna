@@ -887,4 +887,11 @@ const en = <String, String>{
   '区域控制放不下:{0}': 'No room in Region Control: {0}',
   '系列满了(最多 {0} 个),删掉一些不用的系列再放':
       'Series are full (up to {0}). Delete some unused series, then try again',
+  '位置 X': 'Position X',
+  '位置 Y': 'Position Y',
+  '位置 Z': 'Position Z',
+  '厚': 'Depth',
+  '朝向': 'Facing',
+  '调整「{0}」的{1}': 'Adjusted {1} of "{0}"',
+  '体块 · {0}': 'Volume · {0}',
 };

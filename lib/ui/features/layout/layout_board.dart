@@ -310,7 +310,26 @@ class LayoutBoard extends ChangeNotifier {
   /// 换镜头:有体块的框照新镜头重新算,前后跟着远近排(见 [reprojectBoxes])。
   void setCamera(Camera camera, {String? action}) {
     if (camera == _layout.camera) return;
-    final l = _layout.copyWith(camera: camera);
+    _reproject(_layout.copyWith(camera: camera), action: action);
+  }
+
+  /// 手动改第 [i] 块的体块(摄像机栏里的位置、宽高厚、朝向):框照新的体块重新投出来,
+  /// 不再算"猜的"。
+  void setBody(int i, Body body, {String? action}) {
+    if (i < 0 || i >= _layout.boxes.length) return;
+    _reproject(
+      _layout.copyWith(
+        boxes: [
+          for (final (j, b) in _layout.boxes.indexed)
+            j == i ? b.copyWith(body: () => body.copyWith(guessed: false)) : b,
+        ],
+      ),
+      action: action,
+    );
+  }
+
+  /// 换成 [l],有体块的框照它的镜头重新投(见 [reprojectBoxes]),选中的跟着那一块走。
+  void _reproject(Layout l, {String? action}) {
     final moved = reprojectBoxes(l);
     final sel = _selected;
     _set(
