@@ -315,7 +315,10 @@ readMossLayout(
       (own.width > own.height) != (width > height);
   final tw = flip ? height : width, th = flip ? width : height;
   final xyxy = field('bbox_format') == 'xyxy';
-  final abs = field('bbox_coord_space') == 'abs';
+  // 照参考图排时 Agent 在图上量 0–1000 的比例(看图的模型量比例比换算像素准):
+  // 写 "ref1000",程序按画布拉伸过去,贴边、出血的照样贴边。
+  final ref = field('bbox_coord_space') == 'ref1000';
+  final abs = ref || field('bbox_coord_space') == 'abs';
   final items = field('items');
   List<double> bbox(Object? item) => [
     for (final n
@@ -333,7 +336,7 @@ readMossLayout(
   // Gemini 看图时习惯写 0–1000 的比例坐标:有框远远超出写的宽高(多出一成以上),
   // 而所有数都在 0 到 1000 之间,就按 1000×1000 读。
   // 只在它自己写了宽高时这样认(照着参考图写的);没写宽高的出界照常截掉。
-  final perMille = abs && own != null && _perMille(all, xyxy, w, h);
+  final perMille = ref || abs && own != null && _perMille(all, xyxy, w, h);
   if (perMille) w = h = 1000;
   final dx = abs ? 0 : w ~/ 2, dy = abs ? 0 : h ~/ 2;
   final boxes = <LayoutBox>[];

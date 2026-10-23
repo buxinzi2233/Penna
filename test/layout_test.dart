@@ -228,6 +228,20 @@ void main() {
     final desk = board.layout.boxes.firstWhere((b) => b.name == '桌');
     expect((desk.right, desk.bottom), (1215, 831));
 
+    // 照参考图量的 ref1000:没写宽高、框也没出界,照样按比例拉到画布上,贴边的还贴边。
+    board.apply(
+      '{"items": [{"name": "头", "bbox": [300, 80, 1000, 1000]},'
+      '{"name": "日期", "bbox": [0, 0, 500, 60]}],'
+      ' "bbox_coord_space": "ref1000", "bbox_format": "xyxy"}',
+    );
+    expect((board.layout.width, board.layout.height), (1216, 832));
+    final head = board.layout.boxes.firstWhere((b) => b.name == '头');
+    expect(
+      (head.left, head.top, head.right, head.bottom),
+      (365, 67, 1216, 832),
+    );
+    expect(board.fixes, isEmpty);
+
     // 只稍微画出界的照常截掉,不当成比例坐标。
     board.apply(
       '{"width": 1216, "height": 832, "items": [{"bbox": [0, 0, 300, 860]}],'
