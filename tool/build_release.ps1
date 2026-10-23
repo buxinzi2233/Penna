@@ -48,6 +48,32 @@ subst $drive (Split-Path $root -Parent)
 try {
   Set-Location "$drive\$(Split-Path $root -Leaf)"
   flutter clean | Out-Null
+  # flutter_onnxruntime 每次 clean 后都要在 CMake 里从 GitHub 下载 onnxruntime 的压缩包,
+  # 不检查下没下成功:网络不稳时下成空文件,报 "extraction directory doesn't exist"。
+  # 所以压缩包在 dist\cache 留一份(只下一次),编译前先解到它要找的地方,它看到就不下了。
+  flutter pub get | Out-Null
+  $ortCmake = 'windows\flutter\ephemeral\.plugin_symlinks\flutter_onnxruntime\windows\CMakeLists.txt'
+  $ortMatch = if (Test-Path $ortCmake) { Select-String -Path $ortCmake -Pattern 'set\(ONNXRUNTIME_VERSION "([^"]+)"\)' }
+  if ($ortMatch) {
+    $ortName = "onnxruntime-win-x64-$($ortMatch.Matches[0].Groups[1].Value)"
+    $ortZip = Join-Path $dist "cache\$ortName.zip"
+    try {
+      if (-not (Test-Path $ortZip)) {
+        New-Item -ItemType Directory -Force (Split-Path $ortZip) | Out-Null
+        "下载 $ortName(只下这一次,之后用 dist\cache 里的)"
+        $ver = $ortMatch.Matches[0].Groups[1].Value
+        Invoke-WebRequest "https://github.com/microsoft/onnxruntime/releases/download/v$ver/$ortName.zip" -OutFile "$ortZip.part"
+        Move-Item "$ortZip.part" $ortZip -Force
+      }
+      $ortDir = 'build\windows\x64\plugins\flutter_onnxruntime\onnxruntime'
+      New-Item -ItemType Directory -Force $ortDir | Out-Null
+      Expand-Archive $ortZip -DestinationPath $ortDir -Force
+    } catch {
+      # 下载失败或压缩包坏了:删掉缓存,交给插件自己去下(下面失败了还会重试一次)。
+      "onnxruntime 预备失败,交给插件自己下载:$($_.Exception.Message)"
+      Remove-Item "$ortZip.part", $ortZip -Force -ErrorAction SilentlyContinue
+    }
+  }
   flutter build windows --release
   # flutter clean 之后,flutter_onnxruntime 的 CMake 第一次常报
   # "ONNX Runtime extraction directory doesn't exist",再编一次就好:自动重试一次。
