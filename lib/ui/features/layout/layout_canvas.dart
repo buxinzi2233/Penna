@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/harness/layout.dart';
@@ -10,6 +11,8 @@ import 'layout_bodies.dart';
 import 'layout_board.dart';
 import 'layout_perspective.dart';
 import '../../../l10n/l10n.dart';
+
+part 'layout_navigation.dart';
 
 /// 框的颜色按先后轮换。用中间色调,深浅两套配色上都看得清。
 const _boxColors = [
@@ -24,21 +27,18 @@ const _boxColors = [
 
 Color layoutBoxColor(int i) => _boxColors[i % _boxColors.length];
 
-/// 右键拖镜头时每移动一个屏幕像素转多少度。
-const _orbitPerPx = 0.4, _pitchPerPx = 0.3;
-
 /// 比这个小(画布像素)的框不算,当成手抖。
 const _minBox = 8;
 
 /// 右下角这么大(屏幕像素)的地方按下去是拉大小。
 const _handle = 12.0;
 
-enum _Drag { draw, move, resize, vanish }
+enum _Drag { draw, move, resize, vanish, look }
 
 /// 画布:按画布尺寸等比缩放显示。空白处拖出一个新框,拖框移动,拖右下角改大小,
 /// 点一下选中,双击改它的描述,Delete 删掉选中的。框按图层先后画,前景盖住后景。
-/// 开了透视辅助时画出透视线,消失点能拖。3D 视图里画出每块的体块,右键拖动转镜头,
-/// 中键或 Shift+右键拖动平移,滚轮推拉。
+/// 开了透视辅助时画出透视线,消失点能拖。3D 视图里画出每块的体块,鼠标和键盘照 Blender
+/// 的习惯转镜头(见 [_Navigation])。屏蔽了的块不画、点不中。
 class LayoutCanvas extends StatefulWidget {
   const LayoutCanvas({
     super.key,
@@ -59,7 +59,8 @@ class LayoutCanvas extends StatefulWidget {
   State<LayoutCanvas> createState() => _LayoutCanvasState();
 }
 
-class _LayoutCanvasState extends State<LayoutCanvas> {
+class _LayoutCanvasState extends State<LayoutCanvas>
+    with SingleTickerProviderStateMixin {
   _Drag? _drag;
   int _target = -1;
 
@@ -79,15 +80,23 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
   /// 正在画的新框(画布像素)。
   Rect? _drawing;
 
-  /// 3D 视图里右键(转)或中键、Shift+右键(平移)拖镜头:按下的位置和那时的镜头。
+  /// 3D 视图里用中键、右键拖镜头:按下的位置、那时的镜头和拖的是哪一种。
   Offset? _camFrom;
   Camera? _camStart;
-  bool _panning = false;
+  _CamDrag _camDrag = _CamDrag.orbit;
+
+  /// 自由镜头里按着 WASDQE 时每帧走一点(见 [_Navigation._walkTick])。
+  late final Ticker _walker = createTicker((t) => _walkTick(t));
+  Duration _walkedAt = Duration.zero;
+
+  /// 上一帧是不是自由镜头:刚打开时把焦点拿到画布上,WASD 才收得到。
+  bool _wasFree = false;
 
   LayoutBoard get _board => widget.board;
 
   @override
   void dispose() {
+    _walker.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -107,6 +116,7 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
   }
 
   KeyEventResult _key(FocusNode _, KeyEvent e) {
+    if (_navKey(e) == KeyEventResult.handled) return KeyEventResult.handled;
     final i = _board.selected;
     if (e is! KeyDownEvent || i == null) return KeyEventResult.ignored;
     if (e.logicalKey != LogicalKeyboardKey.delete &&
@@ -143,7 +153,7 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
     ];
     for (final i in order) {
       final b = boxes[i];
-      if (b.offscreen) continue;
+      if (b.offscreen || !_board.shown(i)) continue;
       final r = Rect.fromLTRB(
         b.left.toDouble(),
         b.top.toDouble(),
@@ -156,6 +166,13 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
   }
 
   void _start(Offset p, double scale) {
+    // 自由镜头里左键拖动是转头,不碰框。
+    if (_board.freeCam) {
+      _drag = _Drag.look;
+      _from = p * scale;
+      _camStart = _board.layout.camera;
+      return;
+    }
     // 消失点在最上面,先看是不是按在它上面。
     final v = _hitVanishing(p, scale);
     if (v != null) {
@@ -191,10 +208,13 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
     setState(() {});
   }
 
-  void _update(Offset p) {
+  void _update(Offset p, double scale) {
     final l = _board.layout;
     final b = _origin;
     switch (_drag) {
+      case _Drag.look:
+        final start = _camStart;
+        if (start != null) _look(_from, p * scale, start);
       case _Drag.draw:
         setState(() => _drawing = Rect.fromPoints(_from, p));
       case _Drag.move when b != null:
@@ -240,54 +260,13 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
         );
       }
     }
+    if (_drag == _Drag.look) _camStart = null;
     _board.mark(null);
     setState(() {
       _drag = null;
       _drawing = null;
       _origin = null;
     });
-  }
-
-  void _cameraDown(PointerDownEvent e) {
-    if (!_board.threeD) return;
-    final right = e.buttons & kSecondaryMouseButton != 0;
-    final middle = e.buttons & kTertiaryButton != 0;
-    if (!right && !middle) return;
-    _panning = middle || HardwareKeyboard.instance.isShiftPressed;
-    _camFrom = e.localPosition;
-    _camStart = _board.layout.camera;
-    _board.mark(_panning ? tr('平移镜头') : tr('转动镜头'));
-  }
-
-  void _cameraMove(PointerMoveEvent e, double scale) {
-    final from = _camFrom, c = _camStart;
-    if (from == null || c == null) return;
-    final d = (e.localPosition - from) / scale;
-    final l = _board.layout;
-    _board.setCamera(
-      _panning
-          ? panned(c, d.dx, d.dy, l.width, l.height)
-          : c.copyWith(
-              orbit: c.orbit + d.dx * scale * _orbitPerPx,
-              pitch: c.pitch + d.dy * scale * _pitchPerPx,
-            ),
-    );
-  }
-
-  void _cameraUp() {
-    if (_camFrom == null) return;
-    _camFrom = null;
-    _camStart = null;
-    _board.mark(null);
-  }
-
-  /// 3D 视图里滚轮推拉镜头(不记进操作记录,滚一下就是一步太碎)。
-  void _zoom(PointerSignalEvent e) {
-    if (!_board.threeD || e is! PointerScrollEvent) return;
-    final c = _board.layout.camera;
-    _board.setCamera(
-      c.copyWith(distance: c.distance * math.exp(e.scrollDelta.dy / 600)),
-    );
   }
 
   @override
@@ -297,6 +276,12 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
       builder: (context, _) => LayoutBuilder(
         builder: (context, box) {
           final l = _board.layout;
+          if (_board.freeCam && !_wasFree) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _focus.requestFocus();
+            });
+          }
+          _wasFree = _board.freeCam;
           final scale = math.min(
             box.maxWidth / l.width,
             box.maxHeight / l.height,
@@ -324,7 +309,9 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
                   onPointerCancel: (_) => _cameraUp(),
                   onPointerSignal: _zoom,
                   child: MouseRegion(
-                    cursor: SystemMouseCursors.precise,
+                    cursor: _board.freeCam
+                        ? SystemMouseCursors.move
+                        : SystemMouseCursors.precise,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       // 从按下的那一点算起,不是挪过一小段之后。
@@ -333,7 +320,8 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
                           _tap(_hit(toCanvas(d.localPosition), scale)),
                       onPanStart: (d) =>
                           _start(toCanvas(d.localPosition), scale),
-                      onPanUpdate: (d) => _update(toCanvas(d.localPosition)),
+                      onPanUpdate: (d) =>
+                          _update(toCanvas(d.localPosition), scale),
                       onPanEnd: (_) => _end(),
                       onPanCancel: _end,
                       child: _paint(l, scale),
@@ -377,7 +365,7 @@ class _LayoutCanvasState extends State<LayoutCanvas> {
               ),
             ),
           for (final i in _paintOrder)
-            if (!l.boxes[i].offscreen)
+            if (!l.boxes[i].offscreen && _board.shown(i))
               Positioned.fromRect(
                 rect: screen(l.boxes[i]),
                 child: _BoxView(

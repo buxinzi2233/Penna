@@ -182,8 +182,8 @@ class _BoxCard extends StatelessWidget {
     onPressed: onPressed,
   );
 
-  /// 折叠时那一行。
-  Widget _header(LayoutBox b, Color color) => Row(
+  /// 折叠时那一行。[shown] 为假时这一块在画布上屏蔽着:名字变淡,眼睛是闭着的。
+  Widget _header(LayoutBox b, Color color, bool shown) => Row(
     children: [
       ReorderableDragStartListener(
         index: index,
@@ -218,12 +218,21 @@ class _BoxCard extends StatelessWidget {
           b.name.trim().isEmpty ? layoutLabelName(b.label) : b.name.trim(),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: shown ? null : PennaColors.slate400,
+          ),
         ),
       ),
       Text(
         layoutLayerName(b.layer),
         style: TextStyle(fontSize: 11, color: PennaColors.slate500),
+      ),
+      _icon(
+        shown ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+        shown ? tr('在画布上屏蔽') : tr('在画布上显示'),
+        () => board.setHidden(index, shown),
       ),
       _icon(
         open ? Icons.expand_less : Icons.expand_more,
@@ -253,7 +262,7 @@ class _BoxCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _header(b, color),
+              _header(b, color, board.shown(index)),
               if (open)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(6, 4, 6, 8),

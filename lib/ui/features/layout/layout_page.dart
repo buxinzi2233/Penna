@@ -269,40 +269,25 @@ class _LayoutPageState extends State<LayoutPage> {
                           ),
                         ),
                         Expanded(
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: LayoutCanvas(
-                                    board: board,
-                                    onPick: _reveal,
-                                    onEdit: (i) => _reveal(i, edit: true),
-                                  ),
-                                ),
-                              ),
-                              if (board.threeD)
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  bottom: 8,
-                                  child: Align(
-                                    alignment: Alignment.topRight,
-                                    child: SingleChildScrollView(
-                                      child: CameraPanel(
-                                        board: board,
-                                        onRedescribe: _redescribe,
-                                        onEstimate: _estimate,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: LayoutCanvas(
+                              board: board,
+                              onPick: _reveal,
+                              onEdit: (i) => _reveal(i, edit: true),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
+                  // 3D 视图的摄像机一栏贴在画布右边,不盖住画布。
+                  if (board.threeD)
+                    CameraPanel(
+                      board: board,
+                      onRedescribe: _redescribe,
+                      onEstimate: _estimate,
+                    ),
                   Container(
                     width: _chatWidth,
                     decoration: BoxDecoration(border: Border(left: side)),

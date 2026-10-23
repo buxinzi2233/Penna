@@ -32,6 +32,8 @@ const minLayoutSide = 64, maxLayoutSide = 4096;
 /// [name] 是给这一块起的名字,[layer] 是它在哪一层(见 [layoutLayers]),
 /// 两样都只在 Penna 里用(用户和 Agent 靠它们说"哪一块"、谁挡着谁),
 /// 官方格式不认,交出去的 JSON 里没有。[body] 是它在 3D 视图里的体块(文字块没有)。
+/// [hidden] 是在画布上暂时屏蔽(只是不画、点不中,交出去的 JSON 照常带着):
+/// null 是没设过,按视图来定(见 [shownIn])。
 @immutable
 class LayoutBox {
   const LayoutBox({
@@ -45,11 +47,18 @@ class LayoutBox {
     this.name = '',
     this.layer = defaultLayer,
     this.body,
+    this.hidden,
   });
 
   final int left, top, right, bottom;
   final String label, caption, text, name, layer;
   final Body? body;
+  final bool? hidden;
+
+  /// 画布上画不画它:用户点过眼睛就照他的;没点过的,3D 视图里文字块默认屏蔽
+  /// (文字贴在画面上不跟镜头转,在 3D 里只会挡住别的块)。
+  bool shownIn({required bool threeD}) =>
+      !(hidden ?? (threeD && label == 'text'));
 
   int get width => right - left;
   int get height => bottom - top;
@@ -75,6 +84,7 @@ class LayoutBox {
     String? name,
     String? layer,
     Body? Function()? body,
+    bool? Function()? hidden,
   }) => LayoutBox(
     left: left ?? this.left,
     top: top ?? this.top,
@@ -86,6 +96,7 @@ class LayoutBox {
     name: name ?? this.name,
     layer: layer ?? this.layer,
     body: body == null ? this.body : body(),
+    hidden: hidden == null ? this.hidden : hidden(),
   );
 
   /// 按比例缩到另一块画布上(换画布尺寸时用)。
@@ -104,6 +115,7 @@ class LayoutBox {
     'name': name,
     'layer': layer,
     'body': ?body?.toJson(),
+    'hidden': ?hidden,
   };
 
   static LayoutBox? fromJson(Object? j) {
@@ -121,6 +133,7 @@ class LayoutBox {
       name: j['name'] as String? ?? '',
       layer: _layer(j['layer']),
       body: Body.fromJson(j['body']),
+      hidden: j['hidden'] is bool ? j['hidden'] as bool : null,
     );
   }
 }
@@ -429,8 +442,8 @@ bool _perMille(List<List<double>> boxes, bool xyxy, int w, int h) {
   return (width: (width as num).round(), height: (height as num).round());
 }
 
-/// 新写的布局 [fresh] 漏了 name、layer 时,从原来的 [old] 里接上;体块(JSON 里没有)
-/// 也接上原来那块的。
+/// 新写的布局 [fresh] 漏了 name、layer 时,从原来的 [old] 里接上;体块和屏蔽
+/// (JSON 里没有)也接上原来那块的。
 /// 先按名字对号;没写名字的,块数没变时接离它中心最近、还没被认领的那块
 /// (Agent 常把先后换了,按下标接会接错)。[keepLayers] 为真时 layer 也照原来的。
 List<LayoutBox> inheritNames(
@@ -472,6 +485,7 @@ List<LayoutBox> inheritNames(
           name: b.name.trim().isEmpty ? old[j].name : null,
           layer: keepLayers ? old[j].layer : null,
           body: () => old[j].body,
+          hidden: () => old[j].hidden,
         ),
       },
   ];

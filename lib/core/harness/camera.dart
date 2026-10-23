@@ -390,3 +390,29 @@ Camera panned(Camera c, double du, double dv, int width, int height) {
   );
   return c.copyWith(panX: t.x, panY: t.y, panZ: t.z - 1);
 }
+
+/// 自由镜头里转头:镜头位置不动,朝向转 [dOrbit] / [dPitch] 度(目标点跟着挪到正前方)。
+Camera lookAround(Camera c, double dOrbit, double dPitch) {
+  final eye = CameraView(c, 1, 1).eye;
+  final turned = c.copyWith(orbit: c.orbit + dOrbit, pitch: c.pitch + dPitch);
+  final t = _add(eye, _mul(CameraView(turned, 1, 1).fwd, c.distance));
+  return turned.copyWith(panX: t.x, panY: t.y, panZ: t.z - 1);
+}
+
+/// 自由镜头里走动:镜头和目标点一起往前 [forward]、往右 [right]、往上 [up] 挪
+/// (都是世界里的长度,方向按镜头现在的朝向)。
+Camera walk(Camera c, {double forward = 0, double right = 0, double up = 0}) {
+  final v = CameraView(c, 1, 1);
+  final t = _add(
+    c.target,
+    _add(
+      _mul(v.fwd, forward),
+      _add(_mul(v.right, right), _mul(v.down, -up)),
+    ),
+  );
+  return c.copyWith(panX: t.x, panY: t.y, panZ: t.z - 1);
+}
+
+/// 绕着 [p] 转:目标点挪到它身上,角度和距离不变。
+Camera focusOn(Camera c, Vec3 p) =>
+    c.copyWith(panX: p.x, panY: p.y, panZ: p.z - 1);

@@ -11,14 +11,16 @@ import 'layout_board.dart';
 import 'layout_canvas.dart';
 
 const _panelWidth = 232.0;
+const _railWidth = 40.0;
 const _sceneHeight = 150.0;
 
 /// 拖小场景时每移动一个屏幕像素转多少度。
 const _orbitPerPx = 0.6, _pitchPerPx = 0.4;
 
-/// 3D 视图里画布右上角的摄像机面板:上面是小场景(拖着转镜头、滚轮推拉),
-/// 下面一行一个参数(两边的箭头一步一步调,按住中间左右拖着调),
-/// 最底下是交给 Agent 的两件事。
+/// 3D 视图里贴在画布右边的摄像机一栏(不盖住画布):顶上是自由镜头的开关,
+/// 小场景(拖着转镜头、滚轮推拉),一行一个参数(两边的箭头一步一步调,
+/// 按住中间左右拖着调),最底下是交给 Agent 的两件事。收起时是一条窄边,
+/// 只留展开、自由镜头和复位。
 class CameraPanel extends StatefulWidget {
   const CameraPanel({
     super.key,
@@ -125,20 +127,44 @@ class _CameraPanelState extends State<CameraPanel> {
             apply: (v) => cam.copyWith(panZ: v),
           ),
         ];
+    final decoration = BoxDecoration(
+      color: PennaColors.card,
+      border: Border(left: BorderSide(color: PennaColors.border)),
+    );
+    if (!_open) {
+      return Container(
+        width: _railWidth,
+        decoration: decoration,
+        child: Column(
+          children: [
+            const SizedBox(height: 4),
+            IconButton(
+              tooltip: tr('摄像机'),
+              iconSize: 17,
+              icon: Icon(Icons.videocam_outlined, color: PennaColors.primary),
+              onPressed: () => setState(() => _open = true),
+            ),
+            _freeCamIcon(),
+            _resetButton(cam),
+          ],
+        ),
+      );
+    }
     return Container(
       width: _panelWidth,
-      decoration: BoxDecoration(
-        color: PennaColors.card,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: PennaColors.border),
-        boxShadow: const [BoxShadow(color: Color(0x1F000000), blurRadius: 14)],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _header(cam),
-          if (_open) ...[
+      decoration: decoration,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(cam),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: _FreeCamButton(
+                on: board.freeCam,
+                onTap: () => board.setFreeCam(!board.freeCam),
+              ),
+            ),
             const Divider(height: 1),
             _scene(),
             const Divider(height: 1),
@@ -188,10 +214,42 @@ class _CameraPanelState extends State<CameraPanel> {
               ),
             ],
           ],
-        ],
+        ),
       ),
     );
   }
+
+  Widget _resetButton(Camera cam) => IconButton(
+    tooltip: tr('镜头复位'),
+    iconSize: 15,
+    visualDensity: VisualDensity.compact,
+    icon: const Icon(Icons.restart_alt),
+    onPressed: cam.isDefault
+        ? null
+        : () => board.setCamera(const Camera(), action: tr('镜头复位')),
+  );
+
+  /// 收起时那条窄边上的自由镜头开关:开着时填满主色,一眼看得出。
+  Widget _freeCamIcon() => Tooltip(
+    message: board.freeCam ? tr('退出自由镜头') : tr('自由镜头'),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: () => board.setFreeCam(!board.freeCam),
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: board.freeCam ? PennaColors.primary : null,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          Icons.open_with,
+          size: 16,
+          color: board.freeCam ? Colors.white : PennaColors.slate500,
+        ),
+      ),
+    ),
+  );
 
   Widget _header(Camera cam) => SizedBox(
     height: 34,
@@ -206,21 +264,38 @@ class _CameraPanelState extends State<CameraPanel> {
             style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
           ),
         ),
-        IconButton(
-          tooltip: tr('镜头复位'),
-          iconSize: 15,
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.restart_alt),
-          onPressed: cam.isDefault
-              ? null
-              : () => board.setCamera(const Camera(), action: tr('镜头复位')),
+        Tooltip(
+          richMessage: TextSpan(
+            children: [
+              for (final (i, (keys, what)) in layoutNavigationTips.indexed)
+                TextSpan(
+                  children: [
+                    if (i > 0) const TextSpan(text: '\n'),
+                    TextSpan(
+                      text: keys,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    TextSpan(text: '  $what'),
+                  ],
+                ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Icon(
+              Icons.keyboard_outlined,
+              size: 16,
+              color: PennaColors.slate500,
+            ),
+          ),
         ),
+        _resetButton(cam),
         IconButton(
-          tooltip: _open ? tr('收起') : tr('展开'),
+          tooltip: tr('收起'),
           iconSize: 16,
           visualDensity: VisualDensity.compact,
-          icon: Icon(_open ? Icons.expand_less : Icons.expand_more),
-          onPressed: () => setState(() => _open = !_open),
+          icon: const Icon(Icons.keyboard_double_arrow_right),
+          onPressed: () => setState(() => _open = false),
         ),
       ],
     ),
@@ -371,6 +446,60 @@ class _DialState extends State<_Dial> {
             ),
             arrow(Icons.chevron_right, 1),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 自由镜头的开关,放在「摄像机」标题下面:开着时填满主色、写着怎么退出。
+class _FreeCamButton extends StatelessWidget {
+  const _FreeCamButton({required this.on, required this.onTap});
+
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = on ? Colors.white : PennaColors.slate700;
+    return Material(
+      color: on ? PennaColors.primary : PennaColors.slate50,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: on ? PennaColors.primary : PennaColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.open_with, size: 15, color: fg),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  on ? tr('自由镜头中') : tr('自由镜头'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: fg,
+                  ),
+                ),
+              ),
+              Text(
+                on ? 'Esc' : 'Shift+`',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: fg.withValues(alpha: 0.75),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

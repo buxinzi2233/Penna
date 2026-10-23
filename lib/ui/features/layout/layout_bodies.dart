@@ -33,7 +33,7 @@ void paintCuboid(
   }
 }
 
-/// 主画布上(3D 视图)每块的体块:投到画布上,[scale] 是画布像素到屏幕。
+/// 主画布上(3D 视图)每块的体块:投到画布上,[scale] 是画布像素到屏幕。屏蔽了的不画。
 class BodiesPainter extends CustomPainter {
   BodiesPainter(this.layout, this.scale, this.colorOf, this.selected);
 
@@ -49,7 +49,7 @@ class BodiesPainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     for (final (i, b) in layout.boxes.indexed.toList().reversed) {
       final body = b.body;
-      if (body == null || b.offscreen || b.label == 'text') continue;
+      if (body == null || b.offscreen || !b.shownIn(threeD: true)) continue;
       final pts = [for (final c in body.corners) view.project(c)];
       if (pts.contains(null)) continue;
       paintCuboid(
@@ -125,7 +125,7 @@ class OrbitPainter extends CustomPainter {
     ));
     final bodies = <(int, List<Offset?>)>[
       for (final (i, b) in layout.boxes.indexed)
-        if (b.body != null && b.label != 'text')
+        if (b.body != null && b.shownIn(threeD: true))
           (i, [for (final c in b.body!.corners) at(c)]),
     ];
     // 把用到的点都框进面板里。

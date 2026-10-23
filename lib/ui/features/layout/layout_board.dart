@@ -35,6 +35,12 @@ class LayoutBoard extends ChangeNotifier {
   /// 3D 视图开着没有(默认是平面视图,不存盘)。体块和摄像机两种视图下都留着。
   bool _threeD = false;
 
+  /// 自由镜头开着没有(3D 视图里才有,不存盘):开着时画布上拖动是转头、WASD 走动。
+  bool _freeCam = false;
+
+  /// 这一趟自由镜头还没记进操作记录(第一次挪动时记一笔)。
+  bool _freeUnlogged = false;
+
   /// 描述是照哪个镜头写的:Agent 放上布局、换页时记下。镜头转过之后和它不一样,
   /// 界面上就给出「按视角改描述」。
   Camera _described = const Camera();
@@ -48,6 +54,10 @@ class LayoutBoard extends ChangeNotifier {
   int get revision => _revision;
   String get json => mossLayoutJson(_layout);
   bool get threeD => _threeD;
+  bool get freeCam => _freeCam;
+
+  /// 第 [i] 块眼下在画布上画不画(见 [LayoutBox.shownIn])。
+  bool shown(int i) => _layout.boxes[i].shownIn(threeD: _threeD);
 
   /// 镜头转过了,描述还是照原来的镜头写的。
   bool get cameraMoved => _layout.camera != _described;
@@ -248,6 +258,7 @@ class LayoutBoard extends ChangeNotifier {
   /// 开 / 关 3D 视图。打开时还没有体块的块先按图层猜一个(之后可以让 Agent 估)。
   void setThreeD(bool on) {
     _threeD = on;
+    if (!on) _freeCam = false;
     final missing = _layout.boxes.any(
       (b) => b.body == null && b.label != 'text',
     );
@@ -255,6 +266,39 @@ class LayoutBoard extends ChangeNotifier {
       return _set(_layout.copyWith(boxes: liftMissing(_layout)));
     }
     notifyListeners();
+  }
+
+  /// 开 / 关自由镜头(只在 3D 视图里)。
+  void setFreeCam(bool on) {
+    if (on == _freeCam || on && !_threeD) return;
+    _freeCam = on;
+    _freeUnlogged = on;
+    notifyListeners();
+  }
+
+  /// 自由镜头里转头、走动:一趟只在第一次挪动时记一笔操作。
+  void moveFree(Camera camera) {
+    if (camera == _layout.camera) return;
+    setCamera(camera, action: _freeUnlogged ? tr('自由镜头') : null);
+    _freeUnlogged = false;
+  }
+
+  /// 在画布上屏蔽 / 显示第 [i] 块(交出去的 JSON 不受影响)。
+  void setHidden(int i, bool hidden) {
+    if (i < 0 || i >= _layout.boxes.length) return;
+    final b = _layout.boxes[i];
+    if (hidden && _selected == i) _selected = null;
+    _set(
+      _layout.copyWith(
+        boxes: [
+          for (final (j, x) in _layout.boxes.indexed)
+            j == i ? x.copyWith(hidden: () => hidden) : x,
+        ],
+      ),
+      action: hidden
+          ? tr('屏蔽「{0}」', [boxName(b, i)])
+          : tr('显示「{0}」', [boxName(b, i)]),
+    );
   }
 
   /// 换镜头:有体块的框照新镜头重新算,前后跟着远近排(见 [reprojectBoxes])。

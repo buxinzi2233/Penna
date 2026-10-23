@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/layout.dart';
 import 'package:penna/core/harness/layout_3d.dart';
@@ -229,12 +230,10 @@ void main() {
               ),
               ListenableBuilder(
                 listenable: board,
-                builder: (context, _) => SingleChildScrollView(
-                  child: CameraPanel(
-                    board: board,
-                    onRedescribe: () => redescribed++,
-                    onEstimate: () {},
-                  ),
+                builder: (context, _) => CameraPanel(
+                  board: board,
+                  onRedescribe: () => redescribed++,
+                  onEstimate: () {},
                 ),
               ),
             ],
@@ -258,5 +257,90 @@ void main() {
     await tester.pump();
     expect(board.layout.camera.isDefault, isTrue);
     expect(tester.takeException(), isNull);
+  });
+
+  group('自由镜头和屏蔽', () {
+    test('转头时镜头位置不动,走动时朝前挪', () {
+      const c = Camera(orbit: 20, pitch: 10, distance: 1.5);
+      final eye = CameraView(c, _w, _h).eye;
+      final turned = CameraView(lookAround(c, 30, -15), _w, _h);
+      expect(turned.eye.x, closeTo(eye.x, 1e-9));
+      expect(turned.eye.y, closeTo(eye.y, 1e-9));
+      expect(turned.eye.z, closeTo(eye.z, 1e-9));
+      final ahead = CameraView(walk(c, forward: 0.5), _w, _h);
+      final moved = ahead.toCamera(eye);
+      expect(moved.z, closeTo(-0.5, 1e-9));
+    });
+
+    test('3D 视图里文字块默认屏蔽,点过眼睛就照用户的', () {
+      final b = LayoutBoard()
+        ..replace(
+          const Layout(
+            boxes: [
+              LayoutBox(
+                left: 0,
+                top: 0,
+                right: 400,
+                bottom: 100,
+                label: 'text',
+                text: 'SPRING',
+              ),
+              LayoutBox(left: 100, top: 200, right: 300, bottom: 800),
+            ],
+          ),
+        );
+      expect([b.shown(0), b.shown(1)], [true, true]);
+      b.setThreeD(true);
+      expect([b.shown(0), b.shown(1)], [false, true]);
+      b.setHidden(0, false);
+      b.setHidden(1, true);
+      expect([b.shown(0), b.shown(1)], [true, false]);
+      b.setThreeD(false);
+      expect(b.shown(1), isFalse);
+      // 屏蔽只管画布,交出去的 JSON 照常带着。
+      expect(b.json, contains('SPRING'));
+    });
+
+    testWidgets('小键盘切视角,Shift+` 开自由镜头后 WASD 走动', (tester) async {
+      final board = LayoutBoard()
+        ..addBox(_boxAt(100, 300, 400, 1000, name: '小红'))
+        ..setThreeD(true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 300,
+              height: 500,
+              child: LayoutCanvas(board: board),
+            ),
+          ),
+        ),
+      );
+      // 键盘要画布有焦点:点一下拿过来。
+      await tester.tapAt(tester.getCenter(find.byType(LayoutCanvas)));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.numpad3);
+      expect(board.layout.camera.orbit, -90);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      expect(board.layout.camera.orbit, -180);
+      await tester.sendKeyEvent(LogicalKeyboardKey.home);
+      expect(board.layout.camera.isDefault, isTrue);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.backquote);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      expect(board.freeCam, isTrue);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+      for (var k = 0; k < 10; k++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(board.layout.camera.panZ, greaterThan(0));
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      expect(board.freeCam, isFalse);
+    });
   });
 }
