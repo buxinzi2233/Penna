@@ -851,7 +851,6 @@ const en = <String, String>{
       'Some depths, thicknesses and facings were guessed from layers.',
   '估': 'Estimate',
   '给画板上每块估体块(body:远近、厚度、朝向),框的位置、描述和图层都不动': 'Estimate the volume (body: distance, depth, facing) of every block on the board. Keep box positions, captions and layers unchanged',
-  '镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、谁挡着谁),框、体块和图层都不动': 'The camera angle changed. Rewrite the overall caption and each block\'s caption for the new view (facing, visible side, what blocks what). Keep boxes, volumes and layers unchanged',
   '回到平面视图': 'Back to 2D view',
   '3D 视图': '3D view',
   '{0}({1})': '{0} ({1})',
@@ -873,4 +872,9 @@ const en = <String, String>{
   '自由镜头里转头': 'Look around in free camera',
   '在画布上屏蔽': 'Hide on canvas',
   '在画布上显示': 'Show on canvas',
+  '视角变了,描述要跟着改吗?': 'The view changed. Update the captions?',
+  '框已按新视角算好,描述里的朝向和位置关系还是原来的。': 'Boxes follow the new view; captions still describe the old facing and positions.',
+  '镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、左右前后的位置关系、谁挡着谁),框、体块和图层都不动': 'The camera angle changed. Rewrite the overall caption and each block\'s caption for the new view (facing, visible side, left/right and front/back positions, what blocks what). Keep boxes, volumes and layers unchanged',
+  '视角变了,描述还是原来的': 'View changed; captions are outdated',
+  '先不改': 'Not now',
 };

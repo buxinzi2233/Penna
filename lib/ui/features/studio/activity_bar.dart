@@ -38,6 +38,10 @@ class _ActivityBarState extends State<ActivityBar> {
       decoration: BoxDecoration(
         color: PennaColors.slate50,
         border: Border(right: BorderSide(color: PennaColors.border)),
+        // 区域控制页里它展开时盖在属性栏上,带一点影子看得出浮在上面。
+        boxShadow: _open
+            ? const [BoxShadow(color: Color(0x22000000), blurRadius: 14)]
+            : null,
       ),
       // 宽度变化的过程中里面的东西不换行、不报溢出,多出来的裁掉。
       child: ClipRect(

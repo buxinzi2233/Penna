@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -26,6 +27,9 @@ import '../../../l10n/l10n.dart';
 part 'layout_props.dart';
 
 const _propsWidth = 340.0;
+
+/// 镜头停下这么久才算"调好了",提醒按视角改描述。
+const _settleDelay = Duration(milliseconds: 1200);
 const _chatWidth = 420.0;
 
 /// 顶栏存的画布尺寸最多露出几个,多的横着滚。
@@ -76,8 +80,37 @@ class _LayoutPageState extends State<LayoutPage> {
   GlobalKey _cardKey(int i) => _cards.putIfAbsent(i, GlobalKey.new);
   FocusNode _fieldFocus(int i) => _fields.putIfAbsent(i, FocusNode.new);
 
+  /// 镜头调好了(停下一会儿)而描述还是原来视角的,在画布下面提醒一句。
+  /// [_lastCamera] 是上次看到的镜头,一变就重新计时;[_answered] 是用户已经回应过
+  /// (改了或说先不改)的那个镜头,同一个镜头不再提醒。
+  Camera? _lastCamera, _answered;
+  Timer? _settle;
+  bool _settled = false;
+
+  bool get _stale =>
+      _settled && board.cameraMoved && board.layout.camera != _answered;
+
+  @override
+  void initState() {
+    super.initState();
+    board.addListener(_watchCamera);
+  }
+
+  void _watchCamera() {
+    final c = board.layout.camera;
+    if (c == _lastCamera) return;
+    _lastCamera = c;
+    _settle?.cancel();
+    if (_settled) setState(() => _settled = false);
+    _settle = Timer(_settleDelay, () {
+      if (mounted) setState(() => _settled = true);
+    });
+  }
+
   @override
   void dispose() {
+    board.removeListener(_watchCamera);
+    _settle?.cancel();
     _input.dispose();
     _inputFocus.dispose();
     for (final f in _fields.values) {
@@ -163,9 +196,22 @@ class _LayoutPageState extends State<LayoutPage> {
   /// 开 / 关 3D 视图。打开时有体块是程序猜的,问一句要不要让 Agent 估
   /// (开了自动审批直接交给它)。
   Future<void> _toggle3D() async {
-    final on = !board.threeD;
-    board.setThreeD(on);
-    if (!on || !board.guessedBodies) return;
+    if (board.threeD) {
+      // 回平面视图前,镜头转过了而描述没跟着改:确认一次。
+      if (board.cameraMoved && board.layout.camera != _answered) {
+        final redo = await confirmDelete(
+          context,
+          tr('视角变了,描述要跟着改吗?'),
+          tr('框已按新视角算好,描述里的朝向和位置关系还是原来的。'),
+          action: tr('按视角改描述'),
+        );
+        if (!mounted) return;
+        redo ? _redescribe() : setState(() => _answered = board.layout.camera);
+      }
+      return board.setThreeD(false);
+    }
+    board.setThreeD(true);
+    if (!board.guessedBodies) return;
     if (!widget.config.config.autoApprove &&
         !await confirmDelete(
           context,
@@ -185,8 +231,10 @@ class _LayoutPageState extends State<LayoutPage> {
 
   void _estimate() => _send(tr('给画板上每块估体块(body:远近、厚度、朝向),框的位置、描述和图层都不动'));
 
-  void _redescribe() =>
-      _send(tr('镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、谁挡着谁),框、体块和图层都不动'));
+  void _redescribe() {
+    setState(() => _answered = board.layout.camera);
+    _send(tr('镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、左右前后的位置关系、谁挡着谁),框、体块和图层都不动'));
+  }
 
   /// 带着这一块去对话里:输入框上方出现它,接着打字说怎么改。
   void _discuss(int i) {
@@ -225,86 +273,125 @@ class _LayoutPageState extends State<LayoutPage> {
               onToggle3D: _toggle3D,
             ),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Stack(
                 children: [
-                  // 操作记录:画板上的改动、换页都记在区域控制那场对话上,能回滚。
-                  ListenableBuilder(
-                    listenable: widget.chat,
-                    builder: (context, _) => ActivityBar(vm: widget.chat),
-                  ),
-                  Container(
-                    width: _propsWidth,
-                    decoration: BoxDecoration(
-                      color: PennaColors.bg,
-                      border: Border(right: side),
-                    ),
-                    child: _Properties(
-                      board: board,
-                      onDiscuss: _discuss,
-                      onToDraft: _toDraft,
-                      onAsk: _ask,
-                      cardKey: _cardKey,
-                      fieldFocus: _fieldFocus,
-                      isOpen: _open.contains,
-                      onToggle: _toggle,
-                      onMove: _move,
-                      onDelete: _delete,
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
+                  Positioned.fill(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 各系列、各页,同工作台的成稿区;每页是一张布局。
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                          child: ListenableBuilder(
-                            listenable: widget.chat,
-                            builder: (context, _) => PageStrip(
-                              vm: widget.chat,
-                              label: tr('布局'),
-                              tips: false,
-                            ),
+                        // 给收起的操作记录留出窄边;展开时它盖在属性栏上,不挤画布。
+                        SizedBox(width: ActivityBar.widthOf(open: false)),
+                        Container(
+                          width: _propsWidth,
+                          decoration: BoxDecoration(
+                            color: PennaColors.bg,
+                            border: Border(right: side),
+                          ),
+                          child: _Properties(
+                            board: board,
+                            onDiscuss: _discuss,
+                            onToDraft: _toDraft,
+                            onAsk: _ask,
+                            cardKey: _cardKey,
+                            fieldFocus: _fieldFocus,
+                            isOpen: _open.contains,
+                            onToggle: _toggle,
+                            onMove: _move,
+                            onDelete: _delete,
                           ),
                         ),
                         Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: LayoutCanvas(
-                              board: board,
-                              onPick: _reveal,
-                              onEdit: (i) => _reveal(i, edit: true),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // 各系列、各页,同工作台的成稿区;每页是一张布局。
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  16,
+                                  24,
+                                  0,
+                                ),
+                                child: ListenableBuilder(
+                                  listenable: widget.chat,
+                                  builder: (context, _) => PageStrip(
+                                    vm: widget.chat,
+                                    label: tr('布局'),
+                                    tips: false,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(24),
+                                        child: LayoutCanvas(
+                                          board: board,
+                                          onPick: _reveal,
+                                          onEdit: (i) => _reveal(i, edit: true),
+                                        ),
+                                      ),
+                                    ),
+                                    if (_stale)
+                                      Positioned(
+                                        left: 16,
+                                        right: 16,
+                                        bottom: 12,
+                                        child: Center(
+                                          child: _StaleViewNote(
+                                            onRedescribe: _redescribe,
+                                            onLater: () => setState(
+                                              () => _answered =
+                                                  board.layout.camera,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 3D 视图的摄像机一栏贴在画布右边,不盖住画布。
+                        if (board.threeD)
+                          CameraPanel(
+                            board: board,
+                            onRedescribe: _redescribe,
+                            onEstimate: _estimate,
+                          ),
+                        Container(
+                          width: _chatWidth,
+                          decoration: BoxDecoration(border: Border(left: side)),
+                          child: ListenableBuilder(
+                            listenable: Listenable.merge([
+                              widget.chat,
+                              widget.config,
+                            ]),
+                            builder: (context, _) => ChatPane(
+                              vm: widget.chat,
+                              config: widget.config,
+                              input: _input,
+                              inputFocus: _inputFocus,
+                              onQuickAction: _appendInput,
+                              onOpenSettings: widget.onOpenSettings,
+                              onImage: _matchImage,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  // 3D 视图的摄像机一栏贴在画布右边,不盖住画布。
-                  if (board.threeD)
-                    CameraPanel(
-                      board: board,
-                      onRedescribe: _redescribe,
-                      onEstimate: _estimate,
-                    ),
-                  Container(
-                    width: _chatWidth,
-                    decoration: BoxDecoration(border: Border(left: side)),
+                  // 操作记录:画板上的改动、换页都记在区域控制那场对话上,能回滚。
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
                     child: ListenableBuilder(
-                      listenable: Listenable.merge([
-                        widget.chat,
-                        widget.config,
-                      ]),
-                      builder: (context, _) => ChatPane(
-                        vm: widget.chat,
-                        config: widget.config,
-                        input: _input,
-                        inputFocus: _inputFocus,
-                        onQuickAction: _appendInput,
-                        onOpenSettings: widget.onOpenSettings,
-                        onImage: _matchImage,
-                      ),
+                      listenable: widget.chat,
+                      builder: (context, _) => ActivityBar(vm: widget.chat),
                     ),
                   ),
                 ],
@@ -315,6 +402,53 @@ class _LayoutPageState extends State<LayoutPage> {
       ),
     );
   }
+}
+
+/// 画布下面的提醒:镜头调好了,描述还是原来视角的。
+class _StaleViewNote extends StatelessWidget {
+  const _StaleViewNote({required this.onRedescribe, required this.onLater});
+
+  final VoidCallback onRedescribe, onLater;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: PennaColors.card,
+    elevation: 6,
+    shadowColor: const Color(0x33000000),
+    borderRadius: BorderRadius.circular(10),
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: PennaColors.primaryBorder),
+      ),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        children: [
+          Icon(Icons.info_outline, size: 16, color: PennaColors.primary),
+          Text(
+            tr('视角变了,描述还是原来的'),
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          FilledButton.icon(
+            onPressed: onRedescribe,
+            icon: const Icon(Icons.edit_note, size: 16),
+            label: Text(tr('按视角改描述'), style: const TextStyle(fontSize: 12)),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              backgroundColor: PennaColors.primary,
+            ),
+          ),
+          TextButton(
+            onPressed: onLater,
+            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            child: Text(tr('先不改'), style: const TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _TopBar extends StatelessWidget {

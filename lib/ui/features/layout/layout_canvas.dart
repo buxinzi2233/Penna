@@ -27,6 +27,15 @@ const _boxColors = [
 
 Color layoutBoxColor(int i) => _boxColors[i % _boxColors.length];
 
+/// 3D 视图里体块的颜色:和框同一色系、浅一档,框(交出去的)和体块一眼分得开。
+Color layoutBodyColor(int i) {
+  final hsl = HSLColor.fromColor(layoutBoxColor(i));
+  return hsl
+      .withLightness((hsl.lightness + 0.16).clamp(0.0, 0.85))
+      .withSaturation(hsl.saturation * 0.8)
+      .toColor();
+}
+
 /// 比这个小(画布像素)的框不算,当成手抖。
 const _minBox = 8;
 
@@ -372,6 +381,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
                   index: i,
                   box: l.boxes[i],
                   selected: _board.selected == i,
+                  threeD: _board.threeD,
                 ),
               ),
           if (_board.threeD)
@@ -381,7 +391,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
                   painter: BodiesPainter(
                     l,
                     scale,
-                    layoutBoxColor,
+                    layoutBodyColor,
                     _board.selected,
                   ),
                 ),
@@ -425,11 +435,15 @@ class _BoxView extends StatelessWidget {
     required this.index,
     required this.box,
     required this.selected,
+    required this.threeD,
   });
 
   final int index;
   final LayoutBox box;
   final bool selected;
+
+  /// 3D 视图里框只留边和标题条(底色更淡、不写描述),让位给体块,免得叠得太乱。
+  final bool threeD;
 
   @override
   Widget build(BuildContext context) {
@@ -443,19 +457,25 @@ class _BoxView extends StatelessWidget {
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: color.withValues(alpha: selected ? 0.2 : 0.12),
+              color: color.withValues(
+                alpha: threeD
+                    ? (selected ? 0.08 : 0.03)
+                    : (selected ? 0.2 : 0.12),
+              ),
               border: Border.all(color: color, width: selected ? 2.5 : 1.5),
             ),
-            child: ClipRect(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(6, 22, 6, 4),
-                child: Text(
-                  words,
-                  overflow: TextOverflow.fade,
-                  style: TextStyle(fontSize: 11, color: PennaColors.text),
-                ),
-              ),
-            ),
+            child: threeD
+                ? null
+                : ClipRect(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 22, 6, 4),
+                      child: Text(
+                        words,
+                        overflow: TextOverflow.fade,
+                        style: TextStyle(fontSize: 11, color: PennaColors.text),
+                      ),
+                    ),
+                  ),
           ),
         ),
         Positioned(

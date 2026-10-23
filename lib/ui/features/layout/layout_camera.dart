@@ -336,7 +336,7 @@ class _CameraPanelState extends State<CameraPanel> {
           child: CustomPaint(
             painter: OrbitPainter(
               board.layout,
-              layoutBoxColor,
+              layoutBodyColor,
               grid: PennaColors.slate400,
             ),
           ),
