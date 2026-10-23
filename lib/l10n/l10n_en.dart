@@ -894,4 +894,5 @@ const en = <String, String>{
   '朝向': 'Facing',
   '调整「{0}」的{1}': 'Adjusted {1} of "{0}"',
   '体块 · {0}': 'Volume · {0}',
+  '移轴': 'Lens shift',
 };

@@ -198,7 +198,8 @@ class LayoutBoard extends ChangeNotifier {
   /// 把第 [i] 个消失点拖到画布上的 ([x], [y])(可以在画面外)。平面视图里只挪透视线;
   /// 3D 视图里透视线就是镜头,拖它就是转镜头(fSpy 的做法,见
   /// [cameraFromPerspective]):地平线上的点上下拖改俯仰、左右拖改环绕,
-  /// 两点透视时连视角一起定;竖直方向那个点(三点透视最后一个)改俯仰。
+  /// 两点透视时连视角一起定;一点、两点透视镜头保持水平、用移轴放地平线,三点透视
+  /// 由三个消失点的垂心定俯仰和移轴(都见 [cameraFromPerspective])。
   void moveVanishing(int i, double x, double y) {
     final per = _layout.perspective;
     if (per == null) return;
@@ -212,11 +213,7 @@ class LayoutBoard extends ChangeNotifier {
         : per.copyWith(third: (x: x.round(), y: y.round()));
     if (!_threeD) return movePerspective(moved);
     final l = _layout;
-    setCamera(
-      i < per.xs.length
-          ? cameraFromPerspective(moved, l.camera, l.width, l.height)
-          : pitchFromThird(y, l.camera, l.width, l.height),
-    );
+    setCamera(cameraFromPerspective(moved, l.camera, l.width, l.height));
   }
 
   /// 照 Agent 写的 `<layers>` 调图层(见 [parseLayers]):按给的先后排,顺便改名字和

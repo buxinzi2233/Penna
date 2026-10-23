@@ -49,6 +49,12 @@ try {
   Set-Location "$drive\$(Split-Path $root -Leaf)"
   flutter clean | Out-Null
   flutter build windows --release
+  # flutter clean 之后,flutter_onnxruntime 的 CMake 第一次常报
+  # "ONNX Runtime extraction directory doesn't exist",再编一次就好:自动重试一次。
+  if ($LASTEXITCODE -ne 0) {
+    '编译失败,自动再试一次'
+    flutter build windows --release
+  }
   if ($LASTEXITCODE -ne 0) { throw '编译失败,见上方输出' }
 } finally {
   Set-Location $root

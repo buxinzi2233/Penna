@@ -126,6 +126,14 @@ class _CameraPanelState extends State<CameraPanel> {
             perPx: 0.005,
             apply: (v) => cam.copyWith(panZ: v),
           ),
+          (
+            label: tr('移轴'),
+            unit: '',
+            value: cam.shift,
+            step: 0.05,
+            perPx: 0.003,
+            apply: (v) => cam.copyWith(shift: v),
+          ),
         ];
     final decoration = BoxDecoration(
       color: PennaColors.card,

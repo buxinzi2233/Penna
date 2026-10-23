@@ -111,7 +111,8 @@ String describeCamera(Layout l, {required bool threeD}) {
       ? '镜头正对着画面,没转过。'
       : '镜头水平环绕 ${_deg(c.orbit)}(0 是正面,90 是从主体左侧拍,±180 是从背后拍),'
             '俯仰 ${_deg(c.pitch)}(正数是俯视,负数是仰视),画面歪 ${_deg(c.roll)},'
-            '视角 ${_deg(c.fov)},离主体 ${c.distance.toStringAsFixed(2)}(1 是原来的距离)。'
+            '视角 ${_deg(c.fov)},离主体 ${c.distance.toStringAsFixed(2)}(1 是原来的距离)'
+            '${c.shift == 0 ? '' : ',移轴 ${c.shift.toStringAsFixed(2)}(镜头保持水平、底片上下平移,地平线不在正中,竖线依然竖直)'}。'
             'bbox 是从这个镜头拍到的样子,描述也要照这个视角写:从背后拍写背影、看不到脸,'
             '俯视写看得到头顶和地面,仰视写看得到下巴和天空,谁挡着谁照现在的前后。';
   return '【摄像机】$view。$shot'
@@ -183,19 +184,32 @@ Perspective perspectiveFromCamera(Camera c, int w, int h, int points) {
   );
 }
 
-/// 反过来,照透视辅助线定镜头(fSpy 的做法):地平线定俯仰(tan p = (cy − 地平线)/f);
-/// 两点透视时两个消失点互相垂直,定出焦距 f² = −(F₁ − P)·(F₂ − P)(P 是画面中心);
-/// 前后方向的消失点离中心多远定环绕。哪个消失点算前后、哪个算左右,挑和 [c]
-/// 现在的环绕最接近的那种,拖动时镜头不会一下转 90°。
+/// 反过来,照透视辅助线定镜头(fSpy 的做法,单视图几何的标准结论):
+/// - 一点、两点透视(没有竖直方向的消失点):竖线保持竖直,所以镜头不低头,用移轴
+///   ([Camera.shift])把底片中心挪到地平线上;两个消失点互相垂直,定出焦距
+///   f² = −(F₁ − P)·(F₂ − P)(P 是底片中心)。
+/// - 三点透视:三个互相垂直方向的消失点围成的三角形,垂心就是底片中心;焦距同上,
+///   俯仰 tan p = (P 的 y − 地平线)/f。
+/// 前后方向的消失点离中心多远定环绕;哪个消失点算前后、哪个算左右、朝前还是朝后,
+/// 挑和 [c] 现在的环绕最接近的那种,拖动时镜头不会一下转 90° 或 180°。
+// ponytail: 底片中心只上下挪,不左右挪(竖直消失点不在正中时照正中算)。
 Camera cameraFromPerspective(Perspective p, Camera c, int w, int h) {
-  final cx = w / 2, cy = h / 2;
+  final cx = w / 2;
+  final hz = p.horizon.toDouble();
   var f = CameraView(c, w, h).f;
-  final dy = p.horizon - cy;
+  // 底片中心的 y:没有竖直消失点时就在地平线上(镜头水平)。
+  var py = hz;
+  final third = p.third;
+  if (third != null && p.xs.length == 2 && (hz - third.y).abs() > 1) {
+    // 垂心:过竖直消失点的高是竖线 x = x3;再和过 F₁、垂直于 F₂F₃ 的高相交。
+    final x3 = third.x.toDouble();
+    py = hz + (x3 - p.xs[0]) * (x3 - p.xs[1]) / (hz - third.y);
+  }
   if (p.xs.length == 2) {
-    final f2 = -((p.xs[0] - cx) * (p.xs[1] - cx) + dy * dy);
+    final f2 = -((p.xs[0] - cx) * (p.xs[1] - cx) + (hz - py) * (hz - py));
     if (f2 > 1) f = math.sqrt(f2);
   }
-  final pitch = math.atan2(cy - p.horizon, f);
+  final pitch = math.atan2(py - hz, f);
   final cosP = math.cos(pitch);
   double deg(double r) => r * 180 / math.pi;
   // u 当成前后方向的消失点:u = cx − f·tan o / cos p。
@@ -221,14 +235,6 @@ Camera cameraFromPerspective(Perspective p, Camera c, int w, int h) {
     pitch: deg(pitch),
     roll: 0,
     fov: deg(2 * math.atan(math.max(w, h) / 2 / f)),
+    shift: (py - h / 2) / h,
   );
-}
-
-/// 三点透视里拖竖直方向那个消失点:它的高度定俯仰(cot p = (v − cy)/f),在画面下面
-/// 是俯视、上面是仰视。
-Camera pitchFromThird(double v, Camera c, int w, int h) {
-  final view = CameraView(c, w, h);
-  final d = v - view.cy;
-  if (d.abs() < 1) return c;
-  return c.copyWith(pitch: math.atan(view.f / d) * 180 / math.pi);
 }

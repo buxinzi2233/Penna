@@ -270,7 +270,8 @@ extension StudioContext on StudioViewModel {
           agent._changed();
         }
         return (
-          text: '区域控制工作台放不下新的系列了($problem)。照实告诉用户,'
+          text:
+              '区域控制工作台放不下新的系列了($problem)。照实告诉用户,'
               '让他去区域控制工作台删掉一些不用的系列再试。',
           note: tr('区域控制放不下:{0}', [problem]),
         );

@@ -33,7 +33,8 @@ const _near = 0.01;
 /// 摄像机:绕着目标点([panX] / [panY] / [panZ] 是它离画面中心 (0, 0, 1) 挪了多少)转。
 /// [orbit] 水平环绕(0 正面,90 从左侧拍,±180 从背后拍),[pitch] 俯仰(正数俯视),
 /// [roll] 画面歪多少,[distance] 离目标多远(1 是原来的距离),[fov] 长边对着的视角。
-/// 角度都是度。
+/// [shift] 是移轴:底片上下平移多少(画布高的几倍,正数往下),镜头不低头也能把地平线
+/// 放到别处,竖线保持竖直(一点、两点透视就是这样)。角度都是度。
 @immutable
 class Camera {
   const Camera({
@@ -45,9 +46,10 @@ class Camera {
     this.panX = 0,
     this.panY = 0,
     this.panZ = 0,
+    this.shift = 0,
   });
 
-  final double orbit, pitch, roll, distance, fov, panX, panY, panZ;
+  final double orbit, pitch, roll, distance, fov, panX, panY, panZ, shift;
 
   bool get isDefault => this == const Camera();
 
@@ -63,6 +65,7 @@ class Camera {
     double? panX,
     double? panY,
     double? panZ,
+    double? shift,
   }) => Camera(
     orbit: wrapDegrees(orbit ?? this.orbit),
     pitch: (pitch ?? this.pitch).clamp(-89.0, 89.0),
@@ -72,6 +75,7 @@ class Camera {
     panX: (panX ?? this.panX).clamp(-20.0, 20.0),
     panY: (panY ?? this.panY).clamp(-20.0, 20.0),
     panZ: (panZ ?? this.panZ).clamp(-20.0, 20.0),
+    shift: (shift ?? this.shift).clamp(-2.0, 2.0),
   );
 
   Map<String, double> toJson() => {
@@ -83,6 +87,7 @@ class Camera {
     'panX': panX,
     'panY': panY,
     'panZ': panZ,
+    'shift': shift,
   };
 
   /// 读不了的项用默认值。
@@ -99,6 +104,7 @@ class Camera {
       panX: v('panX', 0),
       panY: v('panY', 0),
       panZ: v('panZ', 0),
+      shift: v('shift', 0),
     );
   }
 
@@ -112,11 +118,12 @@ class Camera {
       other.fov == fov &&
       other.panX == panX &&
       other.panY == panY &&
-      other.panZ == panZ;
+      other.panZ == panZ &&
+      other.shift == shift;
 
   @override
   int get hashCode =>
-      Object.hash(orbit, pitch, roll, distance, fov, panX, panY, panZ);
+      Object.hash(orbit, pitch, roll, distance, fov, panX, panY, panZ, shift);
 }
 
 /// 摄像机对着一块 [width]×[height] 的画布:镜头的位置和朝向、焦距(像素)、画布中心。
@@ -138,7 +145,8 @@ class CameraView {
       down: _sub(_mul(down0, math.cos(r)), _mul(right0, math.sin(r))),
       f: math.max(width, height) / 2 / math.tan(_rad(c.fov) / 2),
       cx: width / 2,
-      cy: height / 2,
+      // 移轴:底片的中心跟着上下挪。
+      cy: height / 2 + c.shift * height,
       orbit: c.orbit,
     );
   }

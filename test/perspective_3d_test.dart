@@ -6,13 +6,13 @@ import 'package:penna/ui/features/layout/layout_board.dart';
 const _w = 832, _h = 1216;
 
 void main() {
-  test('镜头算出透视线,再照透视线算回镜头,角度和视角都对得上', () {
+  test('三点透视:镜头算出透视线,再照透视线算回镜头,俯仰、环绕、视角、移轴都对得上', () {
     for (final c in const [
       Camera(orbit: 25, pitch: 15),
       Camera(orbit: -40, pitch: -20, fov: 35),
-      Camera(orbit: 150, pitch: 30),
+      Camera(orbit: 150, pitch: 30, shift: 0.1),
     ]) {
-      final p = perspectiveFromCamera(c, _w, _h, 2);
+      final p = perspectiveFromCamera(c, _w, _h, 3);
       final back = cameraFromPerspective(
         p,
         c.copyWith(orbit: c.orbit + 5),
@@ -22,7 +22,23 @@ void main() {
       expect(back.orbit, closeTo(c.orbit, 0.5), reason: '$c');
       expect(back.pitch, closeTo(c.pitch, 0.5), reason: '$c');
       expect(back.fov, closeTo(c.fov, 0.5), reason: '$c');
+      expect(back.shift, closeTo(c.shift, 0.005), reason: '$c');
     }
+  });
+
+  test('两点透视:镜头保持水平,用移轴把地平线放到画的位置,竖线不收拢', () {
+    const c = Camera(orbit: 30, shift: -0.2, fov: 60);
+    final p = perspectiveFromCamera(c, _w, _h, 2);
+    final back = cameraFromPerspective(p, const Camera(orbit: 20), _w, _h);
+    expect(back.pitch, 0);
+    expect(back.orbit, closeTo(30, 0.5));
+    expect(back.fov, closeTo(60, 0.5));
+    expect(back.shift, closeTo(-0.2, 0.005));
+    // 竖直方向的消失点在无穷远:竖线平行。
+    expect(
+      perspectiveFromCamera(back, _w, _h, 3).third!.y.abs(),
+      greaterThan(_h * 10),
+    );
   });
 
   test('正面平视是一点透视:消失点在正中,地平线在中间;俯视地平线往上走', () {
@@ -35,7 +51,7 @@ void main() {
     expect(down.third!.y, greaterThan(_h));
   });
 
-  test('一点透视的消失点往左拖,镜头往反方向转;拖第三个点定俯仰', () {
+  test('一点透视的消失点往左拖,镜头往反方向转;三点透视把竖直的点拖到下面是俯视', () {
     final p = perspectiveFromCamera(const Camera(), _w, _h, 1);
     final turned = cameraFromPerspective(
       p.copyWith(xs: [p.xs.single - 200]),
@@ -44,8 +60,19 @@ void main() {
       _h,
     );
     expect(turned.orbit, greaterThan(0));
-    final looking = pitchFromThird(_h * 3, const Camera(), _w, _h);
-    expect(looking.pitch, greaterThan(0));
+    final three = perspectiveFromCamera(
+      const Camera(orbit: 30, pitch: 5),
+      _w,
+      _h,
+      3,
+    );
+    final down = cameraFromPerspective(
+      three.copyWith(third: (x: three.third!.x, y: _h * 2)),
+      const Camera(orbit: 30, pitch: 5),
+      _w,
+      _h,
+    );
+    expect(down.pitch, greaterThan(5));
   });
 
   test('开着透视时,站在地上的东西底边越低越近', () {
@@ -67,7 +94,7 @@ void main() {
     expect(horizonOf(l), _h ~/ 2);
   });
 
-  test('开着透视切到 3D:镜头照透视线定,框不动,不算转过镜头', () {
+  test('开着两点透视切到 3D:镜头水平、移轴对上地平线,框不动,不算转过镜头', () {
     final board = LayoutBoard()
       ..replace(
         const Layout(
@@ -80,12 +107,12 @@ void main() {
     final before = board.layout.boxes.single;
     board.setThreeD(true);
     final l = board.layout;
-    expect(l.camera.pitch, greaterThan(0)); // 地平线在上面:俯视
+    expect(l.camera.pitch, 0);
+    expect(l.camera.shift, lessThan(0)); // 地平线在上面:底片往上挪
     expect(board.cameraMoved, isFalse);
     final after = l.boxes.single;
     expect((after.left - before.left).abs(), lessThanOrEqualTo(2));
     expect((after.bottom - before.bottom).abs(), lessThanOrEqualTo(2));
-    // 透视线照镜头重新算过,和原来画的基本对上。
     expect((l.perspective!.horizon - 300).abs(), lessThanOrEqualTo(2));
   });
 
@@ -98,7 +125,7 @@ void main() {
     board.moveVanishing(0, _w / 2 - 300, _h / 2 - 200);
     final l = board.layout;
     expect(l.camera.orbit, greaterThan(0));
-    expect(l.camera.pitch, greaterThan(0));
+    expect(l.camera.shift, lessThan(0));
     expect(
       (l.perspective!.xs.single - (_w ~/ 2 - 300)).abs(),
       lessThanOrEqualTo(2),
