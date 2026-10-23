@@ -877,4 +877,6 @@ const en = <String, String>{
   '镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、左右前后的位置关系、谁挡着谁),框、体块和图层都不动': 'The camera angle changed. Rewrite the overall caption and each block\'s caption for the new view (facing, visible side, left/right and front/back positions, what blocks what). Keep boxes, volumes and layers unchanged',
   '视角变了,描述还是原来的': 'View changed; captions are outdated',
   '先不改': 'Not now',
+  '漫画分格': 'Comic panels',
+  '一张图里排几格漫画:分格、气泡与台词归属、跨格一致,也能排成区域控制布局': 'Several comic panels in one image: panel layout, speech bubbles and speakers, consistency across panels; can be laid out in Region Control',
 };

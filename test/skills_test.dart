@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:penna/core/harness/layout.dart';
 import 'package:penna/core/harness/providers/openai_provider.dart';
 import 'package:penna/data/models/app_config.dart';
 import 'package:penna/data/services/skill_store.dart';
@@ -211,8 +212,46 @@ void main() {
     });
 
     test('内置 Skill 都有正文', () {
-      expect(builtinSkillList, hasLength(13));
+      expect(builtinSkillList, hasLength(14));
       expect(builtinSkillList.every((s) => s.body.trim().isNotEmpty), isTrue);
+    });
+
+    test('漫画分格里的布局例子程序读得出来,人物和气泡都落在自己那一格', () {
+      final body = builtinSkillList
+          .firstWhere((s) => s.id == 'comic-page')
+          .body;
+      // 正文里也提到 <layout> 这个标签,例子是后面紧跟着 JSON 的那一处。
+      final made = splitLayout(body.substring(body.indexOf('<layout>\n{')));
+      expect(made.complete, isTrue);
+      final read = readMossLayout(
+        made.json!,
+        width: 832,
+        height: 1216,
+        ownSize: true,
+      )!;
+      final l = read.layout;
+      expect(read.fixes, isEmpty);
+      expect(l.canvas, 'multi_panel');
+      expect(l.boxes, hasLength(5));
+      expect(read.hints, hasLength(5));
+      final panels = [
+        for (final b in l.boxes)
+          if (b.name.startsWith('第')) b,
+      ];
+      expect(panels, hasLength(2));
+      for (final b in l.boxes.where((b) => !panels.contains(b))) {
+        expect(
+          panels.where(
+            (p) =>
+                b.left >= p.left &&
+                b.right <= p.right &&
+                b.top >= p.top &&
+                b.bottom <= p.bottom,
+          ),
+          hasLength(1),
+          reason: b.name,
+        );
+      }
     });
   });
 

@@ -129,7 +129,7 @@ description: 一句话说清它做什么、什么时候该用
   // 思路改编自 huangserva/xyz-video-skill 的分镜步骤:原版是给视频生成写首尾帧和动作,
   // 这里只留"把故事切成一组静态画面"的部分。
   'storyboard': '''
-把一个故事、一段情节或一个主题拆成一组镜头,每个镜头写一条能单独出图的提示词。用户说"分镜""拆成几个镜头""做成连环画 / 漫画 / 故事板""画一组连续的图"时用。只要一张图时不要用。
+把一个故事、一段情节或一个主题拆成一组镜头,每个镜头写一条能单独出图的提示词。用户说"分镜""拆成几个镜头""做成连环画 / 漫画 / 故事板""画一组连续的图"时用。只要一张图时不要用;要的是一张图里排好几格(带格线、气泡)的漫画页时用「漫画分格」。
 
 一组图最容易出的毛病是:每张单看都行,放在一起却不像同一个故事——人换了长相,雨天下一张成了晴天,手里的伞不见了。所以先把故事和不变的东西定死,再一镜一镜写。
 
@@ -302,6 +302,68 @@ MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通�
 【布局画板】里已经有布局时,那是用户现在的样子:默认保留每块的位置、大小、类别、层和名字,只补全或改写描述;用户明说要挪、要加、要删、要换排法时才动框,而且只动他说到的(被挤到、不得不动别的块时,正文里说明动了谁)。每次都把整份布局写全,没写到的框会被删掉。动了框时,正文最后用一行列出这次动了哪几块,例如"动了:银月(右下→右中)、蓝铃(放大);其他不变"。
 
 正文用一两句中文说明这份布局怎么排。写了 <layout> 的回复里不写 <draft>。''',
+  'comic-page': '''
+用户要一张图里排好几格的漫画页时用:说了"漫画页""四格""2koma""条漫""一页几格""分格""对话气泡""台词放进气泡",或者要把一段剧情排成一页漫画。要的是一组分开的图(一镜一张)时用「分镜」,不用这个。
+
+出图模型把整张画布当成一个场景,"四格漫画"这几个字只是一个很弱的提示。所以最常见的毛病是:人物跨过格线、特写格里多长出一个头、气泡的尾巴连到离得最近的人而不是说话的人、同一个人每格长得不一样。下面的做法都是为了防这几样。
+
+先定分格表,再写。用户已经说清楚的直接写;没说清时先用一两个问题问清(几格、讲什么事、谁说什么),问法照「画面规划」。分格表要定:
+- 几格、阅读顺序:日式从右往左、从上往下;西式从左往右;条漫从上往下。
+- 每格只讲一件事:交代环境、一个动作、一个反应、一个局部特写、一句台词。一格里有两个动作就拆成两格。
+- 主格一两个,占整页四到六成;其余是小格。
+- 每格的景别。格多(六格以上)时不用全身,用腰部以上、大腿以上的中景,不然人物会缩成小人。
+
+每一格怎么写:
+- 开头写格号、位置和景别:"Panel 2 of 4 (top right), waist-up medium shot: ..."。
+- 分清两种格:有完整人物的格写角色和景别;局部特写格(眼睛、嘴、手、手里的东西)只写那一部分,不写角色名和外貌,开头写 "Extreme close-up panel showing only ...",不然模型会在里面补出一个头。
+- 同一格里两个人分开写,中间留出空隙(画面宽的 3% 以上),写 "standing apart with clear space between them",不然会画成肩贴肩。
+- 写清这格里的东西只在这一格,不要写跨格的动作。
+
+角色前后一致:
+- 先写角色卡:每个角色一句固定描述(发型发色、瞳色、脸型体态、一两个标志物、服装)。作品里的角色先用 <search-character> 查。
+- 有这个角色的每一格都把角色卡的核心几样(发型、瞳色、服装、标志物)原样写进去,用词一个字都不换;瞳色每格都写,省掉了容易被脸红染成粉色。
+- 要画成多大年纪就直接写(teenage、young adult),不要写 child、little、petite 这类词,写成否定句也不行:模型会抓住那个词。
+
+气泡和图里的字:
+- 台词原文一字不改地给出来,不留让模型自己编的空间;一个气泡一两句短话,字越少越容易写对。
+- 容器的形状决定读者把它当成什么,所以靠形状区分,不要写"旁白"这种词:
+  - 画面里的角色说话:圆角椭圆气泡,尾巴从靠近他的那条边指向他的头,写 "a rounded oval speech bubble with its tail pointing down to Rin's head"。气泡贴着说话人,离别人的头远一点(画面宽的 8% 以上),不然尾巴会连到最近的那个人。
+  - 画面外的人说话、心声:没有尾巴的椭圆或云状气泡,写 "with no tail pointing to anyone in the panel"。
+  - 旁白、人物介绍牌:直角方框,写 "a sharp-cornered rectangular caption box with no tail"。
+  - 喊叫:几个字的短句用锯齿爆炸框;长句不用锯齿框(锯齿会吃掉排字的地方),改用加宽的圆角气泡。
+- 竖排的中文台词里,数字写成汉字(二十八岁,不写 28岁);人名中间不留空格。
+- Penna 只写正面提示词。想避免的东西写成正面的话:"clean panel borders, no figure crosses into another panel"。
+
+在区域控制里排(写 <layout>;在主工作区就照【区域控制】那一条交给区域控制工作台,任务说明里把分格表、角色卡、每格内容、每句台词和说话人原样写全):
+- summary.canvas 写 "multi_panel",meta 写 "comic"。summary.caption 先说这是一页几格的漫画、画风、阅读顺序、格线的样子(细黑框、白色间隔),再按阅读顺序每格一句,最后把所有台词按顺序原样写出来。
+- 每一格一块:label 用 object,layer 写 back,name 写"第1格""第2格",bbox 就是这一格的框;caption 写这一格的景别、场景、背景和光线,开头写 "Panel 1 of 4 (top):"。格和格不重叠,中间留画面宽 1.5% 到 3% 的白边;左右并排的格,顶边和底边用同一个 y。
+- 格里的人:label 用 character,layer 写 middle,bbox 整个落在那一格里面、离格边留一点;caption 开头写 "In panel 2, ..."。同一个角色出现在几格里,每格各是一块,name 带上格号("凛·2")。局部特写格不放人物块,特写的内容写在那一格的 caption 里。
+- 每个气泡一块:label 用 text,layer 写 front,text 写台词原文,caption 写容器的形状、尾巴朝哪、谁说的;bbox 放在说话人头部旁边、同一格里,不盖住脸。
+- 漫画页这几条以本技能为准:每格的场景要单独画框(区域控制技能里"背景不单独画框"不适用),元素可以多于 8 个,但最多 16 个——先保格、主要人物和台词,小道具写进那一格的 caption。
+- body:漫画页是一张平的纸,每一块都写 {"distance": 1, "depth": 0.02, "yaw": 0}。
+- 一页漫画一张布局;下一页写 <layout page="新" name="第2页">,换了故事写 page="新系列"。
+
+下面是 832×1216 竖版、上下两格的骨架,描述的详细程度照区域控制技能的要求写足:
+<layout>
+{
+  "width": 832,
+  "height": 1216,
+  "summary": {"meta": ["comic"], "canvas": "multi_panel", "caption": "A two-panel vertical manga page in clean black ink with soft grey tones, read from top to bottom, each panel framed by a thin black border with a white gutter between them. Top panel: a wide shot of a rainy bus stop at dusk where Rin waits alone under the shelter. Bottom panel: a close medium shot of Rin looking up as a hand offers her an umbrella from outside the frame. Dialogue, in order: \\"下雨了。\\""},
+  "items": [
+    {"name": "第1格", "layer": "back", "label": "object", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "Panel 1 of 2 (top), wide establishing shot: a small bus stop shelter at dusk in heavy rain, wet asphalt reflecting a single streetlight, grey sky, framed by a thin black border.", "bbox": [24, 24, 808, 580]},
+    {"name": "凛·1", "layer": "middle", "label": "character", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 1, Rin, a slender teenage girl with a short black bob and bright green eyes, wearing a navy school blazer, stands under the shelter with her arms folded, looking out at the rain.", "bbox": [470, 200, 640, 560]},
+    {"name": "气泡·1", "layer": "front", "label": "text", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 1, a small tail-less oval thought bubble near Rin's head, vertical Chinese text, black on white.", "text": "下雨了。", "bbox": [660, 70, 780, 260]},
+    {"name": "第2格", "layer": "back", "label": "object", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "Panel 2 of 2 (bottom), close medium shot: the same shelter wall behind Rin, rain streaks across the background, framed by a thin black border.", "bbox": [24, 604, 808, 1192]},
+    {"name": "凛·2", "layer": "middle", "label": "character", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 2, Rin, the same slender teenage girl with a short black bob and bright green eyes in a navy school blazer, looks up in surprise from waist up, as a hand holding a dark umbrella reaches in from the right edge of the panel.", "bbox": [120, 700, 600, 1170]}
+  ],
+  "bbox_coord_space": "abs",
+  "bbox_format": "xyxy"
+}
+</layout>
+
+不排区域控制、只要提示词时,写进 <draft>,按段写:【版式】几格、阅读顺序、格线;【角色】角色卡;【第1格】到【第N格】每格一段(景别、内容、这一格的气泡和台词)。多页漫画一页一张(<draft page="2">),第一页带上 series。
+
+交之前对一遍:每格写了景别和格号吗?特写格里有没有写进角色名?同格两人留了空吗?并排的格对齐了吗?每句台词都写了说话人和尾巴方向、离别人的头够远吗?画面外说话的气泡没有尾巴吗?竖排的数字改成汉字了吗?区域控制里每个人和气泡都落在自己那一格里吗?''',
   'local-reverse': '''
 用户要用本机的模型反推图片时用:说了"Tag 反推""打标""用 WD14 / PixAI / 某某模型反推""本地反推""用 Florence / Gemma 看图写描述"这类话。他要的是本机模型反推出来的标签或描述,不是你自己看图写。
 

@@ -363,6 +363,9 @@ extension StudioContext on StudioViewModel {
   String _layoutSystemPrompt(AppConfig cfg, AgentPreset preset) => [
     _layoutAgentPrompt,
     builtinSkillList.firstWhere((s) => s.id == 'moss-layout').body,
+    // 漫画页的分格、气泡和多格布局的写法,区域控制这边也要会。
+    if (!cfg.disabledSkills.contains('comic-page'))
+      builtinSkillList.firstWhere((s) => s.id == 'comic-page').body,
     '【用户当前的 Preset】只参考其中的画风和用词;开头怎么写、写多长按布局的要求来:\n'
         '${preset.systemPrompt}',
     if (!cfg.disabledSkills.contains('character-lib')) ...[

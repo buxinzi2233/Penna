@@ -28,6 +28,7 @@ const builtinSkills = [
   Option('storyboard', '分镜', '把故事或情节拆成一组镜头,每个镜头一条能单独出图的提示词'),
   Option('character-lib', '角色库', '用户提到某个具体角色时先查它的触发词和特征;要存角色时也用'),
   Option('moss-layout', '区域控制', '要按位置安排画面(画框、bbox、转成 MOSS-Image 布局 JSON)时写布局'),
+  Option('comic-page', '漫画分格', '一张图里排几格漫画:分格、气泡与台词归属、跨格一致,也能排成区域控制布局'),
   Option('local-reverse', '本地反推', '用户要用 Tag 反推、或点名用本机的某个模型反推图片时,调用本地模型'),
 ];
 

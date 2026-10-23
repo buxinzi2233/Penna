@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261023--1--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261023--2--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -125,7 +125,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 Skill 是一份写法说明(`SKILL.md`),决定 Agent 按什么方式写提示词。
 
-- 内置 11 个,默认全部启用,可逐个开关。
+- 内置 14 个,默认全部启用,可逐个开关。其中「漫画分格」处理一张图里的多格漫画页(分格、气泡与台词归属、跨格一致),也能把漫画页排成区域控制布局。
 - 支持导入 `.md` 或 `.zip`,也可以在设置中直接填写。
 - 可以在对话中让 Agent 写一个新的 Skill,写完自动加入。
 

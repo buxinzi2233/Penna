@@ -124,7 +124,7 @@ Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON
 
 A Skill is a writing guide (`SKILL.md`) that decides how the Agent writes prompts.
 
-- 11 are built in, all enabled by default, and each can be switched on or off.
+- 14 are built in, all enabled by default, and each can be switched on or off. "Comic panels" handles multi-panel comic pages in a single image (panel layout, speech bubbles and speakers, consistency across panels) and can lay a comic page out in Region Control.
 - Import `.md` or `.zip` files, or write one directly in Settings.
 - Ask the Agent in chat to write a new Skill; it is added automatically when done.
 
