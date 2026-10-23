@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'layout.dart';
 
 /// 区域控制的 3D 视图怎么带着画板变(摄像机和体块本身在 `camera.dart`):
@@ -58,10 +60,15 @@ LayoutBox liftBox(LayoutBox b, Layout l, [BodyHint? hint]) {
   if (b.label == 'text') return b.copyWith(body: () => null);
   if (b.offscreen) return b;
   final view = CameraView(l.camera, l.width, l.height);
+  final guess = guessBodyHint(b.label, b.layer);
+  final ground = _groundDistance(b, l);
   final body = liftBody(
     b.span,
     view,
-    hint ?? guessBodyHint(b.label, b.layer),
+    hint ??
+        (ground == null
+            ? guess
+            : (distance: ground, depth: guess.depth, yaw: guess.yaw)),
     guessed: hint == null,
   );
   return _snap(b.copyWith(body: () => body), view, l);
@@ -109,4 +116,119 @@ String describeCamera(Layout l, {required bool threeD}) {
             '俯视写看得到头顶和地面,仰视写看得到下巴和天空,谁挡着谁照现在的前后。';
   return '【摄像机】$view。$shot'
       'items 里的 body 是每块的体块(相对这个镜头量的),写法见技能里的说明。';
+}
+
+// ---- 透视线和镜头互相换算 ----
+
+/// 消失点放到画布外这么远就算"在无穷远"(那个方向和画面平行)。
+const _far = 50;
+
+/// 眼下的地平线在画布的哪个 y:透视辅助线开着就用它的,镜头转过就照镜头算
+/// (俯仰 p 时地平线在 cy − f·tan p);都没有是 null。
+double? horizonOf(Layout l) {
+  final per = l.perspective;
+  if (per != null) return per.horizon.toDouble();
+  if (l.camera.isDefault) return null;
+  final view = CameraView(l.camera, l.width, l.height);
+  return view.cy - view.f * math.tan(l.camera.pitch * math.pi / 180);
+}
+
+/// 站在地上的东西离镜头多远:底边离地平线越远越近(Hoiem 等,《Putting Objects in
+/// Perspective》,CVPR 2006:地面上的物体,距离和底边到地平线的距离成反比)。
+/// 底边贴着画布下边时算 0.75;底边在地平线上面(飞着、挂着的)时是 null,照图层猜。
+double? _groundDistance(LayoutBox b, Layout l) {
+  final h = horizonOf(l);
+  if (h == null || h >= l.height) return null;
+  final below = b.bottom - h;
+  if (below < l.height * 0.02) return null;
+  return (0.75 * (l.height - h) / below).clamp(0.3, 10.0);
+}
+
+double _dot(Vec3 a, Vec3 b) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+/// 世界里某个方向在画布上的消失点(像素);和画面平行的(在无穷远)放到 [_far] 倍远处。
+({double u, double v}) _vanish(Vec3 d, CameraView view, int w, int h) {
+  final x = _dot(d, view.right), y = _dot(d, view.down), z = _dot(d, view.fwd);
+  final far = _far * math.max(w, h).toDouble();
+  if (z.abs() < 1e-6) {
+    final len = math.sqrt(x * x + y * y);
+    return len < 1e-9
+        ? (u: view.cx, v: view.cy)
+        : (u: view.cx + x / len * far, v: view.cy + y / len * far);
+  }
+  // 一条线朝两头的消失点是同一个(x/z、y/z 不随方向反过来变)。
+  return (
+    u: (view.cx + view.f * x / z).clamp(view.cx - far, view.cx + far),
+    v: (view.cy + view.f * y / z).clamp(view.cy - far, view.cy + far),
+  );
+}
+
+/// 镜头对着画布时透视辅助线该在哪:地平线在俯仰定下的高度,消失点是世界的
+/// 前后方向(一点透视)、再加左右方向(两点)、再加竖直方向(三点)投到画布上的点。
+/// 3D 视图里透视线就是镜头本身,只能这样跟着镜头走(画面歪着时地平线照不歪算)。
+// ponytail: 不管滚转;镜头歪着时地平线其实是斜的,Perspective 只能画水平的。
+Perspective perspectiveFromCamera(Camera c, int w, int h, int points) {
+  final view = CameraView(c.copyWith(roll: 0), w, h);
+  final horizon = view.cy - view.f * math.tan(c.pitch * math.pi / 180);
+  final depthVp = _vanish((x: 0, y: 0, z: 1), view, w, h);
+  final sideVp = _vanish((x: 1, y: 0, z: 0), view, w, h);
+  final upVp = _vanish((x: 0, y: 1, z: 0), view, w, h);
+  return Perspective(
+    horizon: horizon.round(),
+    xs: List.unmodifiable([
+      if (points >= 2) sideVp.u.round(),
+      depthVp.u.round(),
+    ]),
+    third: points >= 3 ? (x: upVp.u.round(), y: upVp.v.round()) : null,
+  );
+}
+
+/// 反过来,照透视辅助线定镜头(fSpy 的做法):地平线定俯仰(tan p = (cy − 地平线)/f);
+/// 两点透视时两个消失点互相垂直,定出焦距 f² = −(F₁ − P)·(F₂ − P)(P 是画面中心);
+/// 前后方向的消失点离中心多远定环绕。哪个消失点算前后、哪个算左右,挑和 [c]
+/// 现在的环绕最接近的那种,拖动时镜头不会一下转 90°。
+Camera cameraFromPerspective(Perspective p, Camera c, int w, int h) {
+  final cx = w / 2, cy = h / 2;
+  var f = CameraView(c, w, h).f;
+  final dy = p.horizon - cy;
+  if (p.xs.length == 2) {
+    final f2 = -((p.xs[0] - cx) * (p.xs[1] - cx) + dy * dy);
+    if (f2 > 1) f = math.sqrt(f2);
+  }
+  final pitch = math.atan2(cy - p.horizon, f);
+  final cosP = math.cos(pitch);
+  double deg(double r) => r * 180 / math.pi;
+  // u 当成前后方向的消失点:u = cx − f·tan o / cos p。
+  double asDepth(int u) => deg(math.atan(-(u - cx) * cosP / f));
+  // u 当成左右方向的消失点:u = cx + f / (tan o · cos p)。
+  double asSide(int u) => deg(math.atan2(f, (u - cx) * cosP));
+  final base = [
+    asDepth(p.xs.last),
+    if (p.xs.length == 2) ...[
+      asDepth(p.xs.first),
+      asSide(p.xs.first),
+      asSide(p.xs.last),
+    ],
+  ];
+  // 朝前看和朝后看,消失点落在同一个地方:两种都算候选。
+  final options = [
+    for (final o in base) ...[wrapDegrees(o), wrapDegrees(o + 180)],
+  ];
+  double gap(double o) => wrapDegrees(o - c.orbit).abs();
+  final orbit = options.reduce((a, b) => gap(a) <= gap(b) ? a : b);
+  return c.copyWith(
+    orbit: orbit,
+    pitch: deg(pitch),
+    roll: 0,
+    fov: deg(2 * math.atan(math.max(w, h) / 2 / f)),
+  );
+}
+
+/// 三点透视里拖竖直方向那个消失点:它的高度定俯仰(cot p = (v − cy)/f),在画面下面
+/// 是俯视、上面是仰视。
+Camera pitchFromThird(double v, Camera c, int w, int h) {
+  final view = CameraView(c, w, h);
+  final d = v - view.cy;
+  if (d.abs() < 1) return c;
+  return c.copyWith(pitch: math.atan(view.f / d) * 180 / math.pi);
 }

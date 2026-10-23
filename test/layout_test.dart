@@ -10,7 +10,6 @@ import 'package:penna/core/harness/layout.dart';
 import 'package:penna/data/models/app_config.dart';
 import 'package:penna/ui/features/layout/layout_board.dart';
 import 'package:penna/ui/features/layout/layout_canvas.dart';
-import 'package:penna/ui/features/layout/layout_perspective.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 import 'package:penna/ui/features/studio/studio_page.dart';
 import 'package:penna/ui/shell.dart';
@@ -527,16 +526,11 @@ void main() {
     expect(board.layout.boxes.single.name, '人');
     expect(board.layout.perspective, isNotNull);
 
-    // 拖地平线上的消失点,地平线跟着走;换尺寸时跟着缩放。
-    final p = dragVanishing(
-      board.layout.perspective!,
-      0,
-      const Offset(10, 300),
-    );
-    expect((p.xs.first, p.horizon), (10, 300));
-    board
-      ..movePerspective(p)
-      ..swap();
+    // 拖地平线上的消失点,地平线跟着走(能拖到画面外);换尺寸时跟着缩放。
+    board.moveVanishing(0, -40, 300);
+    final p = board.layout.perspective!;
+    expect((p.xs.first, p.horizon), (-40, 300));
+    board.swap();
     expect(board.layout.perspective!.horizon, (300 * 832 / 1216).round());
     board.setPerspective(null);
     expect(board.prompt, contains('【透视辅助】现在关着'));

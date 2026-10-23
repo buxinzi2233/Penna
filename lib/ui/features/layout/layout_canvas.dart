@@ -89,6 +89,9 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   /// 正在画的新框(画布像素)。
   Rect? _drawing;
 
+  /// 开始拖消失点时它在哪(画布像素,可以在画面外)。
+  Offset _vanishStart = Offset.zero;
+
   /// 3D 视图里用中键、右键拖镜头:按下的位置、那时的镜头和拖的是哪一种。
   Offset? _camFrom;
   Camera? _camStart;
@@ -142,12 +145,16 @@ class _LayoutCanvasState extends State<LayoutCanvas>
     for (var i = _board.layout.boxes.length - 1; i >= 0; i--) i,
   ];
 
-  /// 按在了哪个消失点上;没开透视或没按中是 null。
+  /// 按在了哪个消失点上;没开透视或没按中是 null。画面外的消失点按它在画布边上的
+  /// 替身算(见 [vanishMarker])。
   int? _hitVanishing(Offset p, double scale) {
-    final per = _board.layout.perspective;
+    final l = _board.layout;
+    final per = l.perspective;
     if (per == null) return null;
+    final canvas = Size(l.width.toDouble(), l.height.toDouble());
     for (final (i, v) in vanishingPoints(per).indexed) {
-      if ((p - v).distance * scale <= _handle) return i;
+      final at = vanishMarker(v, canvas, markerInset / scale);
+      if ((p - at).distance * scale <= _handle) return i;
     }
     return null;
   }
@@ -174,7 +181,8 @@ class _LayoutCanvasState extends State<LayoutCanvas>
     return null;
   }
 
-  void _start(Offset p, double scale) {
+  /// [raw] 是没截到画布里的那个点(画布像素):拖消失点时要能拖到画面外。
+  void _start(Offset p, double scale, Offset raw) {
     // 自由镜头里左键拖动是转头,不碰框。
     if (_board.freeCam) {
       _drag = _Drag.look;
@@ -187,7 +195,8 @@ class _LayoutCanvasState extends State<LayoutCanvas>
     if (v != null) {
       _drag = _Drag.vanish;
       _target = v;
-      _from = p;
+      _from = raw;
+      _vanishStart = vanishingPoints(_board.layout.perspective!)[v];
       _board.mark(tr('拖动消失点'));
       return setState(() {});
     }
@@ -217,7 +226,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
     setState(() {});
   }
 
-  void _update(Offset p, double scale) {
+  void _update(Offset p, double scale, Offset raw) {
     final l = _board.layout;
     final b = _origin;
     switch (_drag) {
@@ -246,11 +255,11 @@ class _LayoutCanvasState extends State<LayoutCanvas>
             bottom: math.max(b.top + _minBox, p.dy.round()).clamp(0, l.height),
           ),
         );
+      // 按住时那个消失点在哪,加上鼠标挪了多少;不截到画布里,画面外也拖得到。
+      // 3D 视图里拖它就是转镜头(见 LayoutBoard.moveVanishing)。
       case _Drag.vanish:
-        final per = l.perspective;
-        if (per != null) {
-          _board.movePerspective(dragVanishing(per, _target, p));
-        }
+        final to = _vanishStart + (raw - _from);
+        _board.moveVanishing(_target, to.dx, to.dy);
       default:
     }
   }
@@ -327,10 +336,16 @@ class _LayoutCanvasState extends State<LayoutCanvas>
                       dragStartBehavior: DragStartBehavior.down,
                       onTapUp: (d) =>
                           _tap(_hit(toCanvas(d.localPosition), scale)),
-                      onPanStart: (d) =>
-                          _start(toCanvas(d.localPosition), scale),
-                      onPanUpdate: (d) =>
-                          _update(toCanvas(d.localPosition), scale),
+                      onPanStart: (d) => _start(
+                        toCanvas(d.localPosition),
+                        scale,
+                        d.localPosition / scale,
+                      ),
+                      onPanUpdate: (d) => _update(
+                        toCanvas(d.localPosition),
+                        scale,
+                        d.localPosition / scale,
+                      ),
                       onPanEnd: (_) => _end(),
                       onPanCancel: _end,
                       child: _paint(l, scale),

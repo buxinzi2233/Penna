@@ -174,18 +174,50 @@ class LayoutBoard extends ChangeNotifier {
   }
 
   /// 开 / 关透视辅助线;[points] 是几点透视(1 到 3),换的时候从默认的样子开始。
+  /// 3D 视图里透视线就是镜头:照镜头算出来,不能另画(见 [perspectiveFromCamera])。
   void setPerspective(int? points) => _set(
     _layout.copyWith(
       perspective: () => points == null
           ? null
+          : _threeD
+          ? perspectiveFromCamera(
+              _layout.camera,
+              _layout.width,
+              _layout.height,
+              points,
+            )
           : Perspective.preset(points, _layout.width, _layout.height),
     ),
     action: tr('切换透视辅助'),
   );
 
-  /// 拖动透视线(画布上拖消失点时用)。
+  /// 拖动透视线(平面视图里画布上拖消失点时用)。
   void movePerspective(Perspective p) =>
       _set(_layout.copyWith(perspective: () => p));
+
+  /// 把第 [i] 个消失点拖到画布上的 ([x], [y])(可以在画面外)。平面视图里只挪透视线;
+  /// 3D 视图里透视线就是镜头,拖它就是转镜头(fSpy 的做法,见
+  /// [cameraFromPerspective]):地平线上的点上下拖改俯仰、左右拖改环绕,
+  /// 两点透视时连视角一起定;竖直方向那个点(三点透视最后一个)改俯仰。
+  void moveVanishing(int i, double x, double y) {
+    final per = _layout.perspective;
+    if (per == null) return;
+    final moved = i < per.xs.length
+        ? per.copyWith(
+            horizon: y.round(),
+            xs: [
+              for (final (j, old) in per.xs.indexed) j == i ? x.round() : old,
+            ],
+          )
+        : per.copyWith(third: (x: x.round(), y: y.round()));
+    if (!_threeD) return movePerspective(moved);
+    final l = _layout;
+    setCamera(
+      i < per.xs.length
+          ? cameraFromPerspective(moved, l.camera, l.width, l.height)
+          : pitchFromThird(y, l.camera, l.width, l.height),
+    );
+  }
 
   /// 照 Agent 写的 `<layers>` 调图层(见 [parseLayers]):按给的先后排,顺便改名字和
   /// 前中后景;框的位置和描述一点不动。没写到的块按原来的先后接在后面。
@@ -219,6 +251,19 @@ class LayoutBoard extends ChangeNotifier {
   bool applyPerspective(String spec) {
     final parsed = parsePerspective(spec, _layout.width, _layout.height);
     if (parsed == null) return false;
+    // 3D 视图里透视线就是镜头:照 Agent 写的透视定镜头,透视线再跟着镜头算。
+    final want = parsed.value;
+    if (_threeD && want != null) {
+      final l = _layout;
+      _reproject(
+        l.copyWith(
+          camera: cameraFromPerspective(want, l.camera, l.width, l.height),
+          perspective: () => want,
+        ),
+        action: tr('Agent 调整透视'),
+      );
+      return true;
+    }
     _set(
       _layout.copyWith(perspective: () => parsed.value),
       action: tr('Agent 调整透视'),
@@ -265,16 +310,41 @@ class LayoutBoard extends ChangeNotifier {
       _set(_layout.copyWith(caption: caption, meta: meta, canvas: canvas));
 
   /// 开 / 关 3D 视图。打开时还没有体块的块先按图层猜一个(之后可以让 Agent 估)。
+  ///
+  /// 平面转 3D:开着透视辅助、镜头还没转过时,先照透视线定出镜头(俯仰、环绕、视角,
+  /// 见 [cameraFromPerspective]),已有的体块按原来的远近、厚度、朝向在新镜头下重新立起来,
+  /// 框一点不动;之后透视线跟着镜头走。描述本来就是照这个透视写的,不算转过镜头。
   void setThreeD(bool on) {
     _threeD = on;
-    if (!on) _freeCam = false;
-    final missing = _layout.boxes.any(
-      (b) => b.body == null && b.label != 'text',
-    );
-    if (on && missing) {
-      return _set(_layout.copyWith(boxes: liftMissing(_layout)));
+    if (!on) {
+      _freeCam = false;
+      return notifyListeners();
     }
-    notifyListeners();
+    var l = _layout;
+    final per = l.perspective;
+    if (per != null && l.camera.isDefault) {
+      final before = CameraView(l.camera, l.width, l.height);
+      final next = l.copyWith(
+        camera: cameraFromPerspective(per, l.camera, l.width, l.height),
+      );
+      l = next.copyWith(
+        boxes: [
+          for (final b in l.boxes)
+            b.body == null || b.label == 'text'
+                ? b
+                : liftBox(b, next, hintOf(b.body!, before)),
+        ],
+      );
+      _described = l.camera;
+    }
+    l = l.copyWith(boxes: liftMissing(l));
+    if (per != null) {
+      l = l.copyWith(
+        perspective: () =>
+            perspectiveFromCamera(l.camera, l.width, l.height, per.points),
+      );
+    }
+    _set(l);
   }
 
   /// 开 / 关自由镜头(只在 3D 视图里)。
@@ -333,6 +403,14 @@ class LayoutBoard extends ChangeNotifier {
 
   /// 换成 [l],有体块的框照它的镜头重新投(见 [reprojectBoxes]),选中的跟着那一块走。
   void _reproject(Layout l, {String? action}) {
+    // 3D 视图里透视线就是镜头:镜头一变,跟着重新算。
+    final per = l.perspective;
+    if (_threeD && per != null) {
+      l = l.copyWith(
+        perspective: () =>
+            perspectiveFromCamera(l.camera, l.width, l.height, per.points),
+      );
+    }
     final moved = reprojectBoxes(l);
     final sel = _selected;
     _set(

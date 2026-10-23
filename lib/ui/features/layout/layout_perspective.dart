@@ -10,19 +10,14 @@ List<Offset> vanishingPoints(Perspective p) => [
   if (p.third != null) Offset(p.third!.x.toDouble(), p.third!.y.toDouble()),
 ];
 
-/// 把第 [i] 个消失点拖到 [to](画布像素)。地平线上的消失点上下拖时地平线跟着走。
-// ponytail: 消失点只能拖到画布里面(Agent 能放到画面外,那种点拖不到);
-// 要在画面外也能拖,得让画布四周留出能拖的空白。
-Perspective dragVanishing(Perspective p, int i, Offset to) {
-  final x = to.dx.round(), y = to.dy.round();
-  if (i < p.xs.length) {
-    return p.copyWith(
-      horizon: y,
-      xs: [for (final (j, old) in p.xs.indexed) j == i ? x : old],
-    );
-  }
-  return p.copyWith(third: (x: x, y: y));
-}
+/// 画面外的消失点在画布边上放一个替身(离边 [inset]),按住它照样拖;拖的时候
+/// 消失点本身可以一直往外走(以前只能拖到画布里,点都卡在边上)。
+const markerInset = 8.0;
+
+Offset vanishMarker(Offset v, Size canvas, double inset) => Offset(
+  v.dx.clamp(inset, canvas.width - inset),
+  v.dy.clamp(inset, canvas.height - inset),
+);
 
 /// 每个消失点放出去的辐射线条数。
 const _rays = 28;
@@ -58,15 +53,28 @@ class PerspectivePainter extends CustomPainter {
         ..strokeWidth = 1.6,
     );
     canvas.restore();
-    // 圆点画在裁剪外面:贴着边的消失点也看得全。
-    // 在画面外的(Agent 照参考图放的)不画,免得压住旁边的界面;辐射线照样朝它收拢。
+    // 圆点画在裁剪外面:贴着边的消失点也看得全。画面外的在画布边上画一个小一点的替身,
+    // 再朝真正的方向伸出一小截线,按住它照样能拖(见 vanishMarker)。
     final room = (Offset.zero & size).inflate(8);
-    for (final v in points.where(room.contains)) {
+    for (final v in points) {
+      final inside = room.contains(v);
+      final at = inside ? v : vanishMarker(v, size, markerInset);
+      if (!inside) {
+        final dir = v - at;
+        canvas.drawLine(
+          at,
+          at + dir / dir.distance * 14,
+          Paint()
+            ..color = color
+            ..strokeWidth = 2,
+        );
+      }
+      final r = inside ? 6.0 : 4.5;
       canvas
-        ..drawCircle(v, 6, Paint()..color = Colors.white)
+        ..drawCircle(at, r, Paint()..color = Colors.white)
         ..drawCircle(
-          v,
-          6,
+          at,
+          r,
           Paint()
             ..color = color
             ..style = PaintingStyle.stroke

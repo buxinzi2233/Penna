@@ -354,11 +354,22 @@ BodyHint? parseBodyHint(Object? j) {
 }
 
 /// 体块在 [view] 这个镜头下的说法(写进给 Agent 看的 JSON)。
-Map<String, num> bodyHintJson(Body b, CameraView view) => {
-  'distance': (view.toCamera(b.center).z * 100).round() / 100,
-  'depth': b.w > 0 ? (b.d / b.w * 100).round() / 100 : 0,
-  'yaw': wrapDegrees(b.yaw - view.orbit).round(),
-};
+Map<String, num> bodyHintJson(Body b, CameraView view) {
+  final h = hintOf(b, view);
+  return {
+    'distance': (h.distance * 100).round() / 100,
+    'depth': (h.depth * 100).round() / 100,
+    'yaw': h.yaw.round(),
+  };
+}
+
+/// 体块相对 [view] 这个镜头的说法:离镜头多远、厚是宽的几倍、正面从正对镜头转了几度。
+/// 换镜头时拿它在新镜头下把体块重新立起来,框就不用动。
+BodyHint hintOf(Body b, CameraView view) => (
+  distance: view.toCamera(b.center).z,
+  depth: b.w > 0 ? b.d / b.w : 0,
+  yaw: wrapDegrees(b.yaw - view.orbit),
+);
 
 /// 照 [hint] 把画布上的 [box] 立成体块:沿着镜头的视线推到 distance 那么远,
 /// 再调到投影正好是这个框。
