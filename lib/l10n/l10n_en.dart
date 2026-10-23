@@ -589,7 +589,6 @@ const en = <String, String>{
   '系列 {0}': 'Series {0}',
   '正在生成,稍后再换页': 'Generating; switch pages later',
   '正在生成,稍后再加页': 'Generating; add pages later',
-  '最多 {0} 页': 'Up to {0} pages',
   '新建「{0}」': 'Created "{0}"',
   '新增 {0}': 'Added {0}',
   '正在生成,稍后再删': 'Generating; delete later',
@@ -884,4 +883,8 @@ const en = <String, String>{
   '在镜头外': 'Out of view',
   '上一层': 'Previous row',
   '下一层': 'Next row',
+  '成稿没放上:{0}': 'Draft not placed: {0}',
+  '区域控制放不下:{0}': 'No room in Region Control: {0}',
+  '系列满了(最多 {0} 个),删掉一些不用的系列再放':
+      'Series are full (up to {0}). Delete some unused series, then try again',
 };

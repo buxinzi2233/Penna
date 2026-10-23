@@ -92,14 +92,19 @@ void main() {
       expect(vm.pages.map((p) => p.series), [0, 0]);
     });
 
-    test('最多 10 页;只剩一页时不能删', () {
+    test('每个系列的页数不限,系列最多 20 个;只剩一页时不能删', () {
       final vm = _studio();
-      for (var i = 1; i < StudioPages.maxPages; i++) {
+      for (var i = 0; i < 24; i++) {
         expect(vm.addPage(), isNull);
       }
-
-      expect(vm.addPage(), '最多 10 页');
-      expect(vm.pages, hasLength(10));
+      expect(vm.pages, hasLength(25));
+      for (var i = 1; i < StudioPages.maxSeries; i++) {
+        expect(vm.addPage(newSeries: true), isNull);
+      }
+      expect(vm.seriesCount, StudioPages.maxSeries);
+      expect(vm.addPage(newSeries: true), StudioPages.fullMessage);
+      // 满了也还能往已有的系列里加页。
+      expect(vm.addPage(), isNull);
 
       final one = _studio();
       expect(one.removePage(0), '只剩这一页了');
@@ -279,18 +284,17 @@ void main() {
       expect(vm.pages.first.name, '玩耍');
     });
 
-    test('页数到顶了,多出来的不再开页', () async {
-      final vm = _studio(reply: (_) => storyboard);
-      for (var i = 1; i < StudioPages.maxPages; i++) {
-        vm.addPage();
-        vm.setText(0, 'page $i');
+    test('系列满了时 Agent 要另起系列:放不上、亮出提醒,删掉一个系列提醒就消失', () {
+      final vm = _studio();
+      for (var i = 1; i < StudioPages.maxSeries; i++) {
+        vm.addPage(newSeries: true);
       }
-
-      vm.send('再来三镜');
-      await pumpEventQueue();
-
-      expect(vm.pages, hasLength(10));
-      expect(vm.placeDraft('x', page: '新'), '最多 10 页');
+      vm.setText(0, 'a fox');
+      expect(vm.seriesAlert, isNull);
+      expect(vm.placeDraft('x', page: '新系列'), StudioPages.fullMessage);
+      expect(vm.seriesAlert, StudioPages.fullMessage);
+      expect(vm.removeSeries(vm.pages.first.series), isNull);
+      expect(vm.seriesAlert, isNull);
     });
   });
 

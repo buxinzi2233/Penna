@@ -181,6 +181,9 @@ class StudioViewModel extends ChangeNotifier {
   /// 起过名字的系列;没起的显示成「系列 N」。
   Map<int, String> _seriesNames = const {};
 
+  /// Agent 要另起系列却满了时的提醒(见 [StudioPages.seriesAlert])。
+  String? _seriesAlert;
+
   void _changed() {
     if (layoutOnly) _syncBoard();
     notifyListeners();

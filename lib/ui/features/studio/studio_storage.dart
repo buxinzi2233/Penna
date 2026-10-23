@@ -55,17 +55,15 @@ extension StudioStorage on StudioViewModel {
         (text: b['text'] as String, pinned: b['pinned'] as bool),
     ]);
     // 旧版只有一页,成稿直接存在 blocks 里。
-    final pages = List<DraftPage>.unmodifiable(
-      [
-        for (final p in (j['pages'] as List?) ?? const [])
-          _newPage(
-            p['series'] as int,
-            name: (p['name'] as String?) ?? '',
-            blocks: blocksOf(p['blocks']),
-          ),
-        if (j['pages'] == null) _newPage(0, blocks: blocksOf(j['blocks'])),
-      ].take(StudioPages.maxPages),
-    );
+    final pages = List<DraftPage>.unmodifiable([
+      for (final p in (j['pages'] as List?) ?? const [])
+        _newPage(
+          p['series'] as int,
+          name: (p['name'] as String?) ?? '',
+          blocks: blocksOf(p['blocks']),
+        ),
+      if (j['pages'] == null) _newPage(0, blocks: blocksOf(j['blocks'])),
+    ]);
     final seriesNames = Map<int, String>.unmodifiable({
       for (final e in ((j['seriesNames'] as Map?) ?? const {}).entries)
         int.parse(e.key as String): e.value as String,

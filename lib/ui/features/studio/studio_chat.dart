@@ -94,7 +94,7 @@ extension StudioChat on StudioViewModel {
     final written = <int>{};
     for (final draft in drafts) {
       if (!draft.complete) continue;
-      placeDraft(
+      final problem = placeDraft(
         draft.text,
         page: draft.page,
         replacing: quote,
@@ -102,6 +102,8 @@ extension StudioChat on StudioViewModel {
         name: draft.name,
         seriesTitle: draft.series,
       );
+      // 放不上要说出来(以前悄悄丢掉了);系列满了时页签下面还会亮提醒。
+      if (problem != null) _note(tr('成稿没放上:{0}', [problem]));
     }
   }
 

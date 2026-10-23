@@ -264,9 +264,15 @@ extension StudioContext on StudioViewModel {
     if (!blank) {
       final problem = agent.addPage(newSeries: true);
       if (problem != null) {
+        // 那边的系列满了:在区域控制工作台的页签下面亮出提醒,叫用户清理。
+        if (agent.seriesFull) {
+          agent._seriesAlert = StudioPages.fullMessage;
+          agent._changed();
+        }
         return (
-          text: '区域控制工作台放不下新的一页了($problem)。照实告诉用户,让他先删掉几页。',
-          note: tr('区域控制没写出布局'),
+          text: '区域控制工作台放不下新的系列了($problem)。照实告诉用户,'
+              '让他去区域控制工作台删掉一些不用的系列再试。',
+          note: tr('区域控制放不下:{0}', [problem]),
         );
       }
     }

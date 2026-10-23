@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261023--3--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261023--4--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -58,7 +58,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 ### 分页与系列
 
-一份工作台最多 10 页,每页是一条独立的提示词,页可以归入系列。
+每页是一条独立的提示词,页可以归入系列。系列最多 20 个,页签一层排 5 个、最多 4 层,用左右箭头翻层;每个系列的页数不限。系列满了而 Agent 还要另起系列时,页签下方提示清理。
 
 - 同一系列共用一场对话,Agent 可参照系列内其他页的内容;各系列相互独立。
 - Agent 一条回复可以同时写好几页,换主题时自动另起一个系列。

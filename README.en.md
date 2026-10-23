@@ -57,7 +57,7 @@ Selected text or whole sections can be pinned. The pinned area is read-only for 
 
 ### Pages and series
 
-A workspace holds up to 10 pages. Each page is a separate prompt, and pages can be grouped into series.
+Each page is a separate prompt, and pages can be grouped into series. There can be up to 20 series, shown five per row in up to four rows with arrows to switch rows; each series can hold any number of pages. When the series are full and the Agent needs a new one, a notice under the tabs asks you to clear some out.
 
 - Pages in the same series share one conversation, and the Agent can refer to the other pages in the series; series are independent of each other.
 - One Agent reply can write several pages at once and starts a new series automatically when the topic changes.

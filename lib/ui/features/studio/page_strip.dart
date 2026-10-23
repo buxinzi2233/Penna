@@ -110,7 +110,8 @@ class PageStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pages = vm.pages;
-    final full = pages.length >= StudioPages.maxPages;
+    // 系列满了不能再另起;往已有的系列里加页不限。
+    final full = vm.seriesFull;
     // 同系列的页挨在一起,所以顺着数就能分出组来。
     final groups = <List<int>>[];
     for (final (i, p) in pages.indexed) {
@@ -152,67 +153,78 @@ class PageStrip extends StatelessWidget {
           ),
         ),
         Expanded(
-          // 一层最多放 _perLayer 个系列,多的用左右箭头翻;一层里放不下时自己折行。
-          child: _SeriesPager(
-            current: groups.indexWhere(
-              (g) => pages[g.first].series == vm.series,
-            ),
-            currentSeries: vm.series,
-            trailing: Tooltip(
-              message: tr('另起一个系列,对话和别的系列分开'),
-              child: PennaButton(
-                label: tr('新系列'),
-                icon: Icons.add,
-                borderColor: PennaColors.border,
-                onPressed: full
-                    ? null
-                    : () => _do(context, vm.addPage(newSeries: true)),
-              ),
-            ),
+          // 一层最多放 perLayer 个系列,多的用左右箭头翻;一层里放不下时自己折行。
+          // 系列满了而 Agent 还要另起时,下面亮出提醒叫用户清理。
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final (g, group) in groups.indexed)
-                _SeriesFrame(
-                  tint: _seriesTints[g % _seriesTints.length],
-                  // 眼前这个系列的框描深一点。
-                  current: pages[group.first].series == vm.series,
-                  children: [
-                    _SeriesLabel(
-                      name: vm.seriesName(pages[group.first].series),
-                      tint: _seriesTints[g % _seriesTints.length],
-                      onMenu: (at) =>
-                          _seriesMenu(context, at, pages[group.first].series),
-                      onRename: () =>
-                          _renameSeries(context, pages[group.first].series),
-                    ),
-                    for (final i in group)
-                      _PageChip(
-                        index: i,
-                        number: vm.pageNumber(i),
-                        name: pages[i].name,
-                        tint: _seriesTints[g % _seriesTints.length],
-                        selected: i == vm.pageIndex,
-                        waiting: pages[i].pending != null,
-                        // 只收同一个系列里拖过来的。
-                        accepts: (from) =>
-                            from != i && pages[from].series == pages[i].series,
-                        onTap: () => _do(context, vm.openPage(i)),
-                        onMenu: (at) => _pageMenu(context, at, i),
-                        onRename: () => _renamePage(context, i),
-                        onDrop: (from) => _do(context, vm.movePage(from, i)),
-                      ),
-                    _IconChip(
-                      icon: Icons.add,
-                      tip: tr('在这个系列里加一页'),
-                      color: _seriesTints[g % _seriesTints.length].text,
-                      onTap: full
-                          ? null
-                          : () => _do(
-                              context,
-                              vm.addPage(toSeries: pages[group.first].series),
-                            ),
-                    ),
-                  ],
+              _SeriesPager(
+                current: groups.indexWhere(
+                  (g) => pages[g.first].series == vm.series,
                 ),
+                currentSeries: vm.series,
+                trailing: Tooltip(
+                  message: tr('另起一个系列,对话和别的系列分开'),
+                  child: PennaButton(
+                    label: tr('新系列'),
+                    icon: Icons.add,
+                    borderColor: PennaColors.border,
+                    onPressed: full
+                        ? null
+                        : () => _do(context, vm.addPage(newSeries: true)),
+                  ),
+                ),
+                children: [
+                  for (final (g, group) in groups.indexed)
+                    _SeriesFrame(
+                      tint: _seriesTints[g % _seriesTints.length],
+                      // 眼前这个系列的框描深一点。
+                      current: pages[group.first].series == vm.series,
+                      children: [
+                        _SeriesLabel(
+                          name: vm.seriesName(pages[group.first].series),
+                          tint: _seriesTints[g % _seriesTints.length],
+                          onMenu: (at) => _seriesMenu(
+                            context,
+                            at,
+                            pages[group.first].series,
+                          ),
+                          onRename: () =>
+                              _renameSeries(context, pages[group.first].series),
+                        ),
+                        for (final i in group)
+                          _PageChip(
+                            index: i,
+                            number: vm.pageNumber(i),
+                            name: pages[i].name,
+                            tint: _seriesTints[g % _seriesTints.length],
+                            selected: i == vm.pageIndex,
+                            waiting: pages[i].pending != null,
+                            // 只收同一个系列里拖过来的。
+                            accepts: (from) =>
+                                from != i &&
+                                pages[from].series == pages[i].series,
+                            onTap: () => _do(context, vm.openPage(i)),
+                            onMenu: (at) => _pageMenu(context, at, i),
+                            onRename: () => _renamePage(context, i),
+                            onDrop: (from) =>
+                                _do(context, vm.movePage(from, i)),
+                          ),
+                        _IconChip(
+                          icon: Icons.add,
+                          tip: tr('在这个系列里加一页'),
+                          color: _seriesTints[g % _seriesTints.length].text,
+                          onTap: () => _do(
+                            context,
+                            vm.addPage(toSeries: pages[group.first].series),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+              if (vm.seriesAlert case final alert?)
+                _SeriesAlert(text: alert, onClose: vm.dismissSeriesAlert),
             ],
           ),
         ),
@@ -222,7 +234,50 @@ class PageStrip extends StatelessWidget {
 }
 
 /// 页签上一层放几个系列。
-const _perLayer = 5;
+const _perLayer = StudioPages.perLayer;
+
+/// 系列满了、Agent 放不下时的提醒:叫用户删掉一些系列。删到不满就自己消失。
+class _SeriesAlert extends StatelessWidget {
+  const _SeriesAlert({required this.text, required this.onClose});
+
+  final String text;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: PennaColors.diffDel,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 16,
+            color: PennaColors.diffDelText,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 12, color: PennaColors.diffDelText),
+            ),
+          ),
+          IconButton(
+            tooltip: tr('关闭'),
+            iconSize: 14,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close, color: PennaColors.diffDelText),
+            onPressed: onClose,
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 /// 系列多了分层:一层 [_perLayer] 个,左右箭头翻层。默认停在眼前这个系列那一层;
 /// 用户翻到别的层后,换了系列(新建、切过去)又跟回眼前这一层。

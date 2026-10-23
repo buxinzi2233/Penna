@@ -94,37 +94,52 @@ class _StudioPageState extends State<StudioPage> {
             box.maxWidth - _splitterWidth - ActivityBar.widthOf(open: false);
         return ListenableBuilder(
           listenable: _changes,
-          builder: (context, _) => Row(
+          builder: (context, _) => Stack(
             children: [
-              ActivityBar(vm: widget.vm),
-              // 左栏的宽度是算好的;操作记录展开时多占的那一截,由右边的对话让出来。
-              SizedBox(
-                width: usable * _split,
-                child: PromptPane(
-                  vm: widget.vm,
-                  archive: widget.archive,
-                  // 选中一段后直接去输入框打字。
-                  onDiscuss: (section) {
-                    widget.vm.quoteSection(section);
-                    _inputFocus.requestFocus();
-                  },
+              Positioned.fill(
+                child: Row(
+                  children: [
+                    // 给收起的操作记录留出窄边;展开时它盖在成稿栏上,不挤别的(同区域控制页)。
+                    SizedBox(width: ActivityBar.widthOf(open: false)),
+                    SizedBox(
+                      width: usable * _split,
+                      child: PromptPane(
+                        vm: widget.vm,
+                        archive: widget.archive,
+                        // 选中一段后直接去输入框打字。
+                        onDiscuss: (section) {
+                          widget.vm.quoteSection(section);
+                          _inputFocus.requestFocus();
+                        },
+                      ),
+                    ),
+                    _Splitter(
+                      onDrag: (dx) => setState(() {
+                        _split = (_split + dx / usable).clamp(
+                          _minSplit,
+                          _maxSplit,
+                        );
+                      }),
+                    ),
+                    Expanded(
+                      child: ChatPane(
+                        vm: widget.vm,
+                        config: widget.config,
+                        input: _input,
+                        inputFocus: _inputFocus,
+                        onQuickAction: _appendInput,
+                        onOpenSettings: widget.onOpenSettings,
+                        onOpenLayout: widget.onOpenLayout,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              _Splitter(
-                onDrag: (dx) => setState(() {
-                  _split = (_split + dx / usable).clamp(_minSplit, _maxSplit);
-                }),
-              ),
-              Expanded(
-                child: ChatPane(
-                  vm: widget.vm,
-                  config: widget.config,
-                  input: _input,
-                  inputFocus: _inputFocus,
-                  onQuickAction: _appendInput,
-                  onOpenSettings: widget.onOpenSettings,
-                  onOpenLayout: widget.onOpenLayout,
-                ),
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: ActivityBar(vm: widget.vm),
               ),
             ],
           ),
