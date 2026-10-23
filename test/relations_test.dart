@@ -45,6 +45,32 @@ void main() {
     expect(text, isNot(contains('「标题」在「小杯子」')));
   });
 
+  test('人物块按占画面多高说景别:框小的是全景、贴边又高的是近景', () {
+    String shotOf(int top, int bottom) => layoutRelations(
+      Layout(
+        width: 832,
+        height: 1216,
+        caption: '',
+        boxes: [
+          LayoutBox(
+            left: 200,
+            top: top,
+            right: 600,
+            bottom: bottom,
+            name: '她',
+            label: 'character',
+          ),
+        ],
+      ),
+    );
+    expect(shotOf(550, 1050), contains('高约画面的 41%,全景'));
+    expect(shotOf(900, 1100), contains('远景'));
+    expect(shotOf(300, 1216), contains('近景'));
+    expect(shotOf(550, 1050), contains('不要写成特写'));
+    // 不是人物的块不说景别。
+    expect(text, isNot(contains('高约画面')));
+  });
+
   test('发给 Agent 的画板现状里带着位置关系,空画板不带', () {
     final board = LayoutBoard()..replace(layout);
     expect(board.prompt, contains('【位置关系】'));

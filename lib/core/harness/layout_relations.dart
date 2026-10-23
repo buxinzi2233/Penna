@@ -30,7 +30,7 @@ String layoutRelations(Layout l) {
       '要求:summary.caption 把上面每一处遮挡都写出来;重叠的两块,各自的 caption 里也要写'
       '(前面那块写它挡在谁前面、压住对方哪部分,后面那块写哪部分被谁挡住、露出哪部分);'
       '贴着画面边、被裁掉的写 "cropped by the bottom edge" 这类话;每块的 caption 写上它在画面的位置'
-      '("in the upper left of the frame")。改了框或前后,这些关系跟着变,照新的写。';
+      '("in the upper left of the frame")。$_shotRule改了框或前后,这些关系跟着变,照新的写。';
 }
 
 String _name(LayoutBox b, int i) =>
@@ -48,9 +48,32 @@ String _where(LayoutBox b, Layout l) {
     if (b.right >= l.width * 0.99) '右边',
   ];
   final across = b.width >= l.width * 0.9 ? ',横贯整个宽度' : '';
-  return '画面${_cell(cx, cy)},占画面 ${area.round()}%$across'
+  return '画面${_cell(cx, cy)},占画面 ${area.round()}%$across${_shot(b, l)}'
       '${edges.isEmpty ? '' : ',贴着画面${edges.join('、')}(超出的部分被裁掉)'}';
 }
+
+/// 人物块的景别,按框占画面多高算。MOSS-Image 读描述时爱把主角画成占满画面的特写,
+/// 框再小也一样(用户反馈:3D 里人只占四成高,出图成了大半身近景),所以要直说多大。
+String _shot(LayoutBox b, Layout l) {
+  if (b.label != 'character') return '';
+  final h = (b.height * 100 / l.height).round();
+  final cropped = b.top <= l.height * 0.01 || b.bottom >= l.height * 0.99;
+  final scale = cropped && h >= 60
+      ? '近景,人物被画面边裁掉一部分(medium / close shot)'
+      : h < 30
+      ? '远景,人物很小、四周是大片场景(long shot, small figure)'
+      : h < 70
+      ? '全景,全身完整、四周留出不少场景(full shot)'
+      : '全身几乎撑满画面高度(full-body shot filling the frame)';
+  return ',高约画面的 $h%,$scale';
+}
+
+/// 两种位置关系末尾都加的一条:景别要写进描述。
+const _shotRule =
+    '人物照上面的景别写,并写明大约占画面多高'
+    '("a full shot, she fills only about 40% of the frame height, surrounded by wide empty street"),'
+    '框小的不要写成特写、近景或大半身,也不要用 close-up、portrait 这类词,'
+    '否则出图时人会被放大到占满画面。';
 
 /// 按 0–1 的位置说在画面哪一格:左上、上方居中、正中……
 String _cell(double x, double y) {
@@ -196,7 +219,7 @@ String sceneRelations(Layout l) {
       '要求:summary.caption 交代镜头(机位高低、俯仰、从哪一侧拍)和上面每一处遮挡;'
       '每块的 caption 写它在画面的位置、从这个镜头看得到它的哪几面'
       '("seen from above, showing the top of the suitcase"、"seen from behind")、'
-      '挡在谁前面或被谁挡住哪部分;文字压在什么上面也写清;贴着画面边的写被裁掉。';
+      '挡在谁前面或被谁挡住哪部分;文字压在什么上面也写清;贴着画面边的写被裁掉。$_shotRule';
 }
 
 /// 从镜头看得到这个体块的哪几面。
