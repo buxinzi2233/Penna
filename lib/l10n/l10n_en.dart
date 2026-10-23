@@ -895,4 +895,6 @@ const en = <String, String>{
   '调整「{0}」的{1}': 'Adjusted {1} of "{0}"',
   '体块 · {0}': 'Volume · {0}',
   '移轴': 'Lens shift',
+  '全屏摆放': 'Full-screen arrange',
+  '退出全屏': 'Exit full screen',
 };

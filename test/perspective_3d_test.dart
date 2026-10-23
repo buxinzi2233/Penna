@@ -26,6 +26,19 @@ void main() {
     }
   });
 
+  test('三点透视里一个点在正中、竖直的点在它正下方(正对前方低头):照样算出俯仰', () {
+    for (final c in const [Camera(pitch: 25), Camera(pitch: -30)]) {
+      final p = perspectiveFromCamera(c, _w, _h, 3);
+      final back = cameraFromPerspective(p, const Camera(), _w, _h);
+      expect(back.pitch, closeTo(c.pitch, 0.5), reason: '$c');
+      expect(back.orbit, closeTo(0, 0.5), reason: '$c');
+      // 算回去的透视线和原来的对得上。
+      final again = perspectiveFromCamera(back, _w, _h, 3);
+      expect((again.horizon - p.horizon).abs(), lessThanOrEqualTo(2));
+      expect((again.third!.y - p.third!.y).abs(), lessThanOrEqualTo(3));
+    }
+  });
+
   test('两点透视:镜头保持水平,用移轴把地平线放到画的位置,竖线不收拢', () {
     const c = Camera(orbit: 30, shift: -0.2, fov: 60);
     final p = perspectiveFromCamera(c, _w, _h, 2);

@@ -200,16 +200,31 @@ Camera cameraFromPerspective(Perspective p, Camera c, int w, int h) {
   // 底片中心的 y:没有竖直消失点时就在地平线上(镜头水平)。
   var py = hz;
   final third = p.third;
-  if (third != null && p.xs.length == 2 && (hz - third.y).abs() > 1) {
+  // 垂心法要两个水平消失点分在竖直消失点两边;有一个在无穷远时(正对前方低头、
+  // 抬头,一个点在正中、另一个跑到很远)式子退化,改用下面的办法。
+  final ortho =
+      third != null &&
+      p.xs.length == 2 &&
+      (hz - third.y).abs() > 1 &&
+      (third.x - p.xs[0]) * (third.x - p.xs[1]) < 0;
+  if (ortho) {
     // 垂心:过竖直消失点的高是竖线 x = x3;再和过 F₁、垂直于 F₂F₃ 的高相交。
     final x3 = third.x.toDouble();
     py = hz + (x3 - p.xs[0]) * (x3 - p.xs[1]) / (hz - third.y);
   }
-  if (p.xs.length == 2) {
+  if (p.xs.length == 2 && (third == null || ortho)) {
     final f2 = -((p.xs[0] - cx) * (p.xs[1] - cx) + (hz - py) * (hz - py));
     if (f2 > 1) f = math.sqrt(f2);
   }
-  final pitch = math.atan2(py - hz, f);
+  final double pitch;
+  if (third != null && !ortho && (third.y - hz).abs() > 1) {
+    // 退化时:地平线到竖直消失点的距离 = f(tan p + cot p) = 2f / sin 2p,
+    // 和环绕无关;焦距用现在的。
+    pitch = 0.5 * math.asin((2 * f / (third.y - hz)).clamp(-1.0, 1.0));
+    py = hz + f * math.tan(pitch);
+  } else {
+    pitch = math.atan2(py - hz, f);
+  }
   final cosP = math.cos(pitch);
   double deg(double r) => r * 180 / math.pi;
   // u 当成前后方向的消失点:u = cx − f·tan o / cos p。

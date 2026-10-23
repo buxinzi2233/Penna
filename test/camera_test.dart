@@ -9,6 +9,7 @@ import 'package:penna/core/harness/layout_3d.dart';
 import 'package:penna/ui/features/layout/layout_board.dart';
 import 'package:penna/ui/features/layout/layout_camera.dart';
 import 'package:penna/ui/features/layout/layout_canvas.dart';
+import 'package:penna/ui/features/layout/layout_fullscreen.dart';
 import 'package:penna/ui/features/studio/page_strip.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 
@@ -464,6 +465,38 @@ void main() {
     expect(after.body!.x, closeTo(before.body!.x + 0.05, 1e-9));
     expect(after.body!.guessed, isFalse);
     expect(after.left, greaterThan(before.left));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('全屏摆放:画布铺满窗口,3D 时有摄像机栏,Esc 回去', (tester) async {
+    final board = LayoutBoard()
+      ..addBox(_boxAt(100, 300, 400, 1000, name: '小红'))
+      ..setThreeD(true)
+      ..select(null);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showFullCanvas(
+              context,
+              board: board,
+              onToggle3D: () => board.setThreeD(!board.threeD),
+              onRedescribe: () {},
+              onEstimate: () {},
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayoutCanvas), findsOneWidget);
+    expect(find.byType(CameraPanel), findsOneWidget);
+    expect(find.text('退出全屏'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(LayoutCanvas), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

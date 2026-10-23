@@ -21,6 +21,7 @@ import '../studio/studio_view_model.dart';
 import 'layout_board.dart';
 import 'layout_camera.dart';
 import 'layout_canvas.dart';
+import 'layout_fullscreen.dart';
 import 'layout_json_view.dart';
 import '../../../l10n/l10n.dart';
 
@@ -331,6 +332,23 @@ class _LayoutPageState extends State<LayoutPage> {
                                           board: board,
                                           onPick: _reveal,
                                           onEdit: (i) => _reveal(i, edit: true),
+                                        ),
+                                      ),
+                                    ),
+                                    // 全屏摆放:画布铺满整个软件窗口,方便转镜头、挪框。
+                                    Positioned(
+                                      top: 0,
+                                      right: 0,
+                                      child: IconButton(
+                                        tooltip: tr('全屏摆放'),
+                                        iconSize: 18,
+                                        icon: const Icon(Icons.fullscreen),
+                                        onPressed: () => showFullCanvas(
+                                          context,
+                                          board: board,
+                                          onToggle3D: _toggle3D,
+                                          onRedescribe: _redescribe,
+                                          onEstimate: _estimate,
                                         ),
                                       ),
                                     ),
