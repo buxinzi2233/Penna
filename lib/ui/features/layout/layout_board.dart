@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/harness/layout.dart';
 import '../../../core/harness/layout_3d.dart';
+import '../../../core/harness/layout_relations.dart';
 import '../../../l10n/l10n.dart';
 
 /// 存下来的一个画布尺寸。
@@ -115,7 +116,8 @@ class LayoutBoard extends ChangeNotifier {
                   '各块在画布上的范围(从左上角量,0% 是左边或顶上):\n$where\n'
                   '<current-layout>\n${mossLayoutJson(l, draft: true)}\n</current-layout>'}'
         '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}'
-        '\n\n${describeCamera(l, threeD: _threeD)}';
+        '\n\n${describeCamera(l, threeD: _threeD)}'
+        '${l.isEmpty ? '' : '\n\n${layoutRelations(l)}'}';
   }
 
   /// 换成 [layout]:框先按前后排好(见 [stacked])。[follow] 是要跟着选中的那一块

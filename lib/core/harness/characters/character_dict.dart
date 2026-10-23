@@ -56,7 +56,10 @@ class CharacterDict {
   /// 按名字找作品(系列):完全对上的排最前,其余名字里带着它的按角色多少排,
   /// 最多 [limit] 个。和 [search] 一样不分下划线、空格和大小写。
   // ponytail: 作品名只有英文(数据里没有作品的中文别名),"原神"这种查不到。
-  List<({String name, int count})> searchSeries(String query, {int limit = 10}) {
+  List<({String name, int count})> searchSeries(
+    String query, {
+    int limit = 10,
+  }) {
     final q = _normalize(query);
     if (q.isEmpty) return const [];
     final exact = <({String name, int count})>[];
