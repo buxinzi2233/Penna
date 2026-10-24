@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/services/archive_store.dart';
 import '../data/services/character_store.dart';
 import '../data/services/config_service.dart';
+import '../data/services/notebook_store.dart';
 import '../data/services/skill_store.dart';
 import 'core/theme.dart';
 import 'core/version.dart';
@@ -13,6 +14,7 @@ import 'features/layout/layout_board.dart';
 import 'features/layout/layout_page.dart';
 import 'features/local/local_model.dart';
 import 'features/local/local_page.dart';
+import 'features/notebook/notebook_page.dart';
 import 'features/settings/settings_page.dart';
 import 'features/studio/studio_page.dart';
 import 'features/studio/studio_view_model.dart';
@@ -27,9 +29,10 @@ const _studio = 0,
     _settings = 2,
     _charactersPage = 3,
     _localPage = 4,
-    _layoutPage = 5;
+    _layoutPage = 5,
+    _notebookPage = 6;
 
-/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「角色库」「本地反推」「布局」「设置」之间切换。
+/// 应用外壳:最左图标栏,右边在「工作台」「档案库」「角色库」「本地反推」「布局」「记事本」「设置」之间切换。
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -38,9 +41,13 @@ class AppShell extends StatefulWidget {
     required this.skills,
     this.layoutChat,
     this.archive,
+    this.notebooks,
     this.local,
     this.checkUpdates = false,
   });
+
+  /// 记事本;不给就用一个只在内存里的(测试用)。
+  final NotebookStore? notebooks;
 
   /// 布局页右边那场对话;不给就用一个只在内存里的(测试用)。
   final StudioViewModel? layoutChat;
@@ -82,6 +89,7 @@ class _AppShellState extends State<AppShell> {
 
   int _page = _studio;
   late final _archive = widget.archive ?? ArchiveStore();
+  late final _notebooks = widget.notebooks ?? NotebookStore();
   // 角色库跟着工作台走:Agent 存进去的和这一页上看到的是同一份。
   late final _characters = widget.vm.characters ?? CharacterStore();
   // 布局画板同样跟着工作台走:Agent 写的布局放到这一页上。
@@ -183,6 +191,10 @@ class _AppShellState extends State<AppShell> {
                             onOpenStudio: () => _go(_studio),
                             onOpenSettings: () => _go(_settings),
                           ),
+                        ),
+                        _Page(
+                          active: _page == _notebookPage,
+                          child: NotebookPage(store: _notebooks),
                         ),
                         _Page(
                           active: _page == _settings,
@@ -319,6 +331,13 @@ class _NavRail extends StatelessWidget {
             tooltip: tr('区域控制工作台'),
             selected: page == _layoutPage,
             onTap: () => onSelect(_layoutPage),
+          ),
+          const SizedBox(height: 6),
+          _RailButton(
+            icon: Icons.sticky_note_2_outlined,
+            tooltip: tr('记事本'),
+            selected: page == _notebookPage,
+            onTap: () => onSelect(_notebookPage),
           ),
           const Spacer(),
           _RailButton(

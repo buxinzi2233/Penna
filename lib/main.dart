@@ -15,6 +15,7 @@ import 'core/harness/tags/tag_search.dart';
 import 'core/harness/update/updater.dart';
 import 'data/models/app_config.dart';
 import 'data/services/archive_store.dart';
+import 'data/services/notebook_store.dart';
 import 'data/services/character_store.dart';
 import 'data/services/config_service.dart';
 import 'data/services/error_log.dart';
@@ -110,6 +111,8 @@ Future<void> main() async {
   await layoutChat.load();
   final archive = ArchiveStore(File('${home.path}${sep}archive.json'));
   await archive.load();
+  final notebooks = NotebookStore(File('${home.path}${sep}notebooks.json'));
+  await notebooks.load();
   final local = LocalModel(
     dir: home,
     streamChat: streamChat,
@@ -129,6 +132,7 @@ Future<void> main() async {
       vm: vm,
       layoutChat: layoutChat,
       archive: archive,
+      notebooks: notebooks,
       local: local,
     ),
   );
@@ -221,12 +225,14 @@ class PennaApp extends StatefulWidget {
     required this.vm,
     required this.layoutChat,
     required this.archive,
+    required this.notebooks,
     required this.local,
   });
 
   final StudioViewModel layoutChat;
 
   final ArchiveStore archive;
+  final NotebookStore notebooks;
   final LocalModel local;
   final StudioViewModel vm;
   final ConfigService config;
@@ -323,6 +329,7 @@ class _PennaAppState extends State<PennaApp> with WindowListener {
             config: widget.config,
             skills: widget.skills,
             archive: widget.archive,
+            notebooks: widget.notebooks,
             local: widget.local,
             checkUpdates: kReleaseMode,
           ),

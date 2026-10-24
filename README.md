@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261025--1--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261025--2--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -145,6 +145,7 @@ Skill 是一份写法说明(`SKILL.md`),决定 Agent 按什么方式写提示词
 ### 档案、历史与回滚
 
 - **档案库**:手动保存的成稿与区域控制布局,分为两个分区,带名称和分类。
+- **记事本**:侧栏里随手记录的本子,每个本子包含多条记录,每条有名字和内容,输入即保存。
 - **历史提示词**:采纳改动、复制、清空时自动记录,最多 100 条,可以展开全文或放回成稿。
 - **操作记录**:记录页面、固定、采纳驳回等结构性操作,可以回滚到任意一步之前。
 
@@ -185,6 +186,7 @@ flutter run -d windows
 | 机密 | `keys.dat` | 全部 API Key,经 Windows DPAPI 加密,仅本机当前用户可解 |
 | 工作台 | `workspace.json` | 成稿、对话、历史提示词 |
 | 档案 | `archive.json` | 档案库 |
+| 记事本 | `notebooks.json` | 记事本的本子与记录 |
 | 角色 | `characters.json`、`characters\` | 自存的角色及图片 |
 | 反推 | `reverse.json`、`reverse.img` | 参考图及反推结果 |
 | 本地反推 | `local.json`、`models\`、`runtime\` | 本地反推设置、下载的模型与 llama.cpp 运行时 |

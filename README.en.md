@@ -143,6 +143,7 @@ A Skill is a writing guide (`SKILL.md`) that decides how the Agent writes prompt
 ### Archive, history and rollback
 
 - **Archive**: drafts and Region Control layouts saved by hand, in two sections, with names and categories.
+- **Notes**: notebooks in the sidebar for quick notes; each notebook holds multiple entries with a name and content, saved as you type.
 - **Prompt history**: recorded automatically on accept, copy and clear, up to 100 entries; each can be expanded or put back into the draft.
 - **Activity**: records structural operations such as pages, pins and accept/reject, and can roll back to before any step.
 
@@ -187,6 +188,7 @@ All data is stored on this PC in `Documents\Penna`.
 | Secrets | `keys.dat` | All API keys, encrypted with Windows DPAPI; only the current user on this PC can decrypt them |
 | Workspace | `workspace.json` | Drafts, conversations, prompt history |
 | Archive | `archive.json` | The Archive |
+| Notes | `notebooks.json` | Notebooks and their entries |
 | Characters | `characters.json`, `characters\` | Saved characters and their pictures |
 | Interrogate | `reverse.json`, `reverse.img` | Reference image and interrogation results |
 | Local Interrogate | `local.json`, `models\`, `runtime\` | Local Interrogate settings, downloaded models and the llama.cpp runtime |
