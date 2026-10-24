@@ -145,9 +145,21 @@ class _DraftSectionState extends State<_DraftSection> {
   }
 
   /// 把眼前这个系列的每一页都存进档案库:一页一条,分类就是系列的名字。
+  /// 档案库里已经有一字不差的就跳过,只存新的和改过的。
   void _saveSeries(BuildContext context) {
-    final prompts = vm.seriesPrompts;
-    if (prompts.isEmpty) return showToast(context, tr('这个系列还是空的'), warn: true);
+    final all = vm.seriesPrompts;
+    if (all.isEmpty) return showToast(context, tr('这个系列还是空的'), warn: true);
+    final saved = {
+      for (final e in archive.entries)
+        if (e.kind == archivePrompt) e.text,
+    };
+    final prompts = [
+      for (final p in all)
+        if (!saved.contains(p.text)) p,
+    ];
+    if (prompts.isEmpty) {
+      return showToast(context, tr('这个系列的页都已经存过了'), warn: true);
+    }
     final category = vm.seriesName(vm.series);
     final now = DateTime.now();
     // 档案库里新的在前:倒着存,第 1 页才排在最上面。时间各错开一点,编号不会撞。
@@ -159,7 +171,13 @@ class _DraftSectionState extends State<_DraftSection> {
         now: now.add(Duration(microseconds: i)),
       );
     }
-    showToast(context, tr('「{0}」的 {1} 页已存进档案库', [category, prompts.length]));
+    final skipped = all.length - prompts.length;
+    showToast(
+      context,
+      skipped == 0
+          ? tr('「{0}」的 {1} 页已存进档案库', [category, prompts.length])
+          : tr('「{0}」新存了 {1} 页,{2} 页之前存过', [category, prompts.length, skipped]),
+    );
   }
 
   Future<void> _pin(BuildContext context) async {

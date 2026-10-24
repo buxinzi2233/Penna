@@ -913,4 +913,7 @@ const en = <String, String>{
   '删除这一条?': 'Delete this note?',
   '内容会一起删掉。': 'Its content will be deleted too.',
   '内容': 'Content',
+  '这个系列的页都已经存过了': 'Every page in this series is already saved',
+  '「{0}」新存了 {1} 页,{2} 页之前存过':
+      'Saved {1} new pages of "{0}"; {2} were already saved',
 };

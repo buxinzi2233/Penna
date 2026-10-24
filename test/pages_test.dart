@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/draft_block.dart';
 import 'package:penna/core/harness/providers/openai_provider.dart';
 import 'package:penna/data/models/app_config.dart';
+import 'package:penna/data/services/archive_store.dart';
+import 'package:penna/ui/core/theme.dart';
 import 'package:penna/ui/features/studio/markdown_text.dart';
 import 'package:penna/ui/features/studio/studio_page.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
@@ -345,6 +347,43 @@ void main() {
       expect(vm.pages, hasLength(1));
       expect(vm.finalPrompt, 'a fox');
     });
+  });
+
+  testWidgets('保存系列:已经存过的页不再存,只存新的', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final vm = _studio(blocks: const [(text: 'a fox', pinned: false)]);
+    vm.addPage();
+    vm.setText(0, 'a crow');
+    final archive = ArchiveStore();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: pennaTheme(),
+        home: AppShell(
+          vm: vm,
+          config: vm.config,
+          skills: tempSkills(),
+          archive: archive,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('保存系列'));
+    await tester.pump();
+    expect(archive.entries, hasLength(2));
+
+    await tester.tap(find.text('保存系列'));
+    await tester.pump();
+    expect(archive.entries, hasLength(2));
+    expect(find.text('这个系列的页都已经存过了'), findsOneWidget);
+
+    vm.addPage();
+    vm.setText(0, 'an owl');
+    await tester.pump();
+    await tester.tap(find.text('保存系列'));
+    await tester.pump();
+    expect(archive.entries.map((e) => e.text), ['an owl', 'a fox', 'a crow']);
   });
 
   testWidgets('页签:加一页、另起系列、点页码换页', (tester) async {
