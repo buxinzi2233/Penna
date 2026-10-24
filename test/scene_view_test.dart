@@ -92,4 +92,34 @@ void main() {
     expect(still.body, other.body);
     expect(still.left, other.left);
   });
+
+  testWidgets('体块拖到主镜头外面后,视口里照样画着、还能拖回来', (tester) async {
+    final board = _board();
+    final i = board.layout.boxes.indexWhere((b) => b.name == '桌');
+    final body = board.layout.boxes[i].body!;
+    board.setBody(i, body.copyWith(x: body.x - 3));
+    final gone = board.layout.boxes.firstWhere((b) => b.name == '桌');
+    expect(gone.offscreen, isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 400,
+            height: 300,
+            child: SceneView(board: board),
+          ),
+        ),
+      ),
+    );
+    final view = CameraView(fitSceneCamera(board.layout), 400, 300);
+    final c = view.project(gone.body!.center)!;
+    final origin = tester.getTopLeft(find.byType(SceneView));
+    final g = await tester.startGesture(origin + Offset(c.u, c.v));
+    await g.moveBy(const Offset(10, 0));
+    await g.moveBy(const Offset(30, 0));
+    await g.up();
+    await tester.pump();
+    final back = board.layout.boxes.firstWhere((b) => b.name == '桌');
+    expect(back.body!.x, isNot(gone.body!.x));
+  });
 }

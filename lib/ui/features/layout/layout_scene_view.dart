@@ -58,7 +58,7 @@ Camera fitSceneCamera(Layout l) {
   final pts = [
     main.eye,
     for (final b in l.boxes)
-      if (b.body != null && !b.offscreen) ...b.body!.corners,
+      if (_inScene(b)) ...b.body!.corners,
   ];
   var lo = pts.first, hi = pts.first;
   for (final p in pts) {
@@ -110,6 +110,10 @@ Vec3? hitGround(CameraView view, double u, double v, double y) {
   return (x: view.eye.x + dir.x * t, y: y, z: view.eye.z + dir.z * t);
 }
 
+/// 视口里画不画这一块:有体块、用户没点眼睛关掉的都画。跑到主镜头外面的也画
+/// (主画布上看不到它,只能在这里拖回来)。
+bool _inScene(LayoutBox b) => b.body != null && b.hidden != true;
+
 /// 视口里第 [i] 块体块投出来的外框;有角在视口镜头后面时为 null。
 Rect? _bodyRect(Body body, CameraView view) {
   final pts = [for (final c in body.corners) view.project(c)];
@@ -158,7 +162,7 @@ class _SceneViewState extends State<SceneView> {
     var nearest = double.infinity;
     for (final (i, b) in _board.layout.boxes.indexed) {
       final body = b.body;
-      if (body == null || b.offscreen || !b.shownIn(threeD: true)) continue;
+      if (body == null || !_inScene(b)) continue;
       final r = _bodyRect(body, view);
       if (r == null || !r.inflate(4).contains(p)) continue;
       final z = view.toCamera(body.center).z;
@@ -360,8 +364,7 @@ class _ScenePainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     final bodies = [
       for (final (i, b) in layout.boxes.indexed)
-        if (b.body != null && !b.offscreen && b.shownIn(threeD: true))
-          (i, b.body!),
+        if (_inScene(b)) (i, b.body!),
     ];
     _paintGround(bodies, line);
     // 远的先画,近的盖在上面。
@@ -375,10 +378,14 @@ class _ScenePainter extends CustomPainter {
     for (final (i, body) in order) {
       final pts = [for (final c in body.corners) at(c)];
       if (pts.contains(null)) continue;
+      // 在主镜头外面的(主画布上看不到)画淡一点。
+      final color = layout.boxes[i].offscreen
+          ? Color.lerp(layoutBodyColor(i), grid, 0.6)!
+          : layoutBodyColor(i);
       paintCuboid(
         canvas,
         [for (final p in pts) p!],
-        layoutBodyColor(i),
+        color,
         width: i == selected ? 2.4 : 1.2,
       );
       final top = at((x: body.x, y: body.y - body.h / 2, z: body.z));
