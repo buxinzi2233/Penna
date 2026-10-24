@@ -230,11 +230,11 @@ class _LayoutPageState extends State<LayoutPage> {
     if (problem != null) showToast(context, problem, warn: true);
   }
 
-  void _estimate() => _send(tr('给画板上每块估体块(body:远近、厚度、朝向),框的位置、描述和图层都不动'));
+  void _estimate() => _send(estimateRequest);
 
   void _redescribe() {
     setState(() => _answered = board.layout.camera);
-    _send(tr('镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、左右前后的位置关系、谁挡着谁),框、体块和图层都不动'));
+    _send(redescribeRequest);
   }
 
   /// 带着这一块去对话里:输入框上方出现它,接着打字说怎么改。

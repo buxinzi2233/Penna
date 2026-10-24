@@ -309,10 +309,14 @@ extension StudioContext on StudioViewModel {
       return (text: '', note: '');
     }
     final count = board.layout.boxes.length;
+    // 放进眼前这个系列新开的一页(眼前这页空着就用它),不另起系列:
+    // 用户是在这个系列里聊的,聊完不该多出一个系列。
+    final written = <int>{};
     final problem = placeDraft(
       board.json,
-      page: '新系列',
-      seriesTitle: ask.name.isEmpty ? tr('区域控制') : ask.name,
+      page: '新',
+      name: ask.name,
+      written: written,
     );
     if (problem != null) {
       return (
@@ -320,15 +324,18 @@ extension StudioContext on StudioViewModel {
         note: tr('布局没放进成稿:{0}', [problem]),
       );
     }
-    final name = seriesName(series);
+    final name = tr('「{0}」第 {1} 页', [
+      seriesName(series),
+      pageNumber(written.isEmpty ? _page : written.first),
+    ]);
     final turned = flipped ? ',画布照参考图的横竖对调成了 $size' : '';
     return (
       text:
-          '区域控制的 Agent 已排好布局($count 个框$turned),JSON 已放进成稿区新建的系列「$name」,'
+          '区域控制的 Agent 已排好布局($count 个框$turned),JSON 已放进成稿区$name,'
           '区域控制工作台上也有一份。用一两句话告诉用户排了什么、放在哪里;'
           '不要写 <draft> 或 <layout>,也不要贴 JSON。',
       note: [
-        tr('区域控制排好了 · {0} 个框 · 已放进「{1}」', [count, name]),
+        tr('区域控制排好了 · {0} 个框 · 已放进{1}', [count, name]),
         if (flipped) tr('画布已换成 {0}', [size]),
       ].join(' · '),
     );
@@ -546,11 +553,10 @@ const _layoutAgentPrompt =
     '- 用户要改,就在【布局画板】现有的布局上改:没提到的块位置、大小、描述都不动。'
     '他用名字说"哪一块"时,对照 name 找。\n'
     '- 排位置前先定好主次、分组和前后,再选队形;"随便排"是换一种合理的新队形,不是随机撒点。\n'
-    '- <layout> 默认写进眼前这一页、换掉它。用户换了新主题(换了角色、换了参考图、要另一张画,'
-    '和【当前系列】已有的页不是一回事)时不要盖掉眼前这页:写成 '
-    '<layout page="新系列" name="两到四个字的页名" series="新主题的名字">,程序会另起一个系列,原来的页原样留着;'
-    '同一主题要另一版时写 <layout page="新" name="页名">,在这个系列里新开一页;'
-    '改眼前这页时标签上什么都不加。\n'
+    '- <layout> 默认写进眼前这一页、换掉它。用户要另一张画(换了参考图、换了角色、要另一版)时'
+    '不要盖掉眼前这页,在这个系列里新开一页:<layout page="新" name="两到四个字的页名">;'
+    '只有用户明说要新建系列、另起一组时才写 <layout page="新系列" name="页名" series="系列名">'
+    '(程序会另起一个系列,对话跟着过去);改眼前这页时标签上什么都不加。\n'
     '- 要先查角色库、查标签时,那条回复只写查询的标签,不写 <layout>:那条里的布局不会放到画板上,查完再写。\n'
     '- 上文里〔程序注:…〕是程序替你省略的记号,不要照抄。要改画板就写出完整的 <layout>;'
     '只说话不写布局,画板不会变。\n'
@@ -644,10 +650,9 @@ const _draftFormatRest =
     '一条回复里可以有好几个 <draft>。只要一条提示词时不要分页。'
     '一次写出一组页时顺手起名字:每页加 name="两到四个字",第一个再加 series="这一组的名字",'
     '例如 <draft page="1" name="玩耍" series="午后客厅">。'
-    '同一个系列的页讲的是同一件事。用户换了一个新主题(和【当前系列】已有的页不是一回事)时,'
-    '不要写进原来的页:第一个 <draft> 写成 <draft page="新系列" name="页名" series="新主题的名字">,'
-    '程序会另起一个系列,原来的页原样留着;这条回复里后面的页接着用 page="2"、page="3"。'
-    '只是修改、续写当前系列时不要另起。'
+    '用户换了一个新主题时不要盖掉原来的页,在当前系列里新开一页:<draft page="新" name="页名">。'
+    '只有用户明说要新建系列、另起一组时,第一个 <draft> 才写成 <draft page="新系列" name="页名" series="系列名">'
+    '(程序会另起一个系列,对话跟着过去),这条回复里后面的页接着用 page="2"、page="3"。'
     '【选项】要用户从几个明确的选项里挑一个,或者只等他点头时,在回复最后加上 <options> 和 </options>,'
     '里面一行一个选项(最多 5 个,每个不超过 12 个字),界面会把它们变成按钮,用户点一下就等于回答了。'
     '例如等他确认方案时:<options>\n确认,开始写\n我要改一下\n</options>。'

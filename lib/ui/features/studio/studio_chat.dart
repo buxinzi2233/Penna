@@ -228,9 +228,9 @@ extension StudioChat on StudioViewModel {
               _checkTags();
             }
             _deliverCharacters();
+            // 透视在 _deliverLayout 里先放(没有布局时它自己放)。
             _deliverLayout();
             _deliverLayers();
-            _deliverPerspective();
             unawaited(_deliverSkill());
             _sendNext();
           },

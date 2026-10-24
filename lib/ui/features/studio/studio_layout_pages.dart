@@ -62,11 +62,11 @@ extension StudioLayoutPages on StudioViewModel {
     if (board == null || _messages.isEmpty) return;
     final made = splitLayout(splitNewSkill(_messages.last.text).prose);
     final json = made.json;
-    if (!made.complete || json == null) return;
+    if (!made.complete || json == null) return _deliverPerspective();
     final l0 = board.layout;
     // 先看读不读得了,免得读不了还白开一页。
     if (parseMossLayout(json, width: l0.width, height: l0.height) == null) {
-      return;
+      return _deliverPerspective();
     }
     final where = layoutOnly
         ? _layoutPageFor(made.page, name: made.name, title: made.series)
@@ -74,9 +74,12 @@ extension StudioLayoutPages on StudioViewModel {
     if (where != null && where.problem != null) {
       return _note(tr('布局没放上:{0}', [where.problem!]));
     }
+    // 透视先放:3D 视图里它会转镜头,框和体块要照转好的镜头立起来。
+    // 后放的话已立好的体块跟着镜头一转,框挪了位置、人物也转成侧身。
+    _deliverPerspective();
     final before = (board.layout.width, board.layout.height);
     final style = _seriesStyle;
-    if (!board.apply(json)) return;
+    if (!board.apply(json, keep: _layoutKeep)) return;
     // 换到本系列的新一页时画板是空的,Agent 没写画风就接上本系列的。
     if (board.layout.style.trim().isEmpty && style.isNotEmpty) {
       board.setSummary(style: style);
@@ -102,6 +105,15 @@ extension StudioLayoutPages on StudioViewModel {
         if (dropped > 0) tr('{0} 个读不了,已去掉', [dropped]),
       ].join(' · '),
     );
+  }
+
+  /// 这条回复答的是哪句话:「按视角改描述」「估体块」时只收那一样(见 [LayoutKeep])。
+  LayoutKeep get _layoutKeep {
+    final asked = _messages.lastWhere(
+      (m) => m.fromUser && !m.tool,
+      orElse: () => _messages.last,
+    );
+    return asked.fromUser ? layoutKeepFor(asked.text) : LayoutKeep.none;
   }
 
   /// 照 `<layout>` 标签上的 page / series / name 定好放到哪一页并换过去
@@ -183,7 +195,8 @@ extension StudioLayoutPages on StudioViewModel {
             '程序把它记在这个系列上,之后同系列的每一张都沿用它,画风才统一。'
       : '【本系列画风】已定,程序会把它放在每张布局的整体描述前面:\n$style\n'
             '继续这个系列时 <layout> 里不写 "style",也不要在 caption 里改写画风;'
-            '用户明说要换画风,或另起新系列(page="新系列")时,才在 summary 里写一个新的 "style"。';
+            '用户明说要换画风、发了新的参考图要照它做,或另起新系列(page="新系列")时,'
+            '才在 summary 里写一个新的 "style"。';
 
   /// 告诉区域控制的 Agent 有哪些页、眼前是哪一页;同系列的别的页只列名字和各块。
   String get _layoutPagesPrompt {

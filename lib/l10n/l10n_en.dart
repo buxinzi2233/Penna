@@ -787,8 +787,7 @@ const en = <String, String>{
   '区域控制的 Agent 正在忙': 'The Region Control agent is busy',
   '区域控制没写出布局': 'Region Control produced no layout',
   '布局没放进成稿:{0}': 'Layout not added to the draft: {0}',
-  '区域控制排好了 · {0} 个框 · 已放进「{1}」':
-      'Region Control done · {0} boxes · added to "{1}"',
+  '区域控制排好了 · {0} 个框 · 已放进{1}': 'Region Control done · {0} boxes · added to {1}',
   '预览图没存上:{0}': 'Preview image not saved: {0}',
   '列表': 'List',
   '大缩略图': 'Large thumbnails',

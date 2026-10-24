@@ -126,7 +126,7 @@ void main() {
   });
 
   group('主工作区把排布局转给区域控制', () {
-    test('转过去:那边开一场对话写布局,JSON 放回主工作区新建的系列,原来的页不动', () async {
+    test('转过去:那边开一场对话写布局,JSON 放进主工作区这个系列新开的一页,不另起系列', () async {
       final config = tempConfig()
         ..update(
           const AppConfig().putLlm(
@@ -189,9 +189,11 @@ void main() {
       expect(task.attachments.single.name, 'a.png');
       expect(board.layout.boxes.single.name, '左');
 
-      // 主工作区:新系列里是交出去的 JSON,原来那页还在。
-      expect(vm.seriesName(vm.series), '双人海报');
-      expect(vm.body, board.json);
+      // 主工作区:还是原来那个系列,新开的一页里是交出去的 JSON,原来那页还在。
+      expect(vm.pages, hasLength(2));
+      expect(vm.pages[1].series, vm.pages[0].series);
+      expect(vm.pages[1].name, '双人海报');
+      expect(vm.pages[1].blocks.single.text, board.json);
       expect(vm.pages.first.blocks.single.text, '【主体】a fox');
       expect(
         vm.messages.firstWhere((m) => m.tool).toolSummary,

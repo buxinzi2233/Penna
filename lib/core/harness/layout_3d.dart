@@ -109,14 +109,48 @@ String describeCamera(Layout l, {required bool threeD}) {
   final view = threeD ? '用户开着 3D 视图,能转镜头、看到每块的体块' : '用户现在用平面视图';
   final shot = c.isDefault
       ? '镜头正对着画面,没转过。'
-      : '镜头水平环绕 ${_deg(c.orbit)}(0 是正面,90 是从主体左侧拍,±180 是从背后拍),'
+      : '镜头水平环绕 ${_deg(c.orbit)}(这是镜头相对地面、墙、桌沿这些场景走向转的角度,'
+            '照透视线算出来的,不是人物的朝向:人物可以正对着这个镜头。'
+            '每个人物朝哪看下面的【朝向】,不要从环绕角去推),'
             '俯仰 ${_deg(c.pitch)}(正数是俯视,负数是仰视),画面歪 ${_deg(c.roll)},'
             '视角 ${_deg(c.fov)},离主体 ${c.distance.toStringAsFixed(2)}(1 是原来的距离)'
             '${c.shift == 0 ? '' : ',移轴 ${c.shift.toStringAsFixed(2)}(镜头保持水平、底片上下平移,地平线不在正中,竖线依然竖直)'}。'
             'bbox 是从这个镜头拍到的样子,描述也要照这个视角写:从背后拍写背影、看不到脸,'
             '俯视写看得到头顶和地面,仰视写看得到下巴和天空,谁挡着谁照现在的前后。';
+  final camView = CameraView(c, l.width, l.height);
+  final facing = [
+    for (final (i, b) in l.boxes.indexed)
+      if (b.label == 'character' && b.body != null && !b.offscreen)
+        '- ${b.name.isEmpty ? '第 ${i + 1} 块' : b.name}:${facingOf(b.body!, camView)}',
+  ];
   return '【摄像机】$view。$shot'
-      'items 里的 body 是每块的体块(相对这个镜头量的),写法见技能里的说明。';
+      'items 里的 body 是每块的体块(相对这个镜头量的),写法见技能里的说明。'
+      '${facing.isEmpty ? '' : '\n【朝向】人物相对这个镜头面朝哪边(按体块的 yaw 算),描述里的朝向照这里写:\n${facing.join('\n')}'}';
+}
+
+/// 一个体块的正面相对镜头朝哪边:面朝镜头、斜侧、侧身、背对(水平方向上算)。
+String facingOf(Body b, CameraView view) {
+  final r = b.yaw * math.pi / 180;
+  final front = (x: -math.sin(r), z: -math.cos(r));
+  final e = view.eye;
+  final to = (x: e.x - b.x, z: e.z - b.z);
+  final len = math.sqrt(to.x * to.x + to.z * to.z);
+  if (len <= 0) return '面朝镜头';
+  final cos = (front.x * to.x + front.z * to.z) / len;
+  final a = math.acos(cos.clamp(-1.0, 1.0)) * 180 / math.pi;
+  // 正面往镜头右边偏还是左边偏(画面上的左右)。
+  final side = front.x * view.right.x + front.z * view.right.z > 0
+      ? '画面右边'
+      : '画面左边';
+  return a < 25
+      ? '面朝镜头,正面对着画面'
+      : a < 65
+      ? '身体斜向$side,四分之三侧面,脸和正面大半看得到'
+      : a < 115
+      ? '侧身,脸朝$side,看到的是侧脸'
+      : a < 155
+      ? '大半背对镜头,斜向$side'
+      : '背对镜头,看到背影';
 }
 
 // ---- 透视线和镜头互相换算 ----

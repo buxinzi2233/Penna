@@ -86,6 +86,10 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   Offset _from = Offset.zero;
   LayoutBox? _origin;
 
+  /// 上一帧拖完画板上那一块的样子:对不上就是拖到一半画板被换掉了(Agent 放上布局、
+  /// 回滚),这次拖动作废,免得照旧序号去改别的块。
+  LayoutBox? _dragged;
+
   /// 正在画的新框(画布像素)。
   Rect? _drawing;
 
@@ -213,6 +217,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
           : _Drag.move;
       _target = i;
       _origin = b;
+      _dragged = b;
       _pick(i);
       // 选中会通知一次,标记要放在它后面,留给接下来真正的改动。
       final name = boxName(b, i);
@@ -229,6 +234,10 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   void _update(Offset p, double scale, Offset raw) {
     final l = _board.layout;
     final b = _origin;
+    if ((_drag == _Drag.move || _drag == _Drag.resize) &&
+        !identical(l.boxes.elementAtOrNull(_target), _dragged)) {
+      return _end();
+    }
     switch (_drag) {
       case _Drag.look:
         final start = _camStart;
@@ -247,6 +256,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
             bottom: b.bottom + dy,
           ),
         );
+        _follow();
       case _Drag.resize when b != null:
         _board.updateBox(
           _target,
@@ -255,6 +265,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
             bottom: math.max(b.top + _minBox, p.dy.round()).clamp(0, l.height),
           ),
         );
+        _follow();
       // 按住时那个消失点在哪,加上鼠标挪了多少;不截到画布里,画面外也拖得到。
       // 3D 视图里拖它就是转镜头(见 LayoutBoard.moveVanishing)。
       case _Drag.vanish:
@@ -262,6 +273,12 @@ class _LayoutCanvasState extends State<LayoutCanvas>
         _board.moveVanishing(_target, to.dx, to.dy);
       default:
     }
+  }
+
+  /// 改完这一帧:排序变了时跟着选中的那一块(它还是被拖的这块),记下它现在的样子。
+  void _follow() {
+    _target = _board.selected ?? _target;
+    _dragged = _board.layout.boxes.elementAtOrNull(_target);
   }
 
   void _end() {
@@ -284,6 +301,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
       _drag = null;
       _drawing = null;
       _origin = null;
+      _dragged = null;
     });
   }
 

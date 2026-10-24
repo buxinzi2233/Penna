@@ -286,6 +286,14 @@ String mossLayoutJson(Layout l, {bool draft = false, String quality = ''}) {
 /// [clipped] 为真是超出画布、截到了画布里,为假是读不了或没有面积、去掉了。
 typedef LayoutFix = ({int item, String name, bool clipped});
 
+/// [readMossLayout] 读出来的:布局、替模型改掉的地方、等比摆入前的宽高、各块的体块提示。
+typedef LayoutRead = ({
+  Layout layout,
+  List<LayoutFix> fixes,
+  ({int width, int height})? refit,
+  Map<int, BodyHint> hints,
+});
+
 /// 读回一份布局 JSON(Agent 写的,或用户贴的),放到 [width]×[height] 的画布上。
 /// 框超出画布的截掉,上下、左右写反的摆正,截完没有面积的不要。读不了返回 null。
 Layout? parseMossLayout(
@@ -299,13 +307,7 @@ Layout? parseMossLayout(
 /// [ownSize] 为真时看 JSON 里写的画布宽高(草稿格式带着):框按它读,再缩放到画布上;
 /// 它和 [width]×[height] 一横一竖时画布对调(Agent 换横竖构图)。别的比例不认:
 /// 画布尺寸由用户定,Agent 照参考图写出 1216×684 这种时,画布还是 1216×832。
-({
-  Layout layout,
-  List<LayoutFix> fixes,
-  ({int width, int height})? refit,
-  Map<int, BodyHint> hints,
-})?
-readMossLayout(
+LayoutRead? readMossLayout(
   String raw, {
   required int width,
   required int height,

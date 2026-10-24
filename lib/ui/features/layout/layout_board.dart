@@ -17,6 +17,22 @@ const _defaultSizes = <LayoutSize>[
   (width: defaultLayoutWidth, height: defaultLayoutHeight),
 ];
 
+/// Agent 这次只该改哪一样:按视角改描述时只收描述,估体块时只收体块,
+/// 其余(框、图层、名字)由程序守住——模型常顺手把框也重排了。
+enum LayoutKeep { none, captions, bodies }
+
+/// 「按视角改描述」「让 Agent 估体块」发出去的话;回复照 [LayoutKeep] 只收那一样。
+String get redescribeRequest =>
+    tr('镜头换了角度,照新视角改整体描述和每块的描述(朝向、露出哪一面、左右前后的位置关系、谁挡着谁),框、体块和图层都不动');
+String get estimateRequest => tr('给画板上每块估体块(body:远近、厚度、朝向),框的位置、描述和图层都不动');
+
+/// 用户发的这句话要 Agent 只改哪一样。
+LayoutKeep layoutKeepFor(String request) => request == redescribeRequest
+    ? LayoutKeep.captions
+    : request == estimateRequest
+    ? LayoutKeep.bodies
+    : LayoutKeep.none;
+
 /// 布局画板:当前这张布局、选中的框、用户存的几个画布尺寸。存在 layout.json。
 /// Agent 写的 `<layout>` 也放到这里(见 `studio_chat.dart` 的 `_deliverLayout`)。
 class LayoutBoard extends ChangeNotifier {
@@ -521,6 +537,54 @@ class LayoutBoard extends ChangeNotifier {
     );
   }
 
+  /// 只收 Agent 写的描述([LayoutKeep.captions])或体块([LayoutKeep.bodies]):
+  /// 按名字对上每一块(没名字按先后),框、图层、名字、画布都照旧。
+  bool _applyOnly(LayoutRead read, LayoutKeep keep) {
+    final old = _layout;
+    final got = read.layout.boxes;
+    final visible = [
+      for (final (i, b) in old.boxes.indexed)
+        if (!b.offscreen) i,
+    ];
+    int? match(LayoutBox b, int k) {
+      final byName = b.name.isEmpty
+          ? -1
+          : got.indexWhere((g) => g.name.trim() == b.name);
+      return byName >= 0 ? byName : (k < got.length ? k : null);
+    }
+
+    final boxes = [...old.boxes];
+    for (final (k, i) in visible.indexed) {
+      final b = old.boxes[i];
+      final j = match(b, k);
+      if (j == null) continue;
+      final hint = read.hints[j];
+      boxes[i] = switch (keep) {
+        LayoutKeep.captions => b.copyWith(
+          caption: got[j].caption.trim().isEmpty ? null : got[j].caption,
+          text: got[j].text.trim().isEmpty ? null : got[j].text,
+        ),
+        _ when hint != null && b.label != 'text' => liftBox(b, old, hint),
+        _ => b,
+      };
+    }
+    final caption = read.layout.caption.trim();
+    _selected = null;
+    _set(
+      old.copyWith(
+        boxes: boxes,
+        caption: keep == LayoutKeep.captions && caption.isNotEmpty
+            ? caption
+            : null,
+      ),
+      rebuild: true,
+      action: tr('Agent 放上布局'),
+    );
+    _fixes = const [];
+    _refit = null;
+    return true;
+  }
+
   /// 整个换成 [layout](换页、回滚、从档案库放回来的),画布尺寸和镜头也跟着换。
   void replace(Layout layout) {
     _selected = null;
@@ -530,7 +594,8 @@ class LayoutBoard extends ChangeNotifier {
 
   /// 换成一份布局 JSON(Agent 写的)。JSON 里写了画布宽高就换成它的
   /// (Agent 换横竖构图时),没写用当前的画布尺寸。读不了返回 false。
-  bool apply(String json) {
+  /// [keep] 不是 none 时只收描述或体块,见 [_applyOnly]。
+  bool apply(String json, {LayoutKeep keep = LayoutKeep.none}) {
     final read = readMossLayout(
       json,
       width: _layout.width,
@@ -539,6 +604,7 @@ class LayoutBoard extends ChangeNotifier {
     );
     if (read == null) return false;
     final old = _layout;
+    if (keep != LayoutKeep.none) return _applyOnly(read, keep);
     // 镜头是用户转的,JSON 里没有它:留着,Agent 写的框就是从这个镜头看到的。
     // 画风定了之后 Agent 不再写(要换画风才写),没写就沿用。
     final parsed = read.layout.copyWith(
