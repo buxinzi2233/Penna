@@ -61,8 +61,8 @@ class _Composer extends StatelessWidget {
         children: [
           // 排队的条目增减时,高度顺着伸缩。
           AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
+            duration: Motion.base,
+            curve: Motion.swift,
             alignment: Alignment.bottomCenter,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,11 +101,9 @@ class _Composer extends StatelessWidget {
             PopIn(child: picker!),
             const SizedBox(height: 6),
           ],
-          PennaCard(
-            color: dragging ? PennaColors.primaryBg : PennaColors.slate50,
-            borderColor: dragging ? PennaColors.primary : PennaColors.border,
-            radius: 16,
-            padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+          _ComposerFrame(
+            focus: inputFocus,
+            dragging: dragging,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -120,8 +118,9 @@ class _Composer extends StatelessWidget {
                     contextMenuBuilder: pennaTextMenu,
                     controller: input,
                     focusNode: inputFocus,
+                    // 跟着内容长高,最多十行,再多就在框里滚。
                     minLines: 3,
-                    maxLines: 3,
+                    maxLines: 10,
                     style: const TextStyle(fontSize: 14, height: 1.5),
                     decoration: InputDecoration(
                       hintText: tr('Enter 发送 · Shift+Enter 换行 · @ 引用 Skill'),
@@ -166,7 +165,7 @@ class _Composer extends StatelessWidget {
                         onPressed: onStop ?? onSend,
                         tooltip: onStop == null ? tr('发送') : tr('停止生成(Esc)'),
                         icon: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
+                          duration: Motion.base,
                           transitionBuilder: (child, animation) =>
                               ScaleTransition(scale: animation, child: child),
                           child: Icon(
@@ -242,6 +241,83 @@ class _QueuedRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 输入框的外框:平时一层很淡的投影,鼠标移上来、打字时投影和边框各加深一档;
+/// 拖文件进来时整个换成主色。
+class _ComposerFrame extends StatefulWidget {
+  const _ComposerFrame({
+    required this.focus,
+    required this.dragging,
+    required this.child,
+  });
+
+  final FocusNode focus;
+  final bool dragging;
+  final Widget child;
+
+  @override
+  State<_ComposerFrame> createState() => _ComposerFrameState();
+}
+
+class _ComposerFrameState extends State<_ComposerFrame> {
+  bool _hover = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focus.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.focus.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final focused = widget.focus.hasFocus;
+    final shadow = Colors.black.withValues(
+      alpha: focused
+          ? 0.08
+          : _hover
+          ? 0.06
+          : 0.035,
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedContainer(
+        duration: Motion.of(context, Motion.base),
+        curve: Motion.swift,
+        padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+        decoration: BoxDecoration(
+          color: widget.dragging ? PennaColors.primaryBg : PennaColors.slate50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: widget.dragging
+                ? PennaColors.primary
+                : focused
+                ? PennaColors.primary.withValues(alpha: 0.45)
+                : _hover
+                ? PennaColors.slate400.withValues(alpha: 0.6)
+                : PennaColors.border,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: shadow,
+              blurRadius: focused ? 24 : 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: widget.child,
       ),
     );
   }

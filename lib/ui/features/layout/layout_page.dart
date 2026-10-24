@@ -22,8 +22,10 @@ import 'layout_board.dart';
 import 'layout_camera.dart';
 import 'layout_canvas.dart';
 import 'layout_fullscreen.dart';
+import 'layout_scene_view.dart';
 import 'layout_json_view.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 part 'layout_props.dart';
 
@@ -87,6 +89,9 @@ class _LayoutPageState extends State<LayoutPage> {
   Camera? _lastCamera, _answered;
   Timer? _settle;
   bool _settled = false;
+
+  /// 3D 视图里开着自由摄像机(画布旁边多一个随意转着看的视口)。
+  bool _scene = false;
 
   bool get _stale =>
       _settled && board.cameraMoved && board.layout.camera != _answered;
@@ -152,11 +157,7 @@ class _LayoutPageState extends State<LayoutPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final card = _cards[i]?.currentContext;
       if (card == null || !card.mounted) return;
-      Scrollable.ensureVisible(
-        card,
-        duration: const Duration(milliseconds: 200),
-        alignment: 0.05,
-      );
+      Scrollable.ensureVisible(card, duration: Motion.base, alignment: 0.05);
       if (edit) _fields[i]?.requestFocus();
     });
   }
@@ -235,6 +236,22 @@ class _LayoutPageState extends State<LayoutPage> {
   void _redescribe() {
     setState(() => _answered = board.layout.camera);
     _send(redescribeRequest);
+  }
+
+  /// 画布区:开着自由摄像机时和视口按画布比例摆成上下或左右两块。
+  Widget _canvasArea() {
+    final canvas = LayoutCanvas(
+      board: board,
+      onPick: _reveal,
+      onEdit: (i) => _reveal(i, edit: true),
+    );
+    if (!board.threeD || !_scene) return canvas;
+    final l = board.layout;
+    return SceneSplit(
+      aspect: l.width / l.height,
+      canvas: canvas,
+      scene: SceneView(board: board),
+    );
   }
 
   /// 带着这一块去对话里:输入框上方出现它,接着打字说怎么改。
@@ -329,13 +346,27 @@ class _LayoutPageState extends State<LayoutPage> {
                                     Positioned.fill(
                                       child: Padding(
                                         padding: const EdgeInsets.all(24),
-                                        child: LayoutCanvas(
-                                          board: board,
-                                          onPick: _reveal,
-                                          onEdit: (i) => _reveal(i, edit: true),
-                                        ),
+                                        child: _canvasArea(),
                                       ),
                                     ),
+                                    if (board.threeD)
+                                      Positioned(
+                                        top: 0,
+                                        right: 36,
+                                        child: IconButton(
+                                          tooltip: tr('自由摄像机'),
+                                          iconSize: 18,
+                                          isSelected: _scene,
+                                          color: _scene
+                                              ? PennaColors.primary
+                                              : null,
+                                          icon: const Icon(
+                                            Icons.videocam_outlined,
+                                          ),
+                                          onPressed: () =>
+                                              setState(() => _scene = !_scene),
+                                        ),
+                                      ),
                                     // 全屏摆放:画布铺满整个软件窗口,方便转镜头、挪框。
                                     Positioned(
                                       top: 0,

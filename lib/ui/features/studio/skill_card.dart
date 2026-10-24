@@ -4,6 +4,7 @@ import '../../../data/services/skill_store.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 /// 回复里新写的 Skill:名字、简介、正文预览,和它在用户 Skills 里的状态。
 /// 新名字的在回复结束时已经自动加进去了;同名的要用户点一下才替换。
@@ -54,7 +55,7 @@ class NewSkillCard extends StatelessWidget {
       _ => (tr('替换同名 Skill'), Icons.sync, true),
     };
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
+      duration: Motion.base,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: PennaColors.card,

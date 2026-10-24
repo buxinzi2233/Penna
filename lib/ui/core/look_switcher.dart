@@ -8,6 +8,7 @@ import '../../data/models/app_config.dart';
 import '../../data/services/config_service.dart';
 import '../../l10n/l10n.dart';
 import 'theme.dart';
+import 'motion.dart';
 
 /// 按设置换配色和界面语言(启动时在 runApp 之前调一次)。
 void applyLook(AppConfig cfg) {
@@ -116,7 +117,7 @@ class _LookSwitcherState extends State<LookSwitcher>
                   origin: _origin,
                   progress: CurvedAnimation(
                     parent: _reveal,
-                    curve: Curves.easeInOutCubic,
+                    curve: Motion.expand,
                   ),
                 ),
               ),

@@ -13,6 +13,7 @@ import 'settings_llm_section.dart';
 import 'settings_local_section.dart';
 import 'settings_translate_section.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 typedef _Tab = ({IconData icon, String label});
 
@@ -145,7 +146,7 @@ class _TabItem extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: Motion.base,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: selected ? PennaColors.primaryBg : PennaColors.card,

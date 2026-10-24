@@ -151,7 +151,7 @@ class _SectionCardState extends State<_SectionCard> {
           const SizedBox(width: 4),
           AnimatedRotation(
             turns: _open ? 0.25 : 0,
-            duration: const Duration(milliseconds: 160),
+            duration: Motion.base,
             child: Icon(Icons.chevron_right, size: 14, color: tint.text),
           ),
           Text(tr('中文'), style: TextStyle(fontSize: 10.5, color: tint.text)),
@@ -159,7 +159,7 @@ class _SectionCardState extends State<_SectionCard> {
       ],
     );
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+      duration: Motion.base,
       padding: const EdgeInsets.fromLTRB(8, 5, 6, 5),
       decoration: BoxDecoration(
         color: tint.bg,
@@ -230,8 +230,8 @@ class _SectionCardState extends State<_SectionCard> {
           const SizedBox(height: 2),
           widget.child,
           AnimatedSize(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOut,
+            duration: Motion.base,
+            curve: Motion.swift,
             alignment: Alignment.topLeft,
             child: hasZh && _open
                 ? Padding(

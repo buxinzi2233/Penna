@@ -8,6 +8,7 @@ import '../../core/harness/attachment.dart';
 import 'theme.dart';
 import 'widgets.dart';
 import '../../l10n/l10n.dart';
+import 'motion.dart';
 
 /// 一张图的位置:点一下选图或直接拖进来;有图时显示它,右上角可以换图、移除。
 class ImageDrop extends StatefulWidget {
@@ -95,7 +96,7 @@ class _ImageDropState extends State<ImageDrop> {
             child: IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _over ? 1 : 0,
-                duration: const Duration(milliseconds: 120),
+                duration: Motion.snap,
                 child: const _DropHint(),
               ),
             ),

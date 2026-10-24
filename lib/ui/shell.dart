@@ -18,6 +18,7 @@ import 'features/studio/studio_page.dart';
 import 'features/studio/studio_view_model.dart';
 import 'features/update/update_flow.dart';
 import '../l10n/l10n.dart';
+import 'core/motion.dart';
 
 export 'core/version.dart';
 
@@ -233,10 +234,10 @@ class _Page extends StatelessWidget {
           excluding: !active,
           child: AnimatedOpacity(
             opacity: active ? 1 : 0,
-            duration: const Duration(milliseconds: 160),
+            duration: Motion.base,
             child: AnimatedSlide(
               offset: active ? Offset.zero : const Offset(0, 0.02),
-              duration: const Duration(milliseconds: 360),
+              duration: Motion.sheet,
               curve: Curves.easeOutBack,
               child: child,
             ),
@@ -355,7 +356,7 @@ class _RailButton extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: Motion.base,
               width: 32,
               height: 32,
               decoration: BoxDecoration(

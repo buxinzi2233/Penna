@@ -114,7 +114,7 @@ class _Tab extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          duration: Motion.base,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: selected ? PennaColors.card : PennaColors.slate50,
@@ -217,8 +217,8 @@ class _HistoryCardState extends State<_HistoryCard> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   AnimatedSize(
-                    duration: const Duration(milliseconds: 160),
-                    curve: Curves.easeOut,
+                    duration: Motion.base,
+                    curve: Motion.swift,
                     alignment: Alignment.topLeft,
                     child: Text(
                       clean,

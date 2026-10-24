@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'theme.dart';
 import '../../l10n/l10n.dart';
+import 'motion.dart';
 
 /// 底部的小提示。[warn] 用于"没法这么做"的提醒,图标不同。
 void showToast(BuildContext context, String message, {bool warn = false}) {
@@ -59,10 +60,14 @@ class _BouncyState extends State<Bouncy> {
       onPointerDown: (_) => _set(true),
       onPointerUp: (_) => _set(false),
       onPointerCancel: (_) => _set(false),
+      // 按下轻轻一缩,松手稍微回弹一下就停,不像果冻那样来回晃。
       child: AnimatedScale(
-        scale: _down ? 0.93 : 1,
-        duration: Duration(milliseconds: _down ? 90 : 420),
-        curve: _down ? Curves.easeOut : Curves.elasticOut,
+        scale: _down ? 0.975 : 1,
+        duration: Motion.of(
+          context,
+          _down ? Motion.fast : const Duration(milliseconds: 450),
+        ),
+        curve: _down ? Curves.easeOut : Curves.easeOutBack,
         child: widget.child,
       ),
     );
@@ -80,13 +85,13 @@ class PopIn extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: animate ? 0 : 1, end: 1),
-      duration: const Duration(milliseconds: 380),
-      curve: Curves.easeOutBack,
+      duration: Motion.of(context, Motion.sheet),
+      curve: Motion.enter,
       child: child,
       builder: (_, t, child) => Opacity(
         opacity: t.clamp(0, 1),
         child: Transform.translate(
-          offset: Offset(0, 14 * (1 - t)),
+          offset: Offset(0, 12 * (1 - t)),
           child: child,
         ),
       ),
@@ -118,7 +123,7 @@ class PennaChip extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: Motion.base,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
               color: selected ? PennaColors.primaryBg : PennaColors.card,

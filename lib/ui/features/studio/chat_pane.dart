@@ -22,6 +22,7 @@ import 'chat_tabs.dart';
 import 'mention.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 part 'chat_composer.dart';
 part 'chat_header.dart';
@@ -274,7 +275,8 @@ class _ChatPaneState extends State<ChatPane> {
     // 自动跟随只会往下跳,所以出现往上的位移一定是用户在翻。
     if (n is ScrollUpdateNotification && (n.scrollDelta ?? 0) < 0) {
       _follow = false;
-    } else if (n is ScrollEndNotification && n.metrics.extentAfter < 4) {
+    } else if (n is ScrollEndNotification && n.metrics.extentAfter <= 40) {
+      // 停在离底 40 像素以内就算回到了最新,接着跟。
       _follow = true;
     }
     return false;
@@ -511,7 +513,7 @@ class _ChatPaneState extends State<ChatPane> {
                         ignoring: !_away,
                         child: AnimatedScale(
                           scale: _away ? 1 : 0,
-                          duration: const Duration(milliseconds: 160),
+                          duration: Motion.base,
                           curve: Curves.easeOutBack,
                           child: Tooltip(
                             message: tr('回到底部'),

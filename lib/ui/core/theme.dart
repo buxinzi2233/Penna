@@ -185,8 +185,9 @@ ThemeData pennaTheme({String latin = '', String cjk = ''}) {
     popupMenuTheme: PopupMenuThemeData(
       color: PennaColors.card,
       surfaceTintColor: Colors.transparent,
+      // 浮层:大而淡的投影 + 一圈细描边,浮起来但不压人。
       elevation: 8,
-      shadowColor: const Color(0x330F172A),
+      shadowColor: const Color(0x1F0F172A),
       menuPadding: const EdgeInsets.all(4),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
@@ -212,7 +213,12 @@ ThemeData pennaTheme({String latin = '', String cjk = ''}) {
     dialogTheme: DialogThemeData(
       backgroundColor: PennaColors.card,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 12,
+      shadowColor: const Color(0x1F0F172A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: PennaColors.border),
+      ),
     ),
     sliderTheme: SliderThemeData(
       trackHeight: 4,

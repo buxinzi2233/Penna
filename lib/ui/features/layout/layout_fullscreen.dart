@@ -7,6 +7,7 @@ import '../../../l10n/l10n.dart';
 import 'layout_board.dart';
 import 'layout_camera.dart';
 import 'layout_canvas.dart';
+import '../../core/motion.dart';
 
 /// 全屏摆放:画布(3D 视图时连同摄像机栏)铺满整个软件窗口,属性栏、对话、左边的
 /// 图标栏都先让开,方便转镜头、挪框。标题栏还在(窗口的按钮要能点)。Esc 或「退出全屏」回去;
@@ -21,7 +22,7 @@ Future<void> showFullCanvas(
   context: context,
   barrierDismissible: false,
   barrierLabel: tr('全屏摆放'),
-  transitionDuration: const Duration(milliseconds: 120),
+  transitionDuration: Motion.snap,
   pageBuilder: (context, _, _) => _FullCanvas(
     board: board,
     onToggle3D: onToggle3D,

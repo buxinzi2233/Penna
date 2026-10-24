@@ -9,6 +9,7 @@ import '../layout/layout_json_view.dart';
 import 'page_strip.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 part 'body_diff.dart';
 part 'body_editor.dart';

@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261024--2--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261024--3--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -102,6 +102,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 - 3D 视图:每块带有体块(远近、厚度、朝向),由 Agent 估计;摄像机可水平环绕、俯仰、滚转、推拉和平移,框随视角重新计算,前后顺序按远近重排,描述可交给 Agent 按新视角改写,镜头调整后会提示这一步。平面视图与 3D 视图之间切换时各块的状态保留。
 - 3D 视图的操作参照 Blender:中键拖动环绕,Shift+中键平移,Ctrl+中键或滚轮推拉;小键盘 1、3、7 切换正面、侧面、顶视,2、4、6、8 逐步旋转;Shift+` 进入自由镜头,WASD 走动、QE 升降。摄像机栏位于画布右侧,可收起为窄边;选中一块后,可在摄像机栏中直接调整它体块的位置、宽高厚与朝向。
 - 3D 视图中透视辅助线由摄像机算出,拖动消失点即调整镜头(俯仰、环绕,两点透视时连同视角);开着透视切换到 3D 时,镜头先按透视线确定,布局保持不变;一点、两点透视用移轴保持竖线竖直,三点透视按三个消失点确定俯仰。消失点可以拖到画面外,画面外的消失点在画布边缘显示可拖动的标记。
+- 自由摄像机:3D 视图中在画布旁另开一个视口,主镜头保持不动,视口可任意环绕、平移、推拉,显示地面网格、各块体块以及主镜头和它的取景范围;在视口里拖动体块即在地面上移动它,画布上的框随之更新。画布与视口按画布比例上下或左右排布。
 - 画布可以全屏摆放:画布与摄像机栏铺满整个窗口,方便调整镜头和挪动各块,按 Esc 返回。
 - 程序估计体块远近时,站在地面上的物体按框底边到地平线的距离推算。
 - 图层可在画布上暂时屏蔽,不影响导出的 JSON;3D 视图中文字图层默认屏蔽。

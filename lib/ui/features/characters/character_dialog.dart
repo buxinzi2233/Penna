@@ -87,7 +87,7 @@ class _CharacterDialogState extends State<_CharacterDialog> {
                   onTap: _pick,
                   borderRadius: BorderRadius.circular(8),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
+                    duration: Motion.snap,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: _over

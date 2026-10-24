@@ -18,6 +18,7 @@ import '../settings/settings_sections.dart';
 import '../studio/studio_view_model.dart';
 import 'local_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 part 'local_llm_tab.dart';
 part 'local_nl_tab.dart';
@@ -258,7 +259,7 @@ class _DownloadRow extends StatelessWidget {
       onTap: onSelect,
       borderRadius: BorderRadius.circular(6),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
+        duration: Motion.snap,
         padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
         margin: const EdgeInsets.only(bottom: 4),
         decoration: BoxDecoration(
@@ -420,7 +421,7 @@ class _GroupedModelListState extends State<_GroupedModelList> {
             _handle(index),
             AnimatedRotation(
               turns: open ? 0.25 : 0,
-              duration: const Duration(milliseconds: 160),
+              duration: Motion.base,
               child: Icon(
                 Icons.chevron_right,
                 size: 18,

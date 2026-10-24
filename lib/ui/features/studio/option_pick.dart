@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 /// 多选里的一项:[label] 是发出去的字,[detail] 是排在它后面的一行预览(可以是空串)。
 typedef PickItem = ({String label, String detail});
@@ -116,7 +117,7 @@ class _PickState extends State<MultiPick> {
       onTap: () => _toggle(item.label),
       borderRadius: BorderRadius.circular(6),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
+        duration: Motion.snap,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: on ? PennaColors.primaryBg : PennaColors.card,

@@ -6,6 +6,7 @@ import '../../core/widgets.dart';
 import '../settings/settings_sections.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 typedef _Tint = ({Color bg, Color border, Color text});
 
@@ -377,7 +378,7 @@ class _SeriesFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
+      duration: Motion.base,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: tint.bg,
@@ -475,7 +476,7 @@ class _PageChip extends StatelessWidget {
   Widget _face({required bool hovered}) {
     final label = name.isEmpty ? '$number' : '$number $name';
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
+      duration: Motion.base,
       height: 22,
       constraints: const BoxConstraints(minWidth: 26, maxWidth: 110),
       padding: const EdgeInsets.symmetric(horizontal: 7),

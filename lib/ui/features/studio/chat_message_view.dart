@@ -16,6 +16,7 @@ import 'option_pick.dart';
 import 'skill_card.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 String _clock(DateTime t) =>
     [t.hour, t.minute, t.second].map((n) => '$n'.padLeft(2, '0')).join(':');
@@ -336,7 +337,7 @@ class ChatMessageView extends StatelessWidget {
 
 const _bodyStyle = TextStyle(fontSize: 14, height: 1.6);
 
-/// 等第一个字出来时的三个跳动小点。
+/// 等第一个字出来时的三个小点:慢慢地依次亮起、浮起再暗下去,安静不抢眼。
 class _TypingDots extends StatefulWidget {
   const _TypingDots();
 
@@ -348,7 +349,7 @@ class _TypingDotsState extends State<_TypingDots>
     with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: const Duration(milliseconds: 1900),
   )..repeat();
 
   @override
@@ -368,16 +369,18 @@ class _TypingDotsState extends State<_TypingDots>
             for (var i = 0; i < 3; i++)
               Builder(
                 builder: (_) {
-                  // 三个点依次起跳:每个点比前一个晚 0.18 圈。
-                  final t = (_controller.value - i * 0.18) % 1;
-                  // 前 0.4 圈里升到顶再落回,其余时间待在原地。
-                  final up = t < 0.4 ? 1 - (t / 0.2 - 1).abs() : 0.0;
+                  // 三个点依次亮起:每个点比前一个晚 150ms(一圈 1.9 秒)。
+                  final t = (_controller.value - i * 0.08) % 1;
+                  // 前一半里亮起再暗下(0→1→0,缓入缓出),后一半歇着。
+                  final up = t < 0.5
+                      ? Curves.easeInOut.transform(1 - (t / 0.25 - 1).abs())
+                      : 0.0;
                   return Padding(
-                    padding: const EdgeInsets.only(right: 5),
+                    padding: const EdgeInsets.only(right: 3.5),
                     child: Transform.translate(
-                      offset: Offset(0, -4 * up),
+                      offset: Offset(0, -2 * up),
                       child: CircleAvatar(
-                        radius: 3,
+                        radius: 1.5 + 0.5 * up,
                         backgroundColor: Color.lerp(
                           PennaColors.slate400,
                           PennaColors.primary,
@@ -438,7 +441,7 @@ class _DraftCardState extends State<_DraftCard> {
     };
     final ready = !writing && draft.complete && status == DraftStatus.ready;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
+      duration: Motion.base,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: PennaColors.card,
@@ -463,7 +466,7 @@ class _DraftCardState extends State<_DraftCard> {
                       children: [
                         AnimatedRotation(
                           turns: open ? 0.25 : 0,
-                          duration: const Duration(milliseconds: 160),
+                          duration: Motion.base,
                           child: Icon(
                             Icons.chevron_right,
                             size: 16,
@@ -497,7 +500,7 @@ class _DraftCardState extends State<_DraftCard> {
               ),
               const SizedBox(width: 8),
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
+                duration: Motion.base,
                 transitionBuilder: (child, animation) => ScaleTransition(
                   scale: animation,
                   child: FadeTransition(opacity: animation, child: child),
@@ -515,8 +518,8 @@ class _DraftCardState extends State<_DraftCard> {
           ),
           // 一段一段长出来,卡片跟着平滑变高。
           AnimatedSize(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOut,
+            duration: Motion.base,
+            curve: Motion.swift,
             alignment: Alignment.topCenter,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

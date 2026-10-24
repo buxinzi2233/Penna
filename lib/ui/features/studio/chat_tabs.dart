@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 /// 对话顶栏下面的一行标签:一个标签一场对话(`vm.chatTabs`)。
 /// 点一下换过去;叉掉只是关标签,对话还在历史里;最后的加号开一场新的。
@@ -39,11 +40,7 @@ class _ChatTabsState extends State<ChatTabs> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final at = _current.currentContext;
       if (at != null && at.mounted) {
-        Scrollable.ensureVisible(
-          at,
-          alignment: 0.5,
-          duration: const Duration(milliseconds: 180),
-        );
+        Scrollable.ensureVisible(at, alignment: 0.5, duration: Motion.base);
       }
     });
   }
@@ -152,7 +149,7 @@ class _Tab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
+      duration: Motion.base,
       padding: const EdgeInsets.only(left: 9, right: 3),
       decoration: BoxDecoration(
         color: selected ? PennaColors.card : Colors.transparent,

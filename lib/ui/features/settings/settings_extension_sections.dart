@@ -13,6 +13,7 @@ import '../../core/widgets.dart';
 import 'settings_agent_sections.dart';
 import 'settings_sections.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 /// 「添加 Skill」窗口交回来的:拖进来或选中的文件,或者手写的整篇 SKILL.md。
 typedef _NewSkill = ({String? path, String? text});
@@ -277,7 +278,7 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
                   onTap: _pick,
                   borderRadius: BorderRadius.circular(8),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
+                    duration: Motion.snap,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
                       color: _over

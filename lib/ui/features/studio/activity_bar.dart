@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 const _closedWidth = 30.0;
 const _openWidth = 210.0;
@@ -32,8 +33,8 @@ class _ActivityBarState extends State<ActivityBar> {
   Widget build(BuildContext context) {
     final actions = widget.vm.actions;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
+      duration: Motion.base,
+      curve: Motion.swift,
       width: ActivityBar.widthOf(open: _open),
       decoration: BoxDecoration(
         color: PennaColors.slate50,

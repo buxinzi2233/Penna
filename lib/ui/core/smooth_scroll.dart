@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'motion.dart';
+
 const _wheelDuration = Duration(milliseconds: 240);
 
 /// 鼠标滚轮滚动时平滑滑过去,而不是一格一格地跳。
@@ -42,13 +44,11 @@ class _SmoothPosition extends ScrollPositionWithSingleContext {
     );
     if (to == pixels) return;
     _target = to;
-    animateTo(
-      to,
-      duration: _wheelDuration,
-      curve: Curves.easeOutCubic,
-    ).whenComplete(() {
-      if (_target == to) _target = null;
-    });
+    animateTo(to, duration: _wheelDuration, curve: Motion.swift).whenComplete(
+      () {
+        if (_target == to) _target = null;
+      },
+    );
   }
 }
 

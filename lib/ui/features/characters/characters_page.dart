@@ -14,6 +14,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../settings/settings_sections.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 part 'character_cards.dart';
 part 'character_dialog.dart';
@@ -336,11 +337,11 @@ class _CharactersPageState extends State<CharactersPage> {
                         // 三种样子:查名字的结果、各个系列、某个系列里的角色。
                         // 换的时候旧的淡出、新的滑进来,高度跟着顺过去。
                         AnimatedSize(
-                          duration: const Duration(milliseconds: 280),
-                          curve: Curves.easeOutCubic,
+                          duration: Motion.sheet,
+                          curve: Motion.swift,
                           alignment: Alignment.topCenter,
                           child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 280),
+                            duration: Motion.sheet,
                             switchInCurve: Curves.easeOutCubic,
                             switchOutCurve: Curves.easeInCubic,
                             layoutBuilder: (current, previous) => Stack(

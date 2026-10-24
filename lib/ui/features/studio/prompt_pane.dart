@@ -11,6 +11,7 @@ import 'body_card.dart';
 import 'polish_dialog.dart';
 import 'studio_view_model.dart';
 import '../../../l10n/l10n.dart';
+import '../../core/motion.dart';
 
 part 'prompt_summary.dart';
 
@@ -240,8 +241,8 @@ class _DraftSectionState extends State<_DraftSection> {
         ),
         // 这个系列不止一页时滑出来:把整个系列一起存。
         AnimatedSize(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
+          duration: Motion.base,
+          curve: Motion.swift,
           alignment: Alignment.centerLeft,
           child: series
               ? Padding(
