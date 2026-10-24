@@ -288,6 +288,7 @@ class _LayoutPageState extends State<LayoutPage> {
             _TopBar(
               board: board,
               archive: widget.archive,
+              title: () => widget.chat.pageName,
               onToggle3D: _toggle3D,
             ),
             Expanded(
@@ -505,11 +506,15 @@ class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.board,
     required this.archive,
+    required this.title,
     required this.onToggle3D,
   });
 
   final LayoutBoard board;
   final ArchiveStore archive;
+
+  /// 眼前这页的名字,存档案库时先填进名称。
+  final String Function() title;
   final VoidCallback onToggle3D;
 
   /// 把整张布局(连同画布尺寸和各块的名字)存进档案库的「区域控制」分区。
@@ -517,6 +522,7 @@ class _TopBar extends StatelessWidget {
     final picked = await showSaveDialog(
       context,
       archive.categoriesOf(archiveLayout),
+      title: title(),
     );
     if (picked == null) return;
     archive.add(
@@ -643,12 +649,12 @@ class _TopBar extends StatelessWidget {
           borderColor: PennaColors.border,
           onPressed: l.isEmpty ? null : () => _save(context),
         ),
-        const SizedBox(width: 4),
-        IconButton(
-          tooltip: tr('清空'),
-          iconSize: 16,
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.delete_sweep_outlined),
+        const SizedBox(width: 6),
+        // 和工作区顶栏的「清空」同一个样子。
+        PennaButton(
+          label: tr('清空'),
+          icon: Icons.cleaning_services_outlined,
+          borderColor: PennaColors.border,
           onPressed: l.isEmpty
               ? null
               : () async {

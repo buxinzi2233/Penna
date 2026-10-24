@@ -225,6 +225,21 @@ void main() {
       expect(vm.finalPrompt, 'a fox');
     });
 
+    test('当前页有内容、新写的一页开在后面时,写完换到那一页', () async {
+      final vm = _studio(
+        blocks: const [(text: '【主体】a fox', pinned: false)],
+        reply: (_) => '<draft page="新" name="若叶睦">\n【主体】a girl\n</draft>',
+      );
+
+      vm.send('换成若叶睦');
+      await pumpEventQueue();
+
+      expect(vm.pages, hasLength(2));
+      expect(vm.pageIndex, 1);
+      expect(vm.finalPrompt, 'a girl');
+      expect(vm.pageName, '若叶睦');
+    });
+
     test('页码是系列里的第几页:有内容的页只提改动,没有的页自动开,碰不到别的系列', () async {
       final vm = _studio(
         blocks: const [(text: '【主体】a fox', pinned: false)],

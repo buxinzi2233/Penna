@@ -137,6 +137,7 @@ class _DraftSectionState extends State<_DraftSection> {
     final picked = await showSaveDialog(
       context,
       archive.categoriesOf(archivePrompt),
+      title: vm.pageName,
     );
     if (picked == null) return;
     archive.add(text: text, title: picked.title, category: picked.category);

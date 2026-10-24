@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/draft_block.dart';
 import 'package:penna/ui/core/theme.dart';
+import 'package:penna/ui/features/studio/studio_page.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 import 'package:penna/ui/shell.dart';
 
 import 'fixtures.dart';
+
+/// 区域控制页也有「清空」:限定在工作台里找。
+Finder _inStudio(Finder f) =>
+    find.descendant(of: find.byType(StudioPage), matching: f);
 
 /// 中间那段被固定,成稿隔成上下两栏。
 StudioViewModel _split() => StudioViewModel(
@@ -138,13 +143,13 @@ void main() {
       );
       expect(find.text('最终提示词'), findsOneWidget);
 
-      await tester.tap(find.text('清空'));
+      await tester.tap(_inStudio(find.text('清空')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
       expect(vm.body, isNotEmpty);
 
-      await tester.tap(find.text('清空'));
+      await tester.tap(_inStudio(find.text('清空')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('删除'));
       await tester.pumpAndSettle();

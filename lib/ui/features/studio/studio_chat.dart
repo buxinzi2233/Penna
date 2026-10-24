@@ -105,6 +105,11 @@ extension StudioChat on StudioViewModel {
       // 放不上要说出来(以前悄悄丢掉了);系列满了时页签下面还会亮提醒。
       if (problem != null) _note(tr('成稿没放上:{0}', [problem]));
     }
+    // 只写到了别的页(比如后面新开的一页):换过去,让用户看到刚写好的。
+    if (written.isNotEmpty && !written.contains(_page)) {
+      _show(written.last);
+      _leftPage();
+    }
   }
 
   /// 回复里写完了一个新 Skill:直接加进用户的 Skills。

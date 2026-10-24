@@ -19,12 +19,12 @@ import '../../../l10n/l10n.dart';
 const _tileWidth = 200.0;
 const _gap = 10.0;
 
-/// 问用户这份成稿叫什么、归到哪一类;取消返回 null。
+/// 问用户这份成稿叫什么、归到哪一类;取消返回 null。[title] 是先填好的名称(页名)。
 Future<({String title, String category})?> showSaveDialog(
   BuildContext context,
-  List<String> categories,
-) {
-  var title = '';
+  List<String> categories, {
+  String title = '',
+}) {
   var category = categories.firstOrNull ?? '';
   // 点了已有分类后,分类输入框靠它重建来显示选中的名字。
   var picks = 0;

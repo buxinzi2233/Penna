@@ -349,6 +349,9 @@ extension StudioPages on StudioViewModel {
     _changed();
   }
 
+  /// 眼前这页的名字(Agent 写成稿时起的,或用户改的),存档案库时先填进名称。
+  String get pageName => _pages[_page].name;
+
   /// 眼前这个系列每一页带标注的成稿(空白页不算),存档案库用。
   List<({String title, String text})> get seriesPrompts => [
     for (final (i, p) in pages.indexed)
