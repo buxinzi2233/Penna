@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,6 +12,7 @@ import 'core/harness/characters/character_dict.dart';
 import 'core/harness/providers/llm_router.dart';
 import 'core/harness/tags/tag_dictionary.dart';
 import 'core/harness/tags/tag_search.dart';
+import 'core/harness/update/updater.dart';
 import 'data/models/app_config.dart';
 import 'data/services/archive_store.dart';
 import 'data/services/character_store.dart';
@@ -52,6 +54,7 @@ Future<void> main() async {
   await config.load();
   applyLook(config.config);
   await skills.load();
+  unawaited(clearOldUpdates());
   // 内置的 Danbooru 词库(压缩过的文本):在线搜索连不上时用它查,也用它核对标签。
   final tagDictionary = TagDictionary.parse(
     utf8.decode(
@@ -73,7 +76,10 @@ Future<void> main() async {
     ),
   );
   // 布局画板(画布尺寸、框和描述)存在 layout.json。
-  final layout = LayoutBoard(dir: home);
+  final layout = LayoutBoard(
+    dir: home,
+    quality: () => config.config.layoutQuality,
+  );
   await layout.load();
   // 工作台(成稿、对话、历史提示词)存在 workspace.json,下次打开接着用。
   final vm = StudioViewModel(

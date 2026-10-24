@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../../l10n/l10n.dart';
 
@@ -188,6 +189,10 @@ Future<File> writeUpdateScript(String script, String dir) =>
         .writeAsBytes([0xEF, 0xBB, 0xBF, ...utf8.encode(script)]);
 
 /// 把脚本写进 [dir] 并在后台(不弹窗口)启动它。之后调用方要尽快退出 Penna。
+///
+/// 不能用 [ProcessStartMode.detached]:它是 DETACHED_PROCESS(没有控制台),
+/// PowerShell 5.1 在这种状态下还没读脚本就以 0 退出(issue #2)。默认模式在
+/// 窗口程序里用 CREATE_NO_WINDOW,不弹窗,Penna 退出后脚本照样跑完。
 Future<void> launchUpdater(String script, String dir) async {
   final file = await writeUpdateScript(script, dir);
   await Process.start('powershell.exe', [
@@ -198,5 +203,22 @@ Future<void> launchUpdater(String script, String dir) async {
     'Hidden',
     '-File',
     file.path,
-  ], mode: ProcessStartMode.detached);
+  ]);
+}
+
+/// 删掉临时文件夹里一小时前留下的 `penna-update-*`(更新没走完时脚本删不到它们)。
+/// 新的不动:可能正有一个在下载。出错不管。
+Future<void> clearOldUpdates() async {
+  try {
+    final before = DateTime.now().subtract(const Duration(hours: 1));
+    await for (final d in Directory.systemTemp.list()) {
+      final name = d.path.split(Platform.pathSeparator).last;
+      if (d is! Directory || !name.startsWith('penna-update-')) continue;
+      if ((await d.stat()).modified.isBefore(before)) {
+        await d.delete(recursive: true).catchError((_) => d);
+      }
+    }
+  } on Object catch (e) {
+    debugPrint('清理旧的更新文件失败:${e.runtimeType}');
+  }
 }
