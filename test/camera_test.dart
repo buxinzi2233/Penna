@@ -427,6 +427,34 @@ void main() {
     expect(find.text('系列 1'), findsNothing);
   });
 
+  testWidgets('一个系列页多、页签条窄时,系列框里的页签折行,不溢出', (tester) async {
+    final vm = StudioViewModel(
+      config: tempConfig(),
+      streamChat: (_) => const Stream.empty(),
+    );
+    for (var i = 0; i < 12; i++) {
+      vm.addPage(toSeries: vm.series);
+      vm.renamePage(vm.pages.length - 1, '很长的页名$i');
+    }
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 500,
+            child: ListenableBuilder(
+              listenable: vm,
+              builder: (context, _) => PageStrip(vm: vm),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    // 最后一页的页签还在条里,没被挤出右边。
+    final last = tester.getRect(find.textContaining('很长的页名11'));
+    expect(last.right, lessThanOrEqualTo(500));
+  });
+
   testWidgets('选中一块后在摄像机栏里直接改它的体块,框跟着重新投出来', (tester) async {
     final board = LayoutBoard()
       ..addBox(_boxAt(100, 300, 400, 1000, name: '小红'))

@@ -385,14 +385,12 @@ class _SeriesFrame extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: current ? tint.text : tint.border),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final (i, child) in children.indexed) ...[
-            if (i > 0) const SizedBox(width: 4),
-            child,
-          ],
-        ],
+      // 页多了在框里折行,不把框撑出页签条。
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: children,
       ),
     );
   }
