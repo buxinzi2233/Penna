@@ -75,7 +75,12 @@ extension StudioLayoutPages on StudioViewModel {
       return _note(tr('布局没放上:{0}', [where.problem!]));
     }
     final before = (board.layout.width, board.layout.height);
+    final style = _seriesStyle;
     if (!board.apply(json)) return;
+    // 换到本系列的新一页时画板是空的,Agent 没写画风就接上本系列的。
+    if (board.layout.style.trim().isEmpty && style.isNotEmpty) {
+      board.setSummary(style: style);
+    }
     final l = board.layout;
     final clipped = board.fixes.where((f) => f.clipped).length;
     final dropped = board.fixes.length - clipped;
@@ -155,6 +160,31 @@ extension StudioLayoutPages on StudioViewModel {
   /// 读不了返回 false。
   bool adoptLayout(String json) => layout?.apply(json) ?? false;
 
+  /// 本系列定下的画风:眼前这页的,没有就取同系列别的页的。换了系列就不算。
+  String get _seriesStyle {
+    final here = layout?.layout.style.trim() ?? '';
+    if (here.isNotEmpty) return here;
+    for (final (i, p) in pages.indexed) {
+      if (i == _page || p.series != series) continue;
+      final style = _layoutOf(
+        p.blocks.map((b) => b.text).join(),
+        const Layout(),
+      ).style.trim();
+      if (style.isNotEmpty) return style;
+    }
+    return '';
+  }
+
+  /// 本系列的画风怎么写:定了就沿用,没定就让 Agent 反推一段写进 summary.style。
+  static String _stylePrompt(String style) => style.isEmpty
+      ? '【本系列画风】还没定。这次写 <layout> 时在 summary 里加一个 "style":'
+            '照用户给的参考图或描述反推画风,写成一段 40 到 100 词的英文,只写画风,不写画面内容:'
+            '媒介和画法、线条、上色方式、明暗和光的处理、质感,最后一句 "Palette: …" 列出四五个主色。'
+            '程序把它记在这个系列上,之后同系列的每一张都沿用它,画风才统一。'
+      : '【本系列画风】已定,程序会把它放在每张布局的整体描述前面:\n$style\n'
+            '继续这个系列时 <layout> 里不写 "style",也不要在 caption 里改写画风;'
+            '用户明说要换画风,或另起新系列(page="新系列")时,才在 summary 里写一个新的 "style"。';
+
   /// 告诉区域控制的 Agent 有哪些页、眼前是哪一页;同系列的别的页只列名字和各块。
   String get _layoutPagesPrompt {
     final others = [
@@ -167,6 +197,7 @@ extension StudioLayoutPages on StudioViewModel {
         '每页是一张独立的布局,【布局画板】摆的是眼前这一页。'
         '【当前系列】「${seriesName(series)}」,共 $seriesLength 页,眼前是第 ${pageNumber(_page)} 页'
         '${_pages[_page].name.isEmpty ? '' : '「${_pages[_page].name}」'}。'
-        '${others.isEmpty ? '' : '同系列的其他页(各块的名字):\n${others.join('\n')}'}';
+        '${others.isEmpty ? '' : '同系列的其他页(各块的名字):\n${others.join('\n')}'}'
+        '\n${_stylePrompt(_seriesStyle)}';
   }
 }

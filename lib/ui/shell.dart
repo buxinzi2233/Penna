@@ -84,7 +84,9 @@ class _AppShellState extends State<AppShell> {
   // 角色库跟着工作台走:Agent 存进去的和这一页上看到的是同一份。
   late final _characters = widget.vm.characters ?? CharacterStore();
   // 布局画板同样跟着工作台走:Agent 写的布局放到这一页上。
-  late final _layout = widget.vm.layout ?? LayoutBoard();
+  late final _layout =
+      widget.vm.layout ??
+      LayoutBoard(quality: () => widget.config.config.layoutQuality);
   late final _layoutChat =
       widget.layoutChat ??
       StudioViewModel(

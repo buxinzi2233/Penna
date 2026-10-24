@@ -21,9 +21,12 @@ const _defaultSizes = <LayoutSize>[
 /// Agent 写的 `<layout>` 也放到这里(见 `studio_chat.dart` 的 `_deliverLayout`)。
 class LayoutBoard extends ChangeNotifier {
   /// [dir] 为 null 时不存盘(测试用)。
-  LayoutBoard({this.dir});
+  LayoutBoard({this.dir, this.quality});
 
   final Directory? dir;
+
+  /// 交出去的 JSON 开头加的质量词(读设置里的 `layoutQuality`);null 是不加。
+  final String Function()? quality;
 
   Layout _layout = const Layout();
   List<LayoutSize> _sizes = List.unmodifiable(_defaultSizes);
@@ -53,7 +56,11 @@ class LayoutBoard extends ChangeNotifier {
   List<LayoutSize> get sizes => _sizes;
   int? get selected => _selected;
   int get revision => _revision;
-  String get json => mossLayoutJson(_layout);
+  String get json => exportJson(_layout);
+
+  /// [l] 交出去的样子:官方坐标,caption 前面带上质量词和画风。
+  String exportJson(Layout l) =>
+      mossLayoutJson(l, quality: quality?.call() ?? '');
   bool get threeD => _threeD;
   bool get freeCam => _freeCam;
 
@@ -107,7 +114,8 @@ class LayoutBoard extends ChangeNotifier {
                   '一切以这里为准,上文对话里的旧布局不算数'
                   '(你以前写的布局在上文里已省略,只留了一句说明)。'
                   '这次要改布局,就照这里的样子改好,把完整的 JSON 写进 <layout>。'
-                  '没让你动的框,bbox 照这里原样抄,label、meta、canvas 也照抄。'
+                  '没让你动的框,bbox 照这里原样抄,label、meta、canvas 也照抄;'
+                  '画风(summary.style)定了就不用写,程序沿用;用户要换画风时才写新的。'
                   'name 是用户给这一块起的名字,他说"把某某挪到……"指的就是它;'
                   '你写的时候照样带着 name,新加的块也起一个两到六个字的中文名。\n'
                   '各块按前后排:1 在最前面,越往后越靠后,重叠时前面的盖住后面的;'
@@ -303,8 +311,19 @@ class LayoutBoard extends ChangeNotifier {
     _scheduleSave();
   }
 
-  void setSummary({String? caption, String? meta, String? canvas}) =>
-      _set(_layout.copyWith(caption: caption, meta: meta, canvas: canvas));
+  void setSummary({
+    String? caption,
+    String? style,
+    String? meta,
+    String? canvas,
+  }) => _set(
+    _layout.copyWith(
+      caption: caption,
+      style: style,
+      meta: meta,
+      canvas: canvas,
+    ),
+  );
 
   /// 开 / 关 3D 视图。打开时还没有体块的块先按图层猜一个(之后可以让 Agent 估)。
   ///
@@ -521,7 +540,11 @@ class LayoutBoard extends ChangeNotifier {
     if (read == null) return false;
     final old = _layout;
     // 镜头是用户转的,JSON 里没有它:留着,Agent 写的框就是从这个镜头看到的。
-    final parsed = read.layout.copyWith(camera: old.camera);
+    // 画风定了之后 Agent 不再写(要换画风才写),没写就沿用。
+    final parsed = read.layout.copyWith(
+      camera: old.camera,
+      style: read.layout.style.trim().isEmpty ? old.style : null,
+    );
     final sx = parsed.width / old.width, sy = parsed.height / old.height;
     // Agent 常把 name、layer 漏掉:按名字或位置把原来的接上(见 inheritNames)。
     // 转到镜头外的块 Agent 看不到,不参与对号,原样留在最后。

@@ -140,12 +140,14 @@ class LayoutBox {
 }
 
 /// 一张布局:画布尺寸、整体描述([meta] 是逗号隔开的几个类型词)和各个元素。
+/// [style] 是画风(Agent 照参考图或描述反推的一段,同系列沿用),交出去时拼在 caption 前面。
 @immutable
 class Layout {
   const Layout({
     this.width = defaultLayoutWidth,
     this.height = defaultLayoutHeight,
     this.caption = '',
+    this.style = '',
     this.meta = '',
     this.canvas = 'single',
     this.boxes = const [],
@@ -154,7 +156,7 @@ class Layout {
   });
 
   final int width, height;
-  final String caption, meta, canvas;
+  final String caption, style, meta, canvas;
   final List<LayoutBox> boxes;
 
   /// 透视辅助线;null 是没开。
@@ -169,6 +171,7 @@ class Layout {
     int? width,
     int? height,
     String? caption,
+    String? style,
     String? meta,
     String? canvas,
     List<LayoutBox>? boxes,
@@ -178,6 +181,7 @@ class Layout {
     width: width ?? this.width,
     height: height ?? this.height,
     caption: caption ?? this.caption,
+    style: style ?? this.style,
     meta: meta ?? this.meta,
     canvas: canvas ?? this.canvas,
     boxes: boxes == null ? this.boxes : List.unmodifiable(boxes),
@@ -189,6 +193,7 @@ class Layout {
     'width': width,
     'height': height,
     'caption': caption,
+    if (style.isNotEmpty) 'style': style,
     'meta': meta,
     'canvas': canvas,
     'boxes': [for (final b in boxes) b.toJson()],
@@ -200,6 +205,7 @@ class Layout {
     width: _side(j['width'], defaultLayoutWidth),
     height: _side(j['height'], defaultLayoutHeight),
     caption: j['caption'] as String? ?? '',
+    style: j['style'] as String? ?? '',
     meta: j['meta'] as String? ?? '',
     canvas: _pick(j['canvas'], layoutCanvases),
     boxes: List.unmodifiable([
@@ -208,6 +214,19 @@ class Layout {
     perspective: Perspective.fromJson(j['perspective']),
     camera: Camera.fromJson(j['camera']),
   );
+}
+
+/// 交出去的 summary.caption:质量词、画风、整体描述连成一段。导入过交出去的 JSON 时
+/// 整体描述开头已经带着它们,不再加一遍。
+String _fullCaption(Layout l, String quality) {
+  final caption = l.caption.trim();
+  String sentence(String s) =>
+      s.isEmpty || RegExp(r'[.!?。!?]$').hasMatch(s) ? s : '$s.';
+  return [
+    for (final s in [quality.trim(), l.style.trim()])
+      if (s.isNotEmpty && !caption.contains(s)) sentence(s),
+    caption,
+  ].where((s) => s.isNotEmpty).join(' ');
 }
 
 String _pick(Object? v, List<String> allowed) =>
@@ -220,12 +239,14 @@ int _side(Object? v, int fallback) =>
     v is num ? v.round().clamp(minLayoutSide, maxLayoutSide) : fallback;
 
 /// 写成 MOSS-Image 的布局 JSON。换算照官方 compile_prompt.py:减去宽高的一半(整除);
-/// 画布尺寸不写进去(生成时另设)。
+/// 画布尺寸不写进去(生成时另设)。summary.caption 依次是 [quality]、画风、整体描述
+/// (官方格式没有放画风的字段)。
 ///
 /// [draft] 为真时是给 Agent 看的草稿格式:带画布尺寸,坐标是左上角原点的
 /// `[x_min, y_min, x_max, y_max]`,每一块还带上 `name`、`layer` 和体块 `body`
 /// (见 [bodyHintJson];官方格式不认,交出去的不带)。转镜头转到镜头外面的块两种都不带。
-String mossLayoutJson(Layout l, {bool draft = false}) {
+/// 草稿里 caption 只是整体描述:画风另外告诉 Agent(见 `_layoutPagesPrompt`),质量词它不用管。
+String mossLayoutJson(Layout l, {bool draft = false, String quality = ''}) {
   final w2 = l.width ~/ 2, h2 = l.height ~/ 2;
   final view = CameraView(l.camera, l.width, l.height);
   final meta = [
@@ -238,7 +259,7 @@ String mossLayoutJson(Layout l, {bool draft = false}) {
     'summary': {
       if (meta.isNotEmpty) 'meta': meta,
       'canvas': l.canvas,
-      'caption': l.caption.trim(),
+      'caption': draft ? l.caption.trim() : _fullCaption(l, quality),
     },
     'items': [
       for (final b in l.boxes)
@@ -388,6 +409,7 @@ readMossLayout(
     width: tw,
     height: th,
     caption: summary['caption'] is String ? summary['caption'] as String : '',
+    style: summary['style'] is String ? summary['style'] as String : '',
     meta: meta is List
         ? meta.whereType<String>().join(', ')
         : meta is String

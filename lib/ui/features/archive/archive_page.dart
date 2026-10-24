@@ -161,6 +161,7 @@ class _ArchivePageState extends State<ArchivePage> {
 
   Widget _item(ArchiveEntry entry) {
     final actions = (
+      export: widget.board.exportJson,
       onRestore: () => _restore(entry),
       onDelete: () => _delete(entry),
       onUpload: () => _setImage(entry, pickPreview(context)),
@@ -312,6 +313,7 @@ class _ArchivePageState extends State<ArchivePage> {
 
 /// 一条存档上的几个操作。
 typedef _Actions = ({
+  String Function(Layout) export,
   VoidCallback onRestore,
   VoidCallback onDelete,
   VoidCallback onUpload,
@@ -320,12 +322,12 @@ typedef _Actions = ({
 /// 一条存档复制出去的文字和卡片上的预览文字。
 /// 提示词用干净的(放回成稿时才带分段标注);布局复制的是交出去的 MOSS JSON,
 /// 预览是尺寸、框数和整体描述。
-({String clean, String preview}) _texts(ArchiveEntry entry) {
+({String clean, String preview}) _texts(ArchiveEntry entry, _Actions actions) {
   final layout = entry.kind == archiveLayout ? _layoutOf(entry) : null;
   final clean = entry.kind == archiveLayout
       ? layout == null
             ? ''
-            : mossLayoutJson(layout)
+            : actions.export(layout)
       : stripSectionLabels(entry.text);
   final preview = layout == null
       ? clean
@@ -389,7 +391,7 @@ class _EntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (:clean, :preview) = _texts(entry);
+    final (:clean, :preview) = _texts(entry, actions);
     return PennaCard(
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
       child: Row(
@@ -484,7 +486,7 @@ class _EntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (:clean, :preview) = _texts(entry);
+    final (:clean, :preview) = _texts(entry, actions);
     return PennaCard(
       padding: const EdgeInsets.all(8),
       child: Column(

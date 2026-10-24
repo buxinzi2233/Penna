@@ -290,6 +290,7 @@ class _LayoutPageState extends State<LayoutPage> {
                           ),
                           child: _Properties(
                             board: board,
+                            config: widget.config,
                             onDiscuss: _discuss,
                             onToDraft: _toDraft,
                             onAsk: _ask,

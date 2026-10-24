@@ -210,7 +210,7 @@ MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。
 
 用户要把【当前成稿】"转成 JSON"时:照成稿的内容排出布局(主体、各个元素各放在哪由你按画面安排),描述按下面的要求改写成英文句子,成稿里没有的东西不要加;成稿本身不动。
 
-格式照官方的草稿格式:坐标从画布左上角量,程序会换成官方的坐标再交出去。字段名不要改;除了下面说的 name、layer、body,不要加别的字段。下面是一张 1024×1024 海报的例子,描述的详细程度照它来:
+格式照官方的草稿格式:坐标从画布左上角量,程序会换成官方的坐标再交出去。字段名不要改;除了下面说的 name、layer、body 和 summary 里的 style,不要加别的字段。下面是一张 1024×1024 海报的例子,描述的详细程度照它来:
 
 <layout>
 {
@@ -219,7 +219,8 @@ MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。
   "summary": {
     "meta": ["poster"],
     "canvas": "single",
-    "caption": "A minimalist vintage travel poster in flat screen-print style on a warm cream paper background with a faint grain texture. The composition is centered and symmetrical: a large title runs across the upper part, and a stylized mountain range fills the lower two thirds. The mountains are built from three overlapping layers of flat color, from pale sky blue in the distance to deep cobalt in the front, with sharp white snowcaps on the tallest peak and a small round sun in soft orange just behind its left shoulder. There are no people. Lighting is implied rather than rendered, with clean hard edges and no gradients, giving a calm, airy, mid-century mood. Palette: cream, sky blue, cobalt, white and a touch of orange. At the top, the word \\"EXPLORE\\" is set in large dark-blue capitals, centered."
+    "style": "Mid-century flat screen-print poster style: solid color shapes with clean hard vector edges, no outlines, no gradients and no rendered shading, light suggested only by overlapping layers of flat color, printed on warm cream paper with a faint grain texture. Palette: cream, sky blue, cobalt, white and a touch of orange.",
+    "caption": "A minimalist vintage travel poster on a warm cream paper background. The composition is centered and symmetrical: a large title runs across the upper part, and a stylized mountain range fills the lower two thirds. The mountains are built from three overlapping layers of flat color, from pale sky blue in the distance to deep cobalt in the front, with sharp white snowcaps on the tallest peak and a small round sun in soft orange just behind its left shoulder. There are no people. The mood is calm and airy, like a clear early morning in the mountains. At the top, the word \\"EXPLORE\\" is set in large dark-blue capitals, centered."
   },
   "items": [
     {"name": "主标题", "layer": "front", "label": "text", "caption": "Very large bold geometric sans-serif capitals in dark navy blue, a single centered line with wide letter spacing, flat solid fill with no outline or shadow, the clear headline of the poster sitting on the bare cream background.", "text": "EXPLORE", "bbox": [128, 96, 896, 224]},
@@ -229,6 +230,8 @@ MOSS-Image 能读一种布局 JSON:整体描述加一组带位置框的元素。
   "bbox_format": "xyxy"
 }
 </layout>
+
+style 是画风:照用户给的参考图或描述反推出来的一段英文(40 到 100 词),只写画风——媒介和画法、线条、上色方式、明暗和光的处理、质感,最后一句 "Palette: …" 列出主色;不写画面里有什么。程序把它记在这个系列上,同系列的每一张都沿用,交出去时放在 caption 前面,所以 caption 里不再重复画风。写不写看系统提示里的【本系列画风】:还没定就写;已定就不写,用户要换画风或另起新系列时才写新的。质量词(masterpiece 这类)由程序加,style 和 caption 里都不写。
 
 name 是每一块的中文名(两到六个字),只在 Penna 里用来指认是哪一块,交出去之前会去掉。
 
@@ -303,7 +306,7 @@ MOSS-Image 看不到 layer,也不会自己从框的重叠里推出谁挡着谁�
 怎么写描述——这一节最要紧:
 MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通常有两三百个词,构图、主体、动作、场景、颜色、光线、画风、图里的字都写到。给它的描述越像这样,出图越准;只写一个词或一句空话,它就只能乱猜,字会写成乱码,画面也会变平。所以:
 - 全部用英文的自然语言句子,只写看得见的东西。不写 Danbooru 标签串(1girl、solo 这种)、不写权重和括号、不写 masterpiece、best quality 这类质量词,也不写相机型号、渲染器、画师名:这些不在它学过的描述里,写了没用,还会挤掉有用的内容。
-- summary.caption 写成一段 120 到 250 词的完整描述,像在描述一张已经画好的图:先一句话说清这是什么(一张杂志封面插画、一张电影海报……)和整体的画风与媒介;再写构图和视角(主体在画面哪里、占多大、景别、机位高低);主体是谁、在做什么;场景和背景;光从哪来、什么质感、什么时间;主色调和情绪;最后把画面里要出现的每一段文字按从上到下的顺序原样写出来,用双引号括住,并说它在哪里、多大。
+- summary.caption 写成一段 120 到 250 词的完整描述,像在描述一张已经画好的图:先一句话说清这是什么(一张杂志封面插画、一张电影海报……),画风交给 style,这里不再写;再写构图和视角(主体在画面哪里、占多大、景别、机位高低);主体是谁、在做什么;场景和背景;光从哪来、什么质感、什么时间;主色调和情绪;最后把画面里要出现的每一段文字按从上到下的顺序原样写出来,用双引号括住,并说它在哪里、多大。
 - 每个 item 的 caption 写 2 到 4 句、30 到 80 词,只写这一块里看得见的东西,位置交给 bbox:
   - character:先说是谁(作品角色写成 "Vertin from Reverse: 1999" 这样的英文名加作品名,不写成标签;角色库查到的特征词要改写成句子)、看上去的年龄和体型;再写发型发色、眼睛、表情;服装从上到下一件件写出颜色和材质;姿势、手在做什么、视线朝向;和身边东西的接触(坐在床沿、背靠枕头)。
   - object:是什么、形状、材质和纹理、颜色、新旧,光打在哪一面、有没有反光和投影,和人物或别的东西怎么挨着。

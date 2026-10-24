@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261023--12--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261024--1--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -95,6 +95,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 在画布上框出各个区域并逐块描述,生成 MOSS-Image 布局 JSON;右侧有独立的布局对话。布局可以保存到档案库的「区域控制」分区,从档案库放回时回到区域控制工作台。
 
 - 布局按系列和分页组织,Agent 换主题时自动另起一个系列。
+- 画风固定:Agent 依据参考图或描述反推一段画风(含主色),同一系列的布局沿用这一段,改布局时保持不变;导出的 JSON 在整体描述前依次加上质量词和画风,质量词默认为 `best quality, highres, newest, year 2026, 8k resolution, masterpiece, ultra-detailed`,可在属性栏修改。
 - 各块以图层列表呈现,分前景、中景、后景,拖动调整前后;支持一点、两点、三点透视辅助线。
 - 发给 Agent 时附带程序算出的位置关系(各块在画面中的位置、贴边裁切、前后遮挡及遮挡比例;3D 视图中按离镜头远近、体块的实际投影轮廓和可见的面计算),Agent 据此把空间关系写进描述;给参考图时先分析图中的遮挡、裁切与机位再排布局。
 - 参考图与画布一横一竖时,画布可随之横竖对调;Agent 按其他比例写的布局等比缩放后摆进画布正中。

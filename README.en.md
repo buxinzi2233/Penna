@@ -93,7 +93,7 @@ Drop in an image and a model turns it back into tags or a prompt. There are thre
 
 Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON, with a separate layout chat on the right. Layouts can be saved to the Region Control section of the Archive and reopen in Region Control.
 
-- Layouts are organized into series and pages, and the Agent starts a new series when the topic changes.
+- Locked art style: the Agent infers a style paragraph (including the main palette) from a reference image or description, and every layout in the same series reuses it unchanged through edits. Exported JSON prefixes the overall caption with quality tags and the style; the quality tags default to `best quality, highres, newest, year 2026, 8k resolution, masterpiece, ultra-detailed` and can be edited in the properties panel.
 - Regions are listed as layers (foreground, middle ground, background) and dragged to reorder; one-, two- and three-point perspective guides are available.
 - The Agent receives computed spatial relations (where each region sits, which edges crop it, what overlaps what and by how much; in the 3D view, by distance from the camera, the projected outline of each volume and its visible faces) and writes them into the captions; with a reference image, it first reads the image's occlusion, cropping and camera angle before laying out regions.
 - When the reference image and the canvas differ in orientation, the canvas can swap width and height to match; layouts the Agent writes at another aspect ratio are scaled proportionally into the center of the canvas.

@@ -6,6 +6,7 @@ part of 'layout_page.dart';
 class _Properties extends StatelessWidget {
   const _Properties({
     required this.board,
+    required this.config,
     required this.onDiscuss,
     required this.onToDraft,
     required this.onAsk,
@@ -18,6 +19,9 @@ class _Properties extends StatelessWidget {
   });
 
   final LayoutBoard board;
+
+  /// 质量词存在设置里(所有布局共用)。
+  final ConfigService config;
 
   /// 带着第几块去右边的对话里改。
   final ValueChanged<int> onDiscuss;
@@ -44,7 +48,12 @@ class _Properties extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-          child: _JsonCard(board: board, onToDraft: onToDraft, onAsk: onAsk),
+          // 质量词改了 JSON 也跟着变。
+          child: ListenableBuilder(
+            listenable: config,
+            builder: (context, _) =>
+                _JsonCard(board: board, onToDraft: onToDraft, onAsk: onAsk),
+          ),
         ),
         Expanded(
           // 外层不用 ListView:它不建看不见的卡片,画布上点了框就滚不过去。
@@ -55,7 +64,7 @@ class _Properties extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _SummaryCard(board: board),
+                  _SummaryCard(board: board, config: config),
                   if (count > 0)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(2, 14, 2, 0),
@@ -100,9 +109,10 @@ class _Properties extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.board});
+  const _SummaryCard({required this.board, required this.config});
 
   final LayoutBoard board;
+  final ConfigService config;
 
   @override
   Widget build(BuildContext context) {
@@ -113,11 +123,28 @@ class _SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PennaField(
+            label: tr('质量词'),
+            value: config.config.layoutQuality,
+            maxLines: 2,
+            onChanged: (v) =>
+                config.update(config.config.copyWith(layoutQuality: v)),
+          ),
+          const SizedBox(height: 10),
+          PennaField(
+            key: ValueKey('style-$r'),
+            label: tr('画风'),
+            value: l.style,
+            maxLines: 3,
+            hint: tr('画法、线条、上色、配色'),
+            onChanged: (v) => board.setSummary(style: v),
+          ),
+          const SizedBox(height: 10),
+          PennaField(
             key: ValueKey('caption-$r'),
             label: tr('整体描述'),
             value: l.caption,
             maxLines: 4,
-            hint: tr('画面整体的场景与风格'),
+            hint: tr('画面整体的场景'),
             onChanged: (v) => board.setSummary(caption: v),
           ),
           const SizedBox(height: 10),

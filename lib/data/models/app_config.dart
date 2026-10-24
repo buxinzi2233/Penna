@@ -5,6 +5,10 @@ import '../../l10n/l10n.dart';
 
 export 'mcp_server.dart';
 
+/// 区域控制交出去的 summary.caption 最前面默认加的质量词(属性栏里能改)。
+const defaultLayoutQuality =
+    'best quality, highres, newest, year 2026, 8k resolution, masterpiece, ultra-detailed';
+
 /// 一个可勾选的选项(Skill 或工具)。
 @immutable
 class Option {
@@ -390,6 +394,7 @@ class AppConfig {
     this.tagSearchOnline = true,
     this.piercing = false,
     this.piercingPrompt = '',
+    this.layoutQuality = defaultLayoutQuality,
     this.compressImages = true,
     this.autoApprove = false,
     this.characterPreviews = false,
@@ -440,6 +445,7 @@ class AppConfig {
       tagSearchOnline: m['tagSearchOnline'] as bool? ?? true,
       piercing: m['piercing'] as bool? ?? false,
       piercingPrompt: m['piercingPrompt'] as String? ?? '',
+      layoutQuality: m['layoutQuality'] as String? ?? defaultLayoutQuality,
       compressImages: m['compressImages'] as bool? ?? true,
       autoApprove: m['autoApprove'] as bool? ?? false,
       characterPreviews: m['characterPreviews'] as bool? ?? false,
@@ -546,6 +552,9 @@ class AppConfig {
   final bool piercing;
   final String piercingPrompt;
 
+  /// 区域控制交出去的 JSON 里 summary.caption 最前面的质量词;空串是不加。
+  final String layoutQuality;
+
   /// 要注入的穿甲弹文字;关着或没填为空串。
   String get piercingText => piercing ? piercingPrompt.trim() : '';
 
@@ -590,6 +599,7 @@ class AppConfig {
     'tagSearchOnline': tagSearchOnline,
     'piercing': piercing,
     'piercingPrompt': piercingPrompt,
+    'layoutQuality': layoutQuality,
     'compressImages': compressImages,
     'autoApprove': autoApprove,
     'characterPreviews': characterPreviews,
@@ -637,6 +647,7 @@ class AppConfig {
     bool? tagSearchOnline,
     bool? piercing,
     String? piercingPrompt,
+    String? layoutQuality,
     bool? compressImages,
     bool? autoApprove,
     bool? characterPreviews,
@@ -667,6 +678,7 @@ class AppConfig {
     tagSearchOnline: tagSearchOnline ?? this.tagSearchOnline,
     piercing: piercing ?? this.piercing,
     piercingPrompt: piercingPrompt ?? this.piercingPrompt,
+    layoutQuality: layoutQuality ?? this.layoutQuality,
     compressImages: compressImages ?? this.compressImages,
     autoApprove: autoApprove ?? this.autoApprove,
     characterPreviews: characterPreviews ?? this.characterPreviews,
