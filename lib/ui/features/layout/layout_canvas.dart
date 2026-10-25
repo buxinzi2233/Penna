@@ -42,7 +42,7 @@ const _minBox = 8;
 /// 右下角这么大(屏幕像素)的地方按下去是拉大小。
 const _handle = 12.0;
 
-enum _Drag { draw, move, resize, vanish, look }
+enum _Drag { draw, move, resize, vanish, look, vertex }
 
 /// 画布:按画布尺寸等比缩放显示。空白处拖出一个新框,拖框移动,拖右下角改大小,
 /// 点一下选中,双击改它的描述,Delete 删掉选中的。框按图层先后画,前景盖住后景。
@@ -72,6 +72,9 @@ class _LayoutCanvasState extends State<LayoutCanvas>
     with SingleTickerProviderStateMixin {
   _Drag? _drag;
   int _target = -1;
+
+  /// 正在拖多边形的第几个顶点。
+  int _vertex = -1;
 
   /// 按 Delete 要画布有焦点:按下鼠标时拿过来。
   final _focus = FocusNode();
@@ -180,7 +183,21 @@ class _LayoutCanvasState extends State<LayoutCanvas>
         b.right.toDouble(),
         b.bottom.toDouble(),
       ).inflate(_handle / 2 / scale);
-      if (r.contains(p)) return i;
+      // 异形按形状点(椭圆里套着别的块时点得中里面那块),右下角拉大小的把手照样算。
+      final corner = (p - r.bottomRight).distance * scale <= _handle;
+      if (b.shape == null ? r.contains(p) : b.covers(p.dx, p.dy) || corner) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// 按在选中的那个多边形的哪个顶点上;没按中是 null。
+  int? _hitVertex(Offset p, double scale) {
+    final i = _board.selected;
+    if (i == null || !_board.shown(i)) return null;
+    for (final (k, (x, y)) in _board.layout.boxes[i].shapePoints.indexed) {
+      if ((p - Offset(x, y)).distance * scale <= _handle) return k;
     }
     return null;
   }
@@ -202,6 +219,19 @@ class _LayoutCanvasState extends State<LayoutCanvas>
       _from = raw;
       _vanishStart = vanishingPoints(_board.layout.perspective!)[v];
       _board.mark(tr('拖动消失点'));
+      return setState(() {});
+    }
+    final k = _hitVertex(p, scale);
+    if (k != null) {
+      final i = _board.selected!;
+      final b = _board.layout.boxes[i];
+      _drag = _Drag.vertex;
+      _target = i;
+      _vertex = k;
+      _origin = b;
+      _dragged = b;
+      _board.mark(tr('调整「{0}」的形状', [boxName(b, i)]));
+      _from = p;
       return setState(() {});
     }
     final i = _hit(p, scale);
@@ -234,7 +264,9 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   void _update(Offset p, double scale, Offset raw) {
     final l = _board.layout;
     final b = _origin;
-    if ((_drag == _Drag.move || _drag == _Drag.resize) &&
+    if ((_drag == _Drag.move ||
+            _drag == _Drag.resize ||
+            _drag == _Drag.vertex) &&
         !identical(l.boxes.elementAtOrNull(_target), _dragged)) {
       return _end();
     }
@@ -265,6 +297,10 @@ class _LayoutCanvasState extends State<LayoutCanvas>
             bottom: math.max(b.top + _minBox, p.dy.round()).clamp(0, l.height),
           ),
         );
+        _follow();
+      // 顶点按拖动开始时的形状算:框换成新的外框,别的顶点在画布上不动。
+      case _Drag.vertex when b != null:
+        _board.updateBox(_target, b.withVertex(_vertex, p.dx, p.dy));
         _follow();
       // 按住时那个消失点在哪,加上鼠标挪了多少;不截到画布里,画面外也拖得到。
       // 3D 视图里拖它就是转镜头(见 LayoutBoard.moveVanishing)。
@@ -484,32 +520,42 @@ class _BoxView extends StatelessWidget {
     final words = box.label == 'text' && box.text.trim().isNotEmpty
         ? '"${box.text.trim()}"'
         : box.caption.trim();
+    final fill = color.withValues(
+      alpha: threeD ? (selected ? 0.08 : 0.03) : (selected ? 0.2 : 0.12),
+    );
+    final caption = threeD
+        ? null
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(6, 22, 6, 4),
+            child: Text(
+              words,
+              overflow: TextOverflow.fade,
+              style: TextStyle(fontSize: 11, color: PennaColors.text),
+            ),
+          );
+    final shape = box.shape;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: color.withValues(
-                alpha: threeD
-                    ? (selected ? 0.08 : 0.03)
-                    : (selected ? 0.2 : 0.12),
-              ),
-              border: Border.all(color: color, width: selected ? 2.5 : 1.5),
-            ),
-            child: threeD
-                ? null
-                : ClipRect(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 22, 6, 4),
-                      child: Text(
-                        words,
-                        overflow: TextOverflow.fade,
-                        style: TextStyle(fontSize: 11, color: PennaColors.text),
-                      ),
+          child: shape == null
+              ? DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: fill,
+                    border: Border.all(
+                      color: color,
+                      width: selected ? 2.5 : 1.5,
                     ),
                   ),
-          ),
+                  child: caption == null ? null : ClipRect(child: caption),
+                )
+              // 异形:画形状;选中时淡淡描出外框(交出去的还是这个方框)和顶点。
+              : CustomPaint(
+                  painter: _ShapePainter(shape, color, fill, selected),
+                  child: caption == null
+                      ? null
+                      : ClipPath(clipper: _ShapeClip(shape), child: caption),
+                ),
         ),
         Positioned(
           left: 0,
@@ -547,6 +593,76 @@ class _BoxView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 形状在 [size] 那么大的框里的路径。
+Path _shapePath(LayoutShape s, Size size) {
+  if (s.isEllipse) return Path()..addOval(Offset.zero & size);
+  return Path()..addPolygon([
+    for (final (x, y) in s.points) Offset(x * size.width, y * size.height),
+  ], true);
+}
+
+class _ShapePainter extends CustomPainter {
+  _ShapePainter(this.shape, this.color, this.fill, this.selected);
+
+  final LayoutShape shape;
+  final Color color, fill;
+  final bool selected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = _shapePath(shape, size);
+    canvas
+      ..drawPath(path, Paint()..color = fill)
+      ..drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = selected ? 2.5 : 1.5,
+      );
+    if (!selected) return;
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..color = color.withValues(alpha: 0.45)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    for (final (x, y) in shape.points) {
+      final c = Offset(x * size.width, y * size.height);
+      canvas
+        ..drawCircle(c, 5, Paint()..color = Colors.white)
+        ..drawCircle(
+          c,
+          5,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ShapePainter old) =>
+      old.shape != shape ||
+      old.color != color ||
+      old.fill != fill ||
+      old.selected != selected;
+}
+
+class _ShapeClip extends CustomClipper<Path> {
+  _ShapeClip(this.shape);
+
+  final LayoutShape shape;
+
+  @override
+  Path getClip(Size size) => _shapePath(shape, size);
+
+  @override
+  bool shouldReclip(_ShapeClip old) => old.shape != shape;
 }
 
 /// 类别显示的名字;存的和发出去的都是英文原值。

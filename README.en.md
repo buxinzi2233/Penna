@@ -91,7 +91,7 @@ Drop in an image and a model turns it back into tags or a prompt. There are thre
 
 ### Region Control
 
-Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON, with a separate layout chat on the right. Layouts can be saved to the Region Control section of the Archive and reopen in Region Control.
+Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON, with a separate layout chat on the right. Regions can be drawn as ellipses or polygons (drag vertices to reshape) for working out composition with the Agent; export still writes each region as its bounding box. Layouts can be saved to the Region Control section of the Archive and reopen in Region Control.
 
 - Locked art style: the Agent infers a style paragraph (including the main palette) from a reference image or description, and every layout in the same series reuses it unchanged through edits. Exported JSON prefixes the overall caption with quality tags and the style; the quality tags default to `best quality, highres, newest, year 2026, 8k resolution, masterpiece, ultra-detailed` and can be edited in the properties panel.
 - Regions are listed as layers (foreground, middle ground, background) and dragged to reorder; one-, two- and three-point perspective guides are available.

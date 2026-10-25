@@ -311,6 +311,48 @@ class _BoxCard extends StatelessWidget {
     );
   }
 
+  /// 换形状(记一笔操作);框不动,交出去的还是这个方框。
+  void _setShape(LayoutBox b, LayoutShape? shape) {
+    board.mark(tr('调整「{0}」的形状', [boxName(b, index)]));
+    _edit((b) => b.copyWith(shape: () => shape));
+  }
+
+  /// 方框 / 椭圆 / 多边形;多边形再调顶点数(换成那么多边的正多边形)。
+  Widget _shapeRow(LayoutBox b) {
+    final s = b.shape;
+    final n = s?.points.length ?? 0;
+    return Row(
+      children: [
+        PennaChip(
+          label: tr('方框'),
+          selected: s == null,
+          onTap: () => _setShape(b, null),
+        ),
+        const SizedBox(width: 4),
+        PennaChip(
+          label: tr('椭圆'),
+          selected: s?.isEllipse ?? false,
+          onTap: () => _setShape(b, const LayoutShape.ellipse()),
+        ),
+        const SizedBox(width: 4),
+        PennaChip(
+          label: tr('多边形'),
+          selected: n > 0,
+          onTap: n > 0 ? () {} : () => _setShape(b, LayoutShape.regular(5)),
+        ),
+        if (n > 0) ...[
+          _icon(Icons.remove, tr('少一个顶点'), () {
+            if (n > minShapePoints) _setShape(b, LayoutShape.regular(n - 1));
+          }),
+          Text('$n', style: const TextStyle(fontSize: 12)),
+          _icon(Icons.add, tr('多一个顶点'), () {
+            if (n < maxShapePoints) _setShape(b, LayoutShape.regular(n + 1));
+          }),
+        ],
+      ],
+    );
+  }
+
   /// 展开后的那些输入。
   Widget _details(LayoutBox b, int r) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -340,6 +382,8 @@ class _BoxCard extends StatelessWidget {
           ],
         ],
       ),
+      const SizedBox(height: 6),
+      _shapeRow(b),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(

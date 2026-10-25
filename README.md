@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4F7CF7" alt="platform">
   <img src="https://img.shields.io/badge/Flutter-desktop-4F7CF7?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.13%2B-F26D7D?logo=dart&logoColor=white" alt="Dart">
-  <img src="https://img.shields.io/badge/version-1.0.2--261025--3--dev-F26D7D" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2--261025--4--dev-F26D7D" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-4F7CF7" alt="license">
 </p>
 
@@ -92,7 +92,7 @@ Agent 与润色的结果以待确认改动的形式提交。改动按行以红�
 
 ### 区域控制工作台
 
-在画布上框出各个区域并逐块描述,生成 MOSS-Image 布局 JSON;右侧有独立的布局对话。布局可以保存到档案库的「区域控制」分区,从档案库放回时回到区域控制工作台。
+在画布上框出各个区域并逐块描述,生成 MOSS-Image 布局 JSON;右侧有独立的布局对话。区域可以画成椭圆或多边形(拖动顶点改形状),便于和 Agent 一起推敲构图,导出时仍按外框写成方框。布局可以保存到档案库的「区域控制」分区,从档案库放回时回到区域控制工作台。
 
 - 布局按系列和分页组织,Agent 换主题时自动另起一个系列。
 - 画风固定:Agent 依据参考图或描述反推一段画风(含主色),同一系列的布局沿用这一段,改布局时保持不变;导出的 JSON 在整体描述前依次加上质量词和画风,质量词默认为 `best quality, highres, newest, year 2026, 8k resolution, masterpiece, ultra-detailed`,可在属性栏修改。
