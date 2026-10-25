@@ -97,7 +97,7 @@ void main() {
     expect(backdrop, findsNothing);
   });
 
-  testWidgets('摄像机栏里打开灯光、拖灯光球上的手柄,灯换方向,下面的提示词跟着变', (tester) async {
+  Future<LayoutBoard> panel(WidgetTester tester) async {
     tester.view.physicalSize = const Size(400, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -123,6 +123,44 @@ void main() {
         ),
       ),
     );
+    return board;
+  }
+
+  testWidgets('部件窗口:点图标换窗口、再点收起,摄像机和灯光各是各的', (tester) async {
+    await panel(tester);
+    // 默认展开摄像机窗口,里面没有灯光。
+    expect(find.text('自由镜头'), findsOneWidget);
+    expect(find.byType(Switch), findsNothing);
+    await tester.tap(find.byTooltip('灯光'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Switch), findsOneWidget);
+    expect(find.text('自由镜头'), findsNothing);
+    final open = tester.getSize(find.byType(CameraPanel)).width;
+    await tester.tap(find.byTooltip('灯光'));
+    await tester.pumpAndSettle();
+    // 收起后只剩图标栏。
+    expect(tester.getSize(find.byType(CameraPanel)).width, lessThan(open / 4));
+  });
+
+  testWidgets('灯光窗口里展开预设格子,点一个就套用并收起', (tester) async {
+    final board = await panel(tester);
+    await tester.tap(find.byTooltip('灯光'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('打光预设'));
+    await tester.pumpAndSettle();
+    expect(find.text('人像'), findsOneWidget);
+    await tester.tap(find.text('霓虹'));
+    await tester.pumpAndSettle();
+    expect(board.layout.lighting.preset, 'neon');
+    expect(find.text('人像'), findsNothing);
+  });
+
+  testWidgets('灯光窗口里打开灯光、拖灯光球上的手柄,灯换方向,下面的提示词跟着变', (tester) async {
+    final board = await panel(tester);
+    await tester.tap(find.byTooltip('灯光'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     final lg = board.layout.lighting;

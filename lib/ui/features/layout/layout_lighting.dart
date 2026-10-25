@@ -13,7 +13,33 @@ const _swatches = [
   '#ffffff',
 ];
 
-/// 摄像机栏里的「灯光」:开关、预设、跟随镜头、灯光球(拖手柄改方向)、选中那盏灯的参数、
+/// 预设分组(22 个一长串不好找)。含 tr,所以是 getter。
+List<(String, List<String>)> get _presetGroups => [
+  (
+    tr('人像'),
+    [
+      'natural',
+      'rembrandt',
+      'butterfly',
+      'loop',
+      'split',
+      'three_point',
+      'rim',
+      'high_key',
+      'low_key',
+    ],
+  ),
+  (
+    tr('自然与时段'),
+    ['window', 'overcast', 'golden_hour', 'blue_hour', 'noon', 'moonlight'],
+  ),
+  (
+    tr('氛围'),
+    ['backlight', 'silhouette', 'top', 'under', 'neon', 'candle', 'spotlight'],
+  ),
+];
+
+/// 灯光窗口:开关、预设、跟随镜头、光影预览、灯光球(拖手柄改方向)、选中那盏灯的参数、
 /// 环境光和氛围;最下面是交出去时接在整体描述后的那句。本质是一句光影提示词,
 /// 球和手柄只是方便看(用户要求;Agent 用 `<lighting>` 改同一份)。
 class _LightingSection extends StatefulWidget {
@@ -56,24 +82,28 @@ class _LightingSectionState extends State<_LightingSection> {
         _put(apply(v), step ? tr('调整灯光') : null),
   );
 
+  /// 预设格子展开着没有。
+  bool _presets = false;
+
   @override
   Widget build(BuildContext context) {
     final on = lg.enabled;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 4, 4, 0),
+        // 和摄像机窗口的标题一样高。
+        SizedBox(
+          height: 34,
           child: Row(
             children: [
-              Icon(Icons.wb_sunny_outlined, size: 14, color: PennaColors.amber),
+              const SizedBox(width: 10),
+              Icon(Icons.wb_sunny_outlined, size: 15, color: PennaColors.amber),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   tr('灯光'),
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -91,9 +121,26 @@ class _LightingSectionState extends State<_LightingSection> {
             ],
           ),
         ),
-        if (on) ..._body(),
+        AnimatedSize(
+          duration: Motion.of(context, Motion.base),
+          curve: Motion.expand,
+          alignment: Alignment.topCenter,
+          child: on
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _body(),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
       ],
     );
+  }
+
+  /// 套用预设,收起预设格子。
+  void _apply(String id) {
+    _picked = null;
+    _presets = false;
+    _put(presetLighting(id, cam, lg), tr('套用灯光预设'));
   }
 
   List<Widget> _body() {
@@ -105,54 +152,61 @@ class _LightingSectionState extends State<_LightingSection> {
     return [
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: PopupMenuButton<String>(
-                tooltip: tr('打光预设'),
-                onSelected: (id) {
-                  _picked = null;
-                  _put(presetLighting(id, cam, lg), tr('套用灯光预设'));
-                },
-                itemBuilder: (_) => [
-                  for (final p in lightPresets)
-                    PopupMenuItem(
-                      value: p.id,
-                      height: 32,
-                      child: Text(
-                        tr(p.name),
-                        style: const TextStyle(fontSize: 12.5),
-                      ),
+        child: Tooltip(
+          message: tr('打光预设'),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () => setState(() => _presets = !_presets),
+            child: Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: PennaColors.slate50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: PennaColors.border),
+              ),
+              child: Row(
+                children: [
+                  if (preset != null) ...[
+                    _PresetThumb(id: preset.id, size: 16),
+                    const SizedBox(width: 6),
+                  ],
+                  Expanded(
+                    child: Text(
+                      preset == null ? tr('自定义') : tr(preset.name),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
                     ),
+                  ),
+                  AnimatedRotation(
+                    turns: _presets ? 0.5 : 0,
+                    duration: Motion.of(context, Motion.base),
+                    curve: Motion.swift,
+                    child: Icon(
+                      Icons.expand_more,
+                      size: 15,
+                      color: PennaColors.slate500,
+                    ),
+                  ),
                 ],
-                child: Container(
-                  height: 26,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: PennaColors.slate50,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: PennaColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          preset == null ? tr('自定义') : tr(preset.name),
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                      Icon(
-                        Icons.expand_more,
-                        size: 15,
-                        color: PennaColors.slate500,
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ),
-            const SizedBox(width: 6),
+          ),
+        ),
+      ),
+      AnimatedSize(
+        duration: Motion.of(context, Motion.base),
+        curve: Motion.expand,
+        alignment: Alignment.topCenter,
+        child: _presets
+            ? _PresetGrid(selected: lg.preset, onPick: _apply)
+            : const SizedBox(width: double.infinity),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+        child: Row(
+          spacing: 6,
+          children: [
             Tooltip(
               message: lg.follow ? tr('灯跟着镜头转') : tr('灯固定在场景里,转镜头时光线相对画面会变'),
               child: PennaChip(
@@ -161,24 +215,18 @@ class _LightingSectionState extends State<_LightingSection> {
                 onTap: () => _put(setFollow(lg, !lg.follow, cam), tr('调整灯光')),
               ),
             ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: ValueListenableBuilder(
-            valueListenable: board.shadePreview,
-            builder: (context, on, _) => Tooltip(
-              message: tr('体块和画布按灯光显示明暗'),
-              child: PennaChip(
-                label: tr('光影预览'),
-                selected: on,
-                onTap: () => board.shadePreview.value = !on,
+            ValueListenableBuilder(
+              valueListenable: board.shadePreview,
+              builder: (context, on, _) => Tooltip(
+                message: tr('体块和画布按灯光显示明暗'),
+                child: PennaChip(
+                  label: tr('光影预览'),
+                  selected: on,
+                  onTap: () => board.shadePreview.value = !on,
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
       Padding(
@@ -418,235 +466,145 @@ class _LightingSectionState extends State<_LightingSection> {
   }
 }
 
-/// 灯光球:从镜头看主体,球按现在的灯照亮;每盏灯一个带序号的手柄,拖着改方向,
-/// 拖出球边就翻到背面(背面的手柄是空心的)。
-class _LightBall extends StatefulWidget {
-  const _LightBall({
-    required this.lighting,
-    required this.camera,
-    required this.selected,
-    required this.onPick,
-    required this.onStart,
-    required this.onMove,
-    required this.onEnd,
-  });
+/// 预设格子:按组排,一格是预设的小灯光球加名字,点一下套用。
+class _PresetGrid extends StatelessWidget {
+  const _PresetGrid({required this.selected, required this.onPick});
 
-  final Lighting lighting;
-  final Camera camera;
-  final String? selected;
+  final String selected;
   final ValueChanged<String> onPick;
-  final VoidCallback onStart, onEnd;
-  final void Function(String id, ({double azimuth, double elevation}) to)
-  onMove;
-
-  @override
-  State<_LightBall> createState() => _LightBallState();
-}
-
-class _LightBallState extends State<_LightBall> {
-  ui.Image? _image;
-  Object? _for;
-
-  /// 正在拖的灯,和按下时它在正面(1)还是背面(-1)。
-  String? _drag;
-  int _front = 1;
-
-  @override
-  void dispose() {
-    _image?.dispose();
-    super.dispose();
-  }
-
-  /// 球的像素在别的线程外算不值当(最多 256×256):灯或镜头变了就重算一张。
-  void _render(int px) {
-    final key = (widget.lighting, widget.camera, px);
-    if (key == _for) return;
-    _for = key;
-    ui.decodeImageFromPixels(
-      renderLitSphere(px, widget.lighting, widget.camera),
-      px,
-      px,
-      ui.PixelFormat.rgba8888,
-      (img) {
-        if (!mounted || _for != key) return img.dispose();
-        setState(() {
-          _image?.dispose();
-          _image = img;
-        });
-      },
-    );
-  }
-
-  /// 各盏灯的手柄在球上的位置(相对球心,半径为 1;y 朝下)和在不在正面。
-  List<(Light, Offset, bool)> get _handles => [
-    for (final l in widget.lighting.lights)
-      if (relDir(l, widget.lighting, widget.camera) case final r)
-        (l, Offset(r.side, -r.up), r.front >= 0),
-  ];
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        final size = math.min(box.maxWidth, 180.0);
-        final dpr = MediaQuery.devicePixelRatioOf(context);
-        _render((size * dpr).round().clamp(32, 256));
-        final radius = size / 2 - 1;
-        final center = Offset(size / 2, size / 2);
-        String? hit(Offset p) {
-          String? best;
-          var bestD = 14.0;
-          for (final (l, at, front) in _handles) {
-            // 正面的优先:背面的离得一样近时让给正面的。
-            final d = (center + at * radius - p).distance + (front ? 0 : 4);
-            if (d < bestD) {
-              best = l.id;
-              bestD = d;
-            }
-          }
-          return best;
-        }
-
-        return Center(
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              dragStartBehavior: DragStartBehavior.down,
-              onTapUp: (d) {
-                final id = hit(d.localPosition);
-                if (id != null) widget.onPick(id);
-              },
-              onPanStart: (d) {
-                final id = hit(d.localPosition);
-                if (id == null) return;
-                _drag = id;
-                _front = _handles.firstWhere((h) => h.$1.id == id).$3 ? 1 : -1;
-                widget.onPick(id);
-                widget.onStart();
-              },
-              onPanUpdate: (d) {
-                final id = _drag;
-                if (id == null) return;
-                final p = (d.localPosition - center) / radius;
-                final rel = ballPointToRel(p.dx, -p.dy, _front);
-                widget.onMove(
-                  id,
-                  fromRel(
-                    rel.side,
-                    rel.up,
-                    rel.front,
-                    widget.lighting,
-                    widget.camera,
-                  ),
-                );
-              },
-              onPanEnd: (_) => _endDrag(),
-              onPanCancel: _endDrag,
-              child: CustomPaint(
-                painter: _BallPainter(
-                  _image,
-                  _handles,
-                  widget.selected,
-                  PennaColors.border,
-                ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (group, ids) in _presetGroups) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 4, left: 2),
+              child: Text(
+                group,
+                style: TextStyle(fontSize: 10.5, color: PennaColors.slate500),
               ),
             ),
-          ),
-        );
-      },
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final id in ids)
+                  if (findPreset(id) case final p?)
+                    _PresetTile(
+                      preset: p,
+                      selected: p.id == selected,
+                      onTap: () => onPick(p.id),
+                    ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
-  }
-
-  void _endDrag() {
-    if (_drag == null) return;
-    _drag = null;
-    widget.onEnd();
   }
 }
 
-class _BallPainter extends CustomPainter {
-  _BallPainter(this.image, this.handles, this.selected, this.rim);
+class _PresetTile extends StatelessWidget {
+  const _PresetTile({
+    required this.preset,
+    required this.selected,
+    required this.onTap,
+  });
 
-  final ui.Image? image;
-  final List<(Light, Offset, bool)> handles;
-  final String? selected;
-  final Color rim;
+  final LightPreset preset;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = size.width / 2 - 1;
-    canvas.drawCircle(center, radius, Paint()..color = const Color(0xFF2B2824));
-    final img = image;
-    if (img != null) {
-      paintImage(
-        canvas: canvas,
-        rect: Offset.zero & size,
-        image: img,
-        filterQuality: FilterQuality.medium,
-      );
-    }
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = rim
-        ..style = PaintingStyle.stroke,
-    );
-    // 背面的先画,正面的盖在上面。
-    for (final (i, (l, at, front)) in [
-      ...handles.indexed.where((h) => !h.$2.$3),
-      ...handles.indexed.where((h) => h.$2.$3),
-    ]) {
-      final c = center + at * radius;
-      final (r, g, b) = lightRgb(l);
-      final color = Color.fromARGB(
-        255,
-        (r * 255).round(),
-        (g * 255).round(),
-        (b * 255).round(),
-      );
-      final big = l.id == selected;
-      final rad = big ? 9.0 : 7.5;
-      canvas.drawCircle(
-        c,
-        rad,
-        Paint()..color = front ? color : color.withValues(alpha: 0.25),
-      );
-      canvas.drawCircle(
-        c,
-        rad,
-        Paint()
-          ..color = big ? Colors.white : const Color(0xFF1F2533)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = big ? 2.2 : 1.2,
-      );
-      final label = TextPainter(
-        text: TextSpan(
-          text: '${i + 1}',
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w700,
-            color: front && (r + g + b) > 1.8
-                ? const Color(0xFF1F2533)
-                : Colors.white,
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: Motion.of(context, Motion.base),
+        curve: Motion.swift,
+        width: 66,
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 5),
+        decoration: BoxDecoration(
+          color: selected ? PennaColors.primaryBg : PennaColors.slate50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? PennaColors.primary : PennaColors.border,
           ),
         ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      label.paint(canvas, c - Offset(label.width / 2, label.height / 2));
-    }
+        child: Column(
+          children: [
+            _PresetThumb(id: preset.id, size: 32),
+            const SizedBox(height: 4),
+            Text(
+              tr(preset.name),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? PennaColors.primary : PennaColors.slate700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
+
+/// 预设的小灯光球(默认镜头下看):算一次就记着,不跟着每一帧重画。
+class _PresetThumb extends StatefulWidget {
+  const _PresetThumb({required this.id, required this.size});
+
+  final String id;
+  final double size;
 
   @override
-  bool shouldRepaint(_BallPainter old) =>
-      old.image != image ||
-      old.selected != selected ||
-      old.rim != rim ||
-      !listEquals(
-        [for (final h in old.handles) (h.$1, h.$2, h.$3)],
-        [for (final h in handles) (h.$1, h.$2, h.$3)],
+  State<_PresetThumb> createState() => _PresetThumbState();
+}
+
+class _PresetThumbState extends State<_PresetThumb> {
+  static final _cache = <String, ui.Image>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final px = (widget.size * MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(16, 128);
+    final key = '${widget.id}@$px';
+    final img = _cache[key];
+    if (img == null) {
+      ui.decodeImageFromPixels(
+        renderLitSphere(px, presetLighting(widget.id, null), null),
+        px,
+        px,
+        ui.PixelFormat.rgba8888,
+        (image) {
+          _cache[key] = image;
+          if (mounted) setState(() {});
+        },
       );
+    }
+    return Container(
+      width: widget.size,
+      height: widget.size,
+      decoration: const BoxDecoration(
+        color: Color(0xFF2B2824),
+        shape: BoxShape.circle,
+      ),
+      child: img == null
+          ? null
+          : RawImage(
+              image: img,
+              width: widget.size,
+              height: widget.size,
+              filterQuality: FilterQuality.medium,
+            ),
+    );
+  }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/harness/layout.dart';
+import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../../l10n/l10n.dart';
@@ -13,6 +14,7 @@ import 'layout_bodies.dart';
 import 'layout_board.dart';
 import 'layout_canvas.dart';
 
+part 'layout_light_ball.dart';
 part 'layout_lighting.dart';
 
 const _panelWidth = 232.0;
@@ -22,10 +24,11 @@ const _sceneHeight = 150.0;
 /// 拖小场景时每移动一个屏幕像素转多少度。
 const _orbitPerPx = 0.6, _pitchPerPx = 0.4;
 
-/// 3D 视图里贴在画布右边的摄像机一栏(不盖住画布):顶上是自由镜头的开关,
-/// 小场景(拖着转镜头、滚轮推拉),一行一个参数(两边的箭头一步一步调,
-/// 按住中间左右拖着调),最底下是交给 Agent 的两件事。收起时是一条窄边,
-/// 只留展开、自由镜头和复位。
+/// 3D 视图里画布右边的部件窗口(不盖住画布):最右一条图标栏一直在,摄像机、灯光
+/// 各一个窗口,点图标展开、再点收起、点另一个就换过去(宽度和内容都有过渡),
+/// 下面是自由镜头和复位。摄像机窗口:自由镜头的开关、小场景(拖着转镜头、滚轮推拉)、
+/// 一行一个参数(箭头一步一步调,按住中间左右拖着调)、选中块的体块、交给 Agent 的两件事。
+/// 灯光窗口见 [_LightingSection]。
 class CameraPanel extends StatefulWidget {
   const CameraPanel({
     super.key,
@@ -46,8 +49,21 @@ class CameraPanel extends StatefulWidget {
   State<CameraPanel> createState() => _CameraPanelState();
 }
 
+/// 部件窗口:摄像机、灯光。
+enum _Tab { camera, lighting }
+
 class _CameraPanelState extends State<CameraPanel> {
-  bool _open = true;
+  /// 展开着的窗口;null 是收起。
+  _Tab? _tab = _Tab.camera;
+
+  /// 窗口里画的是哪个:收起的过渡里还画着刚才那个。
+  _Tab _shown = _Tab.camera;
+
+  void _toggle(_Tab tab) => setState(() {
+    _tab = _tab == tab ? null : tab;
+    _shown = tab;
+  });
+
   Camera? _dragFrom;
   Offset _dragStart = Offset.zero;
 
@@ -144,92 +160,165 @@ class _CameraPanelState extends State<CameraPanel> {
       color: PennaColors.card,
       border: Border(left: BorderSide(color: PennaColors.border)),
     );
-    if (!_open) {
-      return Container(
-        width: _railWidth,
-        decoration: decoration,
-        child: Column(
-          children: [
-            const SizedBox(height: 4),
-            IconButton(
-              tooltip: tr('摄像机'),
-              iconSize: 17,
-              icon: Icon(Icons.videocam_outlined, color: PennaColors.primary),
-              onPressed: () => setState(() => _open = true),
-            ),
-            _freeCamIcon(),
-            _resetButton(cam),
-          ],
-        ),
-      );
-    }
-    return Container(
-      width: _panelWidth,
-      decoration: decoration,
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _header(cam),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: _FreeCamButton(
-                on: board.freeCam,
-                onTap: () => board.setFreeCam(!board.freeCam),
+    final lit = board.layout.lighting.enabled;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 窗口:宽度过渡着展开 / 收起,内容按满宽排好、靠右贴着图标栏,露出多少画多少。
+        AnimatedContainer(
+          duration: Motion.of(context, Motion.sheet),
+          curve: Motion.expand,
+          width: _tab == null ? 0 : _panelWidth,
+          decoration: decoration,
+          child: ClipRect(
+            child: OverflowBox(
+              alignment: Alignment.centerRight,
+              minWidth: _panelWidth,
+              maxWidth: _panelWidth,
+              child: AnimatedSwitcher(
+                duration: Motion.of(context, Motion.base),
+                switchInCurve: Motion.swift,
+                child: KeyedSubtree(
+                  key: ValueKey(_shown),
+                  child: _shown == _Tab.camera
+                      ? _cameraWindow(cam, dials)
+                      : SingleChildScrollView(
+                          child: _LightingSection(board: board),
+                        ),
+                ),
               ),
             ),
-            const Divider(height: 1),
-            _scene(),
+          ),
+        ),
+        Container(
+          width: _railWidth,
+          decoration: decoration,
+          child: Column(
+            spacing: 4,
+            children: [
+              const SizedBox(height: 2),
+              _railButton(
+                _Tab.camera,
+                Icons.videocam_outlined,
+                tr('摄像机'),
+                PennaColors.primary,
+              ),
+              _railButton(
+                _Tab.lighting,
+                lit ? Icons.wb_sunny : Icons.wb_sunny_outlined,
+                tr('灯光'),
+                PennaColors.amber,
+              ),
+              const Divider(height: 9, indent: 8, endIndent: 8),
+              _freeCamIcon(),
+              _resetButton(cam),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 图标栏上的一个窗口按钮:展开着时底色填上那个窗口的颜色。
+  Widget _railButton(_Tab tab, IconData icon, String tip, Color color) {
+    final on = _tab == tab;
+    return Tooltip(
+      message: tip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () => _toggle(tab),
+        child: AnimatedContainer(
+          duration: Motion.of(context, Motion.base),
+          curve: Motion.swift,
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: on ? color.withValues(alpha: 0.14) : null,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 17, color: on ? color : PennaColors.slate500),
+        ),
+      ),
+    );
+  }
+
+  Widget _cameraWindow(
+    Camera cam,
+    List<
+      ({
+        String label,
+        String unit,
+        double value,
+        double step,
+        double perPx,
+        Camera Function(double) apply,
+      })
+    >
+    dials,
+  ) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _header(cam),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: _FreeCamButton(
+              on: board.freeCam,
+              onTap: () => board.setFreeCam(!board.freeCam),
+            ),
+          ),
+          const Divider(height: 1),
+          _scene(),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                for (final d in dials)
+                  _Dial(
+                    label: d.label,
+                    value: d.value,
+                    unit: d.unit,
+                    step: d.step,
+                    perPx: d.perPx,
+                    onStart: () => board.mark(tr('调整镜头的{0}', [d.label])),
+                    onEnd: () => board.mark(null),
+                    onChanged: (v, {required bool step}) => board.setCamera(
+                      d.apply(v),
+                      action: step ? tr('调整镜头的{0}', [d.label]) : null,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          ?_bodySection(),
+          if (board.cameraMoved || board.guessedBodies) ...[
             const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.all(8),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 6,
                 children: [
-                  for (final d in dials)
-                    _Dial(
-                      label: d.label,
-                      value: d.value,
-                      unit: d.unit,
-                      step: d.step,
-                      perPx: d.perPx,
-                      onStart: () => board.mark(tr('调整镜头的{0}', [d.label])),
-                      onEnd: () => board.mark(null),
-                      onChanged: (v, {required bool step}) => board.setCamera(
-                        d.apply(v),
-                        action: step ? tr('调整镜头的{0}', [d.label]) : null,
-                      ),
+                  if (board.cameraMoved)
+                    _AgentButton(
+                      icon: Icons.edit_note,
+                      label: tr('按视角改描述'),
+                      onTap: widget.onRedescribe,
+                    ),
+                  if (board.guessedBodies)
+                    _AgentButton(
+                      icon: Icons.view_in_ar_outlined,
+                      label: tr('让 Agent 估体块'),
+                      onTap: widget.onEstimate,
                     ),
                 ],
               ),
             ),
-            ?_bodySection(),
-            _LightingSection(board: board),
-            if (board.cameraMoved || board.guessedBodies) ...[
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 6,
-                  children: [
-                    if (board.cameraMoved)
-                      _AgentButton(
-                        icon: Icons.edit_note,
-                        label: tr('按视角改描述'),
-                        onTap: widget.onRedescribe,
-                      ),
-                    if (board.guessedBodies)
-                      _AgentButton(
-                        icon: Icons.view_in_ar_outlined,
-                        label: tr('让 Agent 估体块'),
-                        onTap: widget.onEstimate,
-                      ),
-                  ],
-                ),
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -437,14 +526,7 @@ class _CameraPanelState extends State<CameraPanel> {
             ),
           ),
         ),
-        _resetButton(cam),
-        IconButton(
-          tooltip: tr('收起'),
-          iconSize: 16,
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.keyboard_double_arrow_right),
-          onPressed: () => setState(() => _open = false),
-        ),
+        const SizedBox(width: 4),
       ],
     ),
   );
