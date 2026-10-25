@@ -33,9 +33,48 @@ class CharacterStore extends ChangeNotifier {
   /// 显示的顺序(新加的在前,拖过的照拖完的)。
   List<CharacterCard> get cards => _cards;
 
-  File? get _file => dir == null
-      ? null
-      : File('${dir!.path}${Platform.pathSeparator}characters.json');
+  File? get _file => _fileOf('characters.json');
+
+  /// 收藏另存一个文件:「我的」那份还是原来的列表格式,旧版本也读得了。
+  File? get _favFile => _fileOf('character_favorites.json');
+
+  File? _fileOf(String name) =>
+      dir == null ? null : File('${dir!.path}${Platform.pathSeparator}$name');
+
+  List<String> _favSeries = const [];
+  List<String> _favCharacters = const [];
+
+  /// 收藏的内置系列、内置角色(都按名字记),新收藏的在前。
+  List<String> get favoriteSeries => _favSeries;
+  List<String> get favoriteCharacters => _favCharacters;
+
+  bool isFavoriteSeries(String name) => _favSeries.contains(name);
+  bool isFavoriteCharacter(String name) => _favCharacters.contains(name);
+
+  /// 收藏或取消收藏一个系列。
+  void toggleSeries(String name) {
+    _favSeries = _toggled(_favSeries, name);
+    _favoritesChanged();
+  }
+
+  /// 收藏或取消收藏一个内置角色。
+  void toggleCharacter(String name) {
+    _favCharacters = _toggled(_favCharacters, name);
+    _favoritesChanged();
+  }
+
+  static List<String> _toggled(List<String> list, String name) =>
+      List.unmodifiable(
+        list.contains(name) ? list.where((n) => n != name) : [name, ...list],
+      );
+
+  void _favoritesChanged() {
+    notifyListeners();
+    _write(_favFile, {
+      'series': _favSeries,
+      'characters': _favCharacters,
+    }, tr('收藏没存上:{0}'));
+  }
 
   String _key(String name) => name.trim().toLowerCase();
 
@@ -159,39 +198,35 @@ class CharacterStore extends ChangeNotifier {
   }
 
   // ponytail: 每次改动都把整个文件重写一遍;存到几千个嫌慢时再改。
-  void _save() {
-    final file = _file;
+  void _save() => _write(_file, [
+    for (final c in _cards)
+      {
+        'id': c.id,
+        'name': c.name,
+        'prompt': c.prompt,
+        'image': c.image,
+        'time': c.time.toIso8601String(),
+      },
+  ], tr('角色库没存上:{0}'));
+
+  /// 把 [json] 写进 [file];[failed] 是写不了时记进日志的话({0} 是原因)。
+  void _write(File? file, Object json, String failed) {
     if (file == null) return;
     try {
       file.parent.createSync(recursive: true);
       // 先写临时文件再改名:写到一半断电也不会留下半个文件。
       File('${file.path}.tmp')
-        ..writeAsStringSync(
-          jsonEncode([
-            for (final c in _cards)
-              {
-                'id': c.id,
-                'name': c.name,
-                'prompt': c.prompt,
-                'image': c.image,
-                'time': c.time.toIso8601String(),
-              },
-          ]),
-          flush: true,
-        )
+        ..writeAsStringSync(jsonEncode(json), flush: true)
         ..renameSync(file.path);
     } on FileSystemException catch (e) {
-      debugPrint(tr('角色库没存上:{0}', [e.message]));
+      debugPrint(failed.replaceAll('{0}', e.message));
     }
   }
 
   Future<void> load() async {
-    final file = _file;
-    if (file == null || !file.existsSync()) return;
-    try {
-      final list = jsonDecode(await file.readAsString()) as List;
+    await _read(_file, (json) {
       _cards = List.unmodifiable([
-        for (final c in list.cast<Map<String, dynamic>>())
+        for (final c in (json as List).cast<Map<String, dynamic>>())
           (
             id: c['id'] as String,
             name: c['name'] as String,
@@ -200,7 +235,22 @@ class CharacterStore extends ChangeNotifier {
             time: DateTime.parse(c['time'] as String),
           ),
       ]);
-      notifyListeners();
+    });
+    await _read(_favFile, (json) {
+      final map = json as Map<String, dynamic>;
+      List<String> names(String key) =>
+          List.unmodifiable((map[key] as List? ?? const []).cast<String>());
+      _favSeries = names('series');
+      _favCharacters = names('characters');
+    });
+    notifyListeners();
+  }
+
+  /// 读 [file] 交给 [use];读不了的文件留个底,不让下一次保存把它盖掉。
+  Future<void> _read(File? file, void Function(Object? json) use) async {
+    if (file == null || !file.existsSync()) return;
+    try {
+      use(jsonDecode(await file.readAsString()));
     } on Object {
       // 读不了的文件留个底再重新开始,不让下一次保存把它盖掉。
       try {

@@ -38,7 +38,10 @@ const _seriesGap = 10.0;
 /// 「我的」大缩略图的格子至少这么宽。
 const _mineTileWidth = 180.0;
 
-/// 角色库:上面是用户自己存的角色(名字、图、提示词),下面按名字查内置的 Danbooru 角色。
+/// 角色库的三页:用户自己存的、内置的、收藏的内置系列和角色。
+enum _Tab { mine, builtin, favorites }
+
+/// 角色库:用户自己存的角色(名字、图、提示词)、内置的 Danbooru 角色、收藏,各占一页。
 class CharactersPage extends StatefulWidget {
   const CharactersPage({super.key, required this.store, required this.dict});
 
@@ -63,13 +66,53 @@ class _CharactersPageState extends State<CharactersPage> {
     super.dispose();
   }
 
-  /// 打开一个系列看它名下的角色;从搜索结果点进来的,先把搜索清掉。
+  var _tab = _Tab.mine;
+
+  /// 打开一个系列看它名下的角色;从搜索结果、收藏点进来的,先把搜索清掉、切到内置。
   void _openSeries(String name) {
     _search.clear();
     setState(() {
       _query = '';
       _series = name;
+      _tab = _Tab.builtin;
     });
+  }
+
+  Widget _builtinCard(CharacterHit hit) => _BuiltinCard(
+    hit: hit,
+    onSave: () => _edit(null, hit),
+    favorite: widget.store.isFavoriteCharacter(hit.name),
+    onFavorite: () => widget.store.toggleCharacter(hit.name),
+  );
+
+  /// 收藏页:收藏的系列在上,角色在下,新收藏的在前。
+  Widget _favorites(CharacterDict dict) {
+    final store = widget.store;
+    final series = [
+      for (final s in store.favoriteSeries) (name: s, count: dict.countOf(s)),
+    ];
+    final hits = [for (final n in store.favoriteCharacters) ?dict.byName(n)];
+    if (series.isEmpty && hits.isEmpty) {
+      return _Empty(tr('还没有收藏 · 在内置里点星标'));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (series.isNotEmpty) ...[
+          _Heading(tr('系列'), tr('{0} 个', [series.length])),
+          const SizedBox(height: 8),
+          _seriesGrid(series),
+          const SizedBox(height: 18),
+        ],
+        if (hits.isNotEmpty) ...[
+          _Heading(tr('角色'), tr('{0} 个', [hits.length])),
+          for (final hit in hits) ...[
+            const SizedBox(height: 8),
+            _builtinCard(hit),
+          ],
+        ],
+      ],
+    );
   }
 
   /// 正在看哪个系列里的内置角色;null 是在看各个系列。
@@ -171,6 +214,8 @@ class _CharactersPageState extends State<CharactersPage> {
                     name: s.name,
                     count: s.count,
                     onTap: () => _openSeries(s.name),
+                    favorite: widget.store.isFavoriteSeries(s.name),
+                    onFavorite: () => widget.store.toggleSeries(s.name),
                   ),
                 ),
             ],
@@ -216,28 +261,102 @@ class _CharactersPageState extends State<CharactersPage> {
               Expanded(
                 child: _Heading(series, tr('前 {0} 个 · 图多的在前', [hits.length])),
               ),
+              _star(
+                widget.store.isFavoriteSeries(series),
+                () => widget.store.toggleSeries(series),
+              ),
             ],
           ),
         if (q.isNotEmpty && hits.isEmpty) _Empty(tr('没有找到')),
         for (final hit in hits) ...[
           const SizedBox(height: 8),
-          _BuiltinCard(hit: hit, onSave: () => _edit(null, hit)),
+          _builtinCard(hit),
         ],
       ],
     );
   }
+
+  /// 内置那一页的三种样子:查名字的结果、各个系列、某个系列里的角色。
+  /// 换的时候旧的淡出、新的滑进来,高度跟着顺过去。
+  Widget _builtinAnimated(CharacterDict dict, String q) => AnimatedSize(
+    duration: Motion.sheet,
+    curve: Motion.swift,
+    alignment: Alignment.topCenter,
+    child: AnimatedSwitcher(
+      duration: Motion.sheet,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topCenter,
+        children: [...previous, ?current],
+      ),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween(
+            begin: const Offset(0.03, 0),
+            end: Offset.zero,
+          ).animate(animation),
+          child: child,
+        ),
+      ),
+      child: KeyedSubtree(
+        key: ValueKey(q.isNotEmpty ? tr('查') : _series ?? tr('系列')),
+        child: _builtin(
+          dict,
+          q,
+          q.isEmpty ? const [] : dict.search(q, limit: _maxBuiltin),
+        ),
+      ),
+    ),
+  );
+
+  /// 「我的」那一页:列表或大缩略图,拖着排顺序。
+  List<Widget> _minePage(List<CharacterCard> mine, String q) => [
+    if (mine.isEmpty)
+      _Empty(q.isEmpty ? tr('还没有角色 · 点「添加角色」,或让 Agent 存') : tr('没有找到'))
+    else if (_grid)
+      _mineGrid(mine)
+    else
+      for (final card in mine) ...[_mine(card), const SizedBox(height: 8)],
+  ];
+
+  Widget _searchBox() => PennaCard(
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    child: TextField(
+      contextMenuBuilder: pennaTextMenu,
+      controller: _search,
+      onChanged: (v) => setState(() => _query = v),
+      style: const TextStyle(fontSize: 13),
+      decoration: InputDecoration(
+        icon: Icon(Icons.search, size: 17, color: PennaColors.slate400),
+        hintText: _tab == _Tab.mine
+            ? tr('按名字找')
+            : tr('按名字或系列找:初音未来、甘雨、genshin impact'),
+        hintStyle: TextStyle(fontSize: 12.5, color: PennaColors.slate400),
+        border: InputBorder.none,
+        isDense: true,
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: widget.store,
       builder: (context, _) {
+        final store = widget.store;
         final dict = widget.dict;
+        // 没有内置数据(测试)时只有「我的」。
+        final tab = dict == null ? _Tab.mine : _tab;
         final q = _query.trim();
-        final mine = q.isEmpty ? widget.store.cards : widget.store.find(q);
-        final builtin = q.isEmpty || dict == null
-            ? const <CharacterHit>[]
-            : dict.search(q, limit: _maxBuiltin);
+        final mine = q.isEmpty ? store.cards : store.find(q);
+        final count = switch (tab) {
+          _Tab.mine => store.cards.length,
+          _Tab.builtin => dict!.length,
+          _Tab.favorites =>
+            store.favoriteSeries.length + store.favoriteCharacters.length,
+        };
         return ColoredBox(
           color: PennaColors.editorBg,
           child: Column(
@@ -255,17 +374,24 @@ class _CharactersPageState extends State<CharactersPage> {
                     tr('角色库'),
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 24),
+                  if (dict != null)
+                    for (final (t, label) in [
+                      (_Tab.mine, tr('我的')),
+                      (_Tab.builtin, tr('内置')),
+                      (_Tab.favorites, tr('收藏')),
+                    ]) ...[
+                      PennaChip(
+                        label: label,
+                        selected: tab == t,
+                        onTap: () => setState(() => _tab = t),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                  const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      tr(
-                        '我的 {0} 个'
-                        '{1}',
-                        [
-                          widget.store.cards.length,
-                          dict == null ? '' : tr(' · 内置 {0} 个', [dict.length]),
-                        ],
-                      ),
+                      tr('{0} 个', [count]),
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
@@ -273,18 +399,20 @@ class _CharactersPageState extends State<CharactersPage> {
                       ),
                     ),
                   ),
-                  ViewSwitch(
-                    grid: _grid,
-                    onChanged: (g) => setState(() => _grid = g),
-                  ),
-                  const SizedBox(width: 8),
-                  PennaButton(
-                    label: tr('添加角色'),
-                    icon: Icons.add,
-                    background: PennaColors.primary,
-                    foreground: Colors.white,
-                    onPressed: _edit,
-                  ),
+                  if (tab == _Tab.mine) ...[
+                    ViewSwitch(
+                      grid: _grid,
+                      onChanged: (g) => setState(() => _grid = g),
+                    ),
+                    const SizedBox(width: 8),
+                    PennaButton(
+                      label: tr('添加角色'),
+                      icon: Icons.add,
+                      background: PennaColors.primary,
+                      foreground: Colors.white,
+                      onPressed: _edit,
+                    ),
+                  ],
                 ],
               ),
               Expanded(
@@ -293,81 +421,15 @@ class _CharactersPageState extends State<CharactersPage> {
                     controller: controller,
                     padding: const EdgeInsets.all(16),
                     children: [
-                      PennaCard(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: TextField(
-                          contextMenuBuilder: pennaTextMenu,
-                          controller: _search,
-                          onChanged: (v) => setState(() => _query = v),
-                          style: const TextStyle(fontSize: 13),
-                          decoration: InputDecoration(
-                            icon: Icon(
-                              Icons.search,
-                              size: 17,
-                              color: PennaColors.slate400,
-                            ),
-                            hintText: tr('按名字或系列找:初音未来、甘雨、genshin impact'),
-                            hintStyle: TextStyle(
-                              fontSize: 12.5,
-                              color: PennaColors.slate400,
-                            ),
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _Heading(tr('我的'), tr('{0} 个', [mine.length])),
-                      if (mine.isEmpty)
-                        _Empty(
-                          q.isEmpty
-                              ? tr('还没有角色 · 点「添加角色」,或让 Agent 存')
-                              : tr('没有找到'),
-                        ),
-                      if (_grid && mine.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        _mineGrid(mine),
-                      ] else
-                        for (final card in mine) ...[
-                          const SizedBox(height: 8),
-                          _mine(card),
-                        ],
-                      if (dict != null) ...[
-                        const SizedBox(height: 18),
-                        // 三种样子:查名字的结果、各个系列、某个系列里的角色。
-                        // 换的时候旧的淡出、新的滑进来,高度跟着顺过去。
-                        AnimatedSize(
-                          duration: Motion.sheet,
-                          curve: Motion.swift,
-                          alignment: Alignment.topCenter,
-                          child: AnimatedSwitcher(
-                            duration: Motion.sheet,
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            layoutBuilder: (current, previous) => Stack(
-                              alignment: Alignment.topCenter,
-                              children: [...previous, ?current],
-                            ),
-                            transitionBuilder: (child, animation) =>
-                                FadeTransition(
-                                  opacity: animation,
-                                  child: SlideTransition(
-                                    position: Tween(
-                                      begin: const Offset(0.03, 0),
-                                      end: Offset.zero,
-                                    ).animate(animation),
-                                    child: child,
-                                  ),
-                                ),
-                            child: KeyedSubtree(
-                              key: ValueKey(
-                                q.isNotEmpty ? tr('查') : _series ?? tr('系列'),
-                              ),
-                              child: _builtin(dict, q, builtin),
-                            ),
-                          ),
-                        ),
+                      if (tab != _Tab.favorites) ...[
+                        _searchBox(),
+                        const SizedBox(height: 14),
                       ],
+                      ...switch (tab) {
+                        _Tab.mine => _minePage(mine, q),
+                        _Tab.builtin => [_builtinAnimated(dict!, q)],
+                        _Tab.favorites => [_favorites(dict!)],
+                      },
                     ],
                   ),
                 ),

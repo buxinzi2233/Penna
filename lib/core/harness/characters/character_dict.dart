@@ -49,6 +49,22 @@ class CharacterDict {
     return List<({String name, int count})>.unmodifiable(out);
   }();
 
+  late final _byName = () {
+    final map = <String, CharacterHit>{};
+    for (final r in _rows) {
+      map.putIfAbsent(r.name, () => r);
+    }
+    return map;
+  }();
+
+  late final _seriesCount = {for (final s in series) s.name: s.count};
+
+  /// 按角色名取回(收藏只记名字);同名的取图多的那个。
+  CharacterHit? byName(String name) => _byName[name];
+
+  /// 某个系列名下有几个角色。
+  int countOf(String series) => _seriesCount[series] ?? 0;
+
   /// 某个作品名下的角色,图多的在前,最多 [limit] 个。
   List<CharacterHit> inSeries(String name, {int limit = 80}) =>
       _rows.where((r) => r.series == name).take(limit).toList();

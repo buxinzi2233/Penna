@@ -336,6 +336,24 @@ MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通�
 - 主格一两个,占整页四到六成;其余是小格。
 - 每格的景别。格多(六格以上)时不用全身,用腰部以上、大腿以上的中景,不然人物会缩成小人。
 
+分格的样子——排成真漫画的版面,不要公式化的格子:
+- 不要每格一样高、一格占满一整行的通栏条带,也不要 2×2、3×2 这种棋盘格:那是表格,不是漫画。先按每格的分量定大小,再拼版面。
+- 格的大小跟着分量走:交代环境的开场格横着铺宽;剧情转折、情绪最满的那一格做主格(最大,常占半页以上);反应、小动作、局部特写做小格,两三个小格挤在一排里加快节奏;想让读者停一下的地方格子留宽、白边留宽。
+- 每一排的高度不一样,一排里的几格宽度也不一样(三七开、四六开,不是对半分)。
+- 动作、冲突、情绪激动的格用斜切的边:相邻两格中间的白边是一条斜线,两格各自贴着它切斜。安静、日常的场面用方正的格。一页里斜切一两处就够,处处都斜就乱了。
+- 还可以用:嵌入格(一个小格压在大格的一角,放特写或反应,边框画清楚)、出血格(画面一直铺到纸边,没有外框,用在开场或高潮)、破格(最要紧的那一格里,人物的头、手或武器伸出格线,一页最多一处,并在描述里写明是有意的)。
+- 镜头像拍电影那样排:先一个远景交代在哪、谁在哪边;随着情绪升高,景别一格比一格近;中间插一格反应或道具特写打节奏;同一场戏里人物在画面里的左右不对调。
+- 多页漫画每页换一种版式,不要每页都是同一个排法(比如每页都"上两格、中间一条大格、下两格"):这页用竖着的长格开场,下一页用跨两排的大主格、再下一页用嵌入格或出血格收尾;格数也跟着剧情变,三格到七格都行。
+- 阅读顺序要一眼看得出:日式从右上开始,同一排从右往左,排完一排再往下;最后一格留个钩子(一个表情、一个没说完的动作),让人想翻下一页。
+
+用户画好了格:
+【布局画板】里已经有一排框、却还没写描述(【画好的框】点了名)时,那就是用户自己定好的分格,这次要做的是往格里填内容,不是重新分格。
+- 每个画好的框就是一格:bbox 和 shape 一个数都不改,不挪、不缩放、不删、不合并、不拆、不换成方框;只把 name 改成"第1格""第2格"、layer 改成 back、写上描述。
+- 格号按位置排阅读顺序,不按块的序号:日式从右上开始,先从右往左、再往下;用户说了西式或条漫就照他的。
+- 格的大小和形状就是用户给的分量:大格、斜切的格放剧情最重的那一下,窄的、小的格放反应和特写,别把重头戏塞进小格。斜切的格,描述里写清它的边往哪斜、画面跟着斜边的走向。
+- 人物和气泡放进格的形状里面,不只是落在外框里:斜边切掉的那一角不放东西,离斜边留一点空。
+- 用户说的格数和画好的框数对不上时(画了六个框、却说"做一个五格漫画"),先用 <options> 问一句:照画好的六格来,还是删掉哪一格;不要自己重新分格。
+
 每一格怎么写:
 - 开头写格号、位置和景别:"Panel 2 of 4 (top right), waist-up medium shot: ..."。
 - 分清两种格:有完整人物的格写角色和景别;局部特写格(眼睛、嘴、手、手里的东西)只写那一部分,不写角色名和外貌,开头写 "Extreme close-up panel showing only ...",不然模型会在里面补出一个头。
@@ -344,7 +362,10 @@ MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通�
 
 角色前后一致:
 - 先写角色卡:每个角色一句固定描述(发型发色、瞳色、脸型体态、一两个标志物、服装)。作品里的角色先用 <search-character> 查。
+- 几个角色要一眼分得开:发色、发型、帽子、衣服的主色各不相同;有相近的地方(都穿制服、都是长发),卡里写明区别(白色立领制服 / 黑色长外套)。
 - 有这个角色的每一格都把角色卡的核心几样(发型、瞳色、服装、标志物)原样写进去,用词一个字都不换;瞳色每格都写,省掉了容易被脸红染成粉色。
+- 特征最容易串到别人身上的写法有两种,都不要用:一句话里连着写两个人的长相("Vertin in her black hat sits beside Sonetto in her white uniform"),一个人的描述里提别人的特征。每个人的长相只写在他自己那一段里,提到别人只写名字。
+- 一格里的人物不要写成"两人组""三人组"一起描述:每个人单独一段(区域控制里单独一块),各自带上自己的角色卡。
 - 要画成多大年纪就直接写(teenage、young adult),不要写 child、little、petite 这类词,写成否定句也不行:模型会抓住那个词。
 
 气泡和图里的字:
@@ -359,25 +380,29 @@ MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通�
 
 在区域控制里排(写 <layout>;在主工作区就照【区域控制】那一条交给区域控制工作台,任务说明里把分格表、角色卡、每格内容、每句台词和说话人原样写全):
 - summary.canvas 写 "multi_panel",meta 写 "comic"。summary.caption 先说这是一页几格的漫画、画风、阅读顺序、格线的样子(细黑框、白色间隔),再按阅读顺序每格一句,最后把所有台词按顺序原样写出来。
-- 每一格一块:label 用 object,layer 写 back,name 写"第1格""第2格",bbox 就是这一格的框;caption 写这一格的景别、场景、背景和光线,开头写 "Panel 1 of 4 (top):"。格和格不重叠,中间留画面宽 1.5% 到 3% 的白边;左右并排的格,顶边和底边用同一个 y。
-- 格里的人:label 用 character,layer 写 middle,bbox 整个落在那一格里面、离格边留一点;caption 开头写 "In panel 2, ..."。同一个角色出现在几格里,每格各是一块,name 带上格号("凛·2")。局部特写格不放人物块,特写的内容写在那一格的 caption 里。
+- 每一格一块:label 用 object,layer 写 back,name 写"第1格""第2格",bbox 就是这一格的框;caption 写这一格的景别、场景、背景和光线,开头写 "Panel 1 of 4 (top):"。格和格的形状不重叠,中间留画面宽 1.5% 到 3% 的白边;左右并排的方格,顶边和底边用同一个 y。
+- 斜切的格写 "shape":顶点是画布像素 [[x, y], …](写法见区域控制技能里的形状一节),bbox 是这些顶点的外框。相邻两格贴着同一条斜线:一格的斜边和另一格的斜边平行,隔开一样宽的白边。斜切的格外框会互相交叠,这没关系,形状不叠就行。caption 里写清边怎么斜("the panel's bottom edge slants upward to the right")。
+- 角色卡写进 summary 的 "cast"(见系统提示里的【本系列角色卡】):{"凛": "英文角色卡"}。程序记在系列上,交出去时原样接在每个对得上的人物块描述最前面,所以人物块的 caption 只写这一格的景别、表情、动作、视线和位置,不再重复发色服装。
+- 格里的人:一个角色一块,label 用 character,layer 写 middle,bbox 整个落在那一格里面、离格边留一点;name 写成「角色卡名字·格号」("凛·2"),名字对不上角色卡程序就接不上;caption 开头写 "In panel 2, ..."。同一格里有两三个人就画两三块,框分开、中间留空,不要用一块装几个人。同一个角色出现在几格里,每格各是一块。局部特写格不放人物块,特写的内容写在那一格的 caption 里。
 - 每个气泡一块:label 用 text,layer 写 front,text 写台词原文,caption 写容器的形状、尾巴朝哪、谁说的;bbox 放在说话人头部旁边、同一格里,不盖住脸。
 - 漫画页这几条以本技能为准:每格的场景要单独画框(区域控制技能里"背景不单独画框"不适用),元素可以多于 8 个,但最多 16 个——先保格、主要人物和台词,小道具写进那一格的 caption。
 - body:漫画页是一张平的纸,每一块都写 {"distance": 1, "depth": 0.02, "yaw": 0}。
 - 一页漫画一张布局;下一页写 <layout page="新" name="第2页">,换了故事写 page="新系列"。
 
-下面是 832×1216 竖版、上下两格的骨架,描述的详细程度照区域控制技能的要求写足:
+下面是 832×1216 竖版、日式三格的骨架:上面一格横着铺开交代环境,底边斜切;下面一排右边是主格(先读),左边是窄的反应特写格,两格中间是一条斜的白边。描述的详细程度照区域控制技能的要求写足:
 <layout>
 {
   "width": 832,
   "height": 1216,
-  "summary": {"meta": ["comic"], "canvas": "multi_panel", "caption": "A two-panel vertical manga page in clean black ink with soft grey tones, read from top to bottom, each panel framed by a thin black border with a white gutter between them. Top panel: a wide shot of a rainy bus stop at dusk where Rin waits alone under the shelter. Bottom panel: a close medium shot of Rin looking up as a hand offers her an umbrella from outside the frame. Dialogue, in order: \\"下雨了。\\""},
+  "summary": {"meta": ["comic"], "canvas": "multi_panel", "cast": {"凛": "Rin, a slender teenage girl with a short black bob, bright green eyes and a small silver hairpin, wearing a navy school blazer over a white shirt with a red ribbon tie"}, "caption": "A three-panel vertical manga page in clean black ink with soft grey tones, read in Japanese order: the wide top panel first, then the large lower right panel, then the narrow lower left panel. Panels are framed by thin black borders with white gutters; the gutter under the top panel slants upward to the right, and the gutter between the two lower panels leans slightly to the left. Top panel: a wide shot of a rainy bus stop at dusk where Rin waits alone under the shelter. Lower right panel, the largest: Rin looks up in surprise as a hand offers her an umbrella from outside the frame. Lower left panel: an extreme close-up of her fingers tightening on her bag strap. Dialogue, in order: \\"下雨了。\\" \\"要一起走吗?\\""},
   "items": [
-    {"name": "第1格", "layer": "back", "label": "object", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "Panel 1 of 2 (top), wide establishing shot: a small bus stop shelter at dusk in heavy rain, wet asphalt reflecting a single streetlight, grey sky, framed by a thin black border.", "bbox": [24, 24, 808, 580]},
-    {"name": "凛·1", "layer": "middle", "label": "character", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 1, Rin, a slender teenage girl with a short black bob and bright green eyes, wearing a navy school blazer, stands under the shelter with her arms folded, looking out at the rain.", "bbox": [470, 200, 640, 560]},
-    {"name": "气泡·1", "layer": "front", "label": "text", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 1, a small tail-less oval thought bubble near Rin's head, vertical Chinese text, black on white.", "text": "下雨了。", "bbox": [660, 70, 780, 260]},
-    {"name": "第2格", "layer": "back", "label": "object", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "Panel 2 of 2 (bottom), close medium shot: the same shelter wall behind Rin, rain streaks across the background, framed by a thin black border.", "bbox": [24, 604, 808, 1192]},
-    {"name": "凛·2", "layer": "middle", "label": "character", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 2, Rin, the same slender teenage girl with a short black bob and bright green eyes in a navy school blazer, looks up in surprise from waist up, as a hand holding a dark umbrella reaches in from the right edge of the panel.", "bbox": [120, 700, 600, 1170]}
+    {"name": "第1格", "layer": "back", "label": "object", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "Panel 1 of 3 (top, full width), wide establishing shot: a small bus stop shelter at dusk in heavy rain, wet asphalt reflecting a single streetlight, grey sky; the panel's bottom edge slants upward to the right, framed by a thin black border.", "bbox": [24, 24, 808, 500], "shape": [[24, 24], [808, 24], [808, 430], [24, 500]]},
+    {"name": "凛·1", "layer": "middle", "label": "character", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 1, a full-body long shot of Rin standing small under the shelter on the right with her arms folded, looking out at the rain with a tired expression.", "bbox": [520, 120, 660, 400]},
+    {"name": "气泡·1", "layer": "front", "label": "text", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 1, a small tail-less oval thought bubble near Rin's head, vertical Chinese text, black on white.", "text": "下雨了。", "bbox": [680, 60, 780, 240]},
+    {"name": "第2格", "layer": "back", "label": "object", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "Panel 2 of 3 (lower right, the largest panel), close medium shot: the shelter wall behind Rin with rain streaks across the background; the top edge slants upward to the right and the left edge leans slightly to the left, framed by a thin black border.", "bbox": [324, 454, 808, 1192], "shape": [[364, 494], [808, 454], [808, 1192], [324, 1192]]},
+    {"name": "凛·2", "layer": "middle", "label": "character", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 2, a waist-up shot of Rin looking up in surprise with her lips slightly parted, as a hand holding a dark umbrella reaches in from the right edge of the panel.", "bbox": [420, 600, 760, 1170]},
+    {"name": "气泡·2", "layer": "front", "label": "text", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "In panel 2, a rounded oval speech bubble with no tail pointing to anyone in the panel, placed above Rin's head without covering her face, the speaker is outside the frame, vertical Chinese text, black on white.", "text": "要一起走吗?", "bbox": [560, 490, 790, 580]},
+    {"name": "第3格", "layer": "back", "label": "object", "body": {"distance": 1, "depth": 0.02, "yaw": 0}, "caption": "Panel 3 of 3 (lower left, narrow), extreme close-up panel showing only a hand's fingers tightening on a navy bag strap, raindrops on the knuckles, soft grey tone background; the right edge leans slightly to the left, framed by a thin black border.", "bbox": [24, 496, 340, 1192], "shape": [[24, 524], [340, 496], [300, 1192], [24, 1192]]}
   ],
   "bbox_coord_space": "abs",
   "bbox_format": "xyxy"
@@ -386,7 +411,7 @@ MOSS-Image 是拿很详细的英文图像描述训练的,一张图的描述通�
 
 不排区域控制、只要提示词时,写进 <draft>,按段写:【版式】几格、阅读顺序、格线;【角色】角色卡;【第1格】到【第N格】每格一段(景别、内容、这一格的气泡和台词)。多页漫画一页一张(<draft page="2">),第一页带上 series。
 
-交之前对一遍:每格写了景别和格号吗?特写格里有没有写进角色名?同格两人留了空吗?并排的格对齐了吗?每句台词都写了说话人和尾巴方向、离别人的头够远吗?画面外说话的气泡没有尾巴吗?竖排的数字改成汉字了吗?区域控制里每个人和气泡都落在自己那一格里吗?''',
+交之前对一遍:格有大有小、有主格吗,是不是排成了一样高的通栏条带或棋盘格?用户画好的格是不是原样留着、格号按阅读顺序排了?每格写了景别和格号吗?特写格里有没有写进角色名?每个人物块只有一个人、名字对得上角色卡吗,有没有一句话里连着写两个人的长相?同格两人留了空吗?并排的格对齐了吗?每句台词都写了说话人和尾巴方向、离别人的头够远吗?画面外说话的气泡没有尾巴吗?竖排的数字改成汉字了吗?区域控制里每个人和气泡都落在自己那一格里吗?''',
   'local-reverse': '''
 用户要用本机的模型反推图片时用:说了"Tag 反推""打标""用 WD14 / PixAI / 某某模型反推""本地反推""用 Florence / Gemma 看图写描述"这类话。他要的是本机模型反推出来的标签或描述,不是你自己看图写。
 

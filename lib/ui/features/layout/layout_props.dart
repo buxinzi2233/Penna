@@ -138,6 +138,15 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           PennaField(
+            key: ValueKey('cast-$r'),
+            label: tr('角色卡'),
+            value: castText(l.cast),
+            maxLines: 4,
+            hint: tr('一行一个 · 名字: 英文外貌和服装'),
+            onChanged: (v) => board.setCast(parseCastText(v)),
+          ),
+          const SizedBox(height: 10),
+          PennaField(
             key: ValueKey('caption-$r'),
             label: tr('整体描述'),
             value: l.caption,

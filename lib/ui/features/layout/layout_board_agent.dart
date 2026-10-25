@@ -26,3 +26,29 @@ String handOverRequest(LayoutBoard board) {
 /// 用户发的这句话要 Agent 只改哪一样。
 LayoutKeep layoutKeepFor(String request) =>
     request.startsWith(_handOverHead) ? LayoutKeep.describe : LayoutKeep.none;
+
+/// 用户画了框还没写描述:那是他定好的构图(比如手画的漫画格),点名要 Agent 原样留着。
+/// Gemini 曾把用户画的六个斜边格换成五条一样高的横条。
+String _drawnNote(Layout l) {
+  final blank = [
+    for (final (i, b) in l.boxes.indexed)
+      if (!b.offscreen && b.caption.trim().isEmpty) '${i + 1}',
+  ];
+  if (blank.isEmpty) return '';
+  return '【画好的框】第 ${blank.join('、')} 块是用户画好、还没写描述的框:'
+      '位置、大小、形状都是他定好的构图。照原样保留它们的 bbox 和 shape'
+      '(一个数都不改,不删、不合并、不拆),按用户这次的话给它们写描述;'
+      '要往里放人物、气泡这些东西,就放进对应的框里面。'
+      '用户说的数量(几格、几个人)和画好的框数对不上时,先用 <options> 问一句,不要自己重排。'
+      '漫画页照「漫画分格」里"用户画好了格"那一条做。';
+}
+
+/// 有角色卡时,对不上任何一张的人物块:点名要 Agent 拆成一人一块、名字用角色卡的。
+String _castNote(Layout l) {
+  final misses = castMisses(l);
+  if (misses.isEmpty) return '';
+  return '【角色卡没对上】${misses.map((b) => '「${b.name.isEmpty ? '(没起名)' : b.name}」').join('、')}'
+      '是人物块,名字却对不上【本系列角色卡】里的任何一个,程序没法给它接上角色卡,出图时特征会乱。'
+      '一个人物块只放一个角色,name 写成「角色卡名字·格号」;几个人同在一格就各画一块。'
+      '路人这类不进角色卡的,label 改成 object。';
+}

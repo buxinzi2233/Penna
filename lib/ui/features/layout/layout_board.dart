@@ -136,6 +136,7 @@ class LayoutBoard extends ChangeNotifier {
           '' => '',
           final s => '\n\n$s',
         }}'
+        '${[_drawnNote(l), _castNote(l)].where((s) => s.isNotEmpty).map((s) => '\n\n$s').join()}'
         // 3D 视图开着时,用户在 3D 里摆的就是构图:关系按 3D 场景算,不按 2D 的框。
         '${l.isEmpty ? '' : '\n\n${_threeD ? sceneRelations(l) : layoutRelations(l)}'}';
   }
@@ -335,6 +336,9 @@ class LayoutBoard extends ChangeNotifier {
       canvas: canvas,
     ),
   );
+
+  /// 换掉本系列的角色卡(属性栏里改、同系列新开一页时接上)。
+  void setCast(Map<String, String> cast) => _set(_layout.copyWith(cast: cast));
 
   /// 开 / 关 3D 视图。打开时还没有体块的块先按图层猜一个(之后可以让 Agent 估)。
   ///
@@ -600,6 +604,8 @@ class LayoutBoard extends ChangeNotifier {
     final parsed = read.layout.copyWith(
       camera: old.camera,
       style: read.layout.style.trim().isEmpty ? old.style : null,
+      // 角色卡同理;Agent 只写新加的或改的那几张,盖在原来的上面。
+      cast: {...old.cast, ...read.layout.cast},
       lighting: old.lighting,
     );
     final sx = parsed.width / old.width, sy = parsed.height / old.height;

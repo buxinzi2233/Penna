@@ -79,10 +79,15 @@ extension StudioLayoutPages on StudioViewModel {
     _deliverPerspective();
     final before = (board.layout.width, board.layout.height);
     final style = _seriesStyle;
+    final cast = _seriesCast;
     if (!board.apply(json, keep: _layoutKeep)) return;
     // 换到本系列的新一页时画板是空的,Agent 没写画风就接上本系列的。
     if (board.layout.style.trim().isEmpty && style.isNotEmpty) {
       board.setSummary(style: style);
+    }
+    // 角色卡也接上;Agent 这次写的(新角色、换装)盖在上面。
+    if (cast.keys.any((k) => !board.layout.cast.containsKey(k))) {
+      board.setCast({...cast, ...board.layout.cast});
     }
     final l = board.layout;
     final clipped = board.fixes.where((f) => f.clipped).length;
@@ -103,6 +108,8 @@ extension StudioLayoutPages on StudioViewModel {
           ]),
         if (clipped > 0) tr('{0} 个超出画布,已截掉', [clipped]),
         if (dropped > 0) tr('{0} 个读不了,已去掉', [dropped]),
+        if (castMisses(l) case final m when m.isNotEmpty)
+          tr('{0} 个人物块没对上角色卡', [m.length]),
       ].join(' · '),
     );
   }
@@ -172,20 +179,47 @@ extension StudioLayoutPages on StudioViewModel {
   /// 读不了返回 false。
   bool adoptLayout(String json) => layout?.apply(json) ?? false;
 
-  /// 本系列定下的画风:眼前这页的,没有就取同系列别的页的。换了系列就不算。
-  String get _seriesStyle {
-    final here = layout?.layout.style.trim() ?? '';
-    if (here.isNotEmpty) return here;
+  /// 本系列定下的一样东西(画风、角色卡):眼前这页的,没有就取同系列别的页的。
+  /// 换了系列就不算。
+  T _fromSeries<T>(
+    T Function(Layout l) pick,
+    bool Function(T v) isSet,
+    T none,
+  ) {
+    final here = layout?.layout;
+    if (here != null && isSet(pick(here))) return pick(here);
     for (final (i, p) in pages.indexed) {
       if (i == _page || p.series != series) continue;
-      final style = _layoutOf(
-        p.blocks.map((b) => b.text).join(),
-        const Layout(),
-      ).style.trim();
-      if (style.isNotEmpty) return style;
+      final v = pick(
+        _layoutOf(p.blocks.map((b) => b.text).join(), const Layout()),
+      );
+      if (isSet(v)) return v;
     }
-    return '';
+    return none;
   }
+
+  String get _seriesStyle =>
+      _fromSeries((l) => l.style.trim(), (s) => s.isNotEmpty, '');
+
+  Map<String, String> get _seriesCast =>
+      _fromSeries((l) => l.cast, (c) => c.isNotEmpty, const {});
+
+  /// 本系列的角色卡怎么写:定了就照名字对上,没定就让 Agent 写进 summary.cast。
+  static String _castPrompt(Map<String, String> cast) => cast.isEmpty
+      ? '【本系列角色卡】还没定。这次的布局里有人物时,在 summary 里加一个 "cast":'
+            '{"名字": "英文角色卡"},每个出场的角色一张,名字用中文短名(维尔汀、凛)。'
+            '角色卡是一句 25 到 50 词的英文:是谁(作品角色写英文名加作品名)、看上去的年龄和体型、'
+            '发色和发型、瞳色、头上戴的和标志物、服装的主色和款式;只写长在身上、每格都不变的,'
+            '不写表情、动作和姿势。作品里的角色先查角色库,特征照查到的写成句子。'
+            '几个角色的发色、发型、帽子、衣服颜色要写得分得开,相近的地方写明区别。'
+            '人物块的 name 写成「名字·格号」(维尔汀·3),程序交出去时把这张卡原样接在那块描述的最前面,'
+            '整体描述末尾也列一遍,每格、每页的特征才一样。'
+      : '【本系列角色卡】已定,程序交出去时把卡原样接在对得上的人物块描述最前面,'
+            '整体描述末尾也列一遍:\n${castText(cast)}\n'
+            '人物块的 name 写成「名字·格号」(名字照上面写),一个人物块只放一个角色,几个人同在一格就各画一块。'
+            '人物块的 caption 不再写发色、瞳色、发型、服装这些角色卡里有的,只写这一格的景别、表情、动作、'
+            '视线和跟别人的位置;一个角色的描述里不写别人的长相,提到别人只写名字。'
+            '新角色出场、或用户要给谁换装时,在 summary 里写 "cast",只写要加的或要改的那几个,没写到的照旧。';
 
   /// 本系列的画风怎么写:定了就沿用,没定就让 Agent 反推一段写进 summary.style。
   static String _stylePrompt(String style) => style.isEmpty
@@ -211,6 +245,7 @@ extension StudioLayoutPages on StudioViewModel {
         '【当前系列】「${seriesName(series)}」,共 $seriesLength 页,眼前是第 ${pageNumber(_page)} 页'
         '${_pages[_page].name.isEmpty ? '' : '「${_pages[_page].name}」'}。'
         '${others.isEmpty ? '' : '同系列的其他页(各块的名字):\n${others.join('\n')}'}'
-        '\n${_stylePrompt(_seriesStyle)}';
+        '\n${_stylePrompt(_seriesStyle)}'
+        '\n${_castPrompt(_seriesCast)}';
   }
 }

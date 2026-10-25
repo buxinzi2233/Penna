@@ -9,6 +9,7 @@ import 'package:penna/core/harness/characters/character_dict.dart';
 import 'package:penna/core/harness/providers/openai_provider.dart';
 import 'package:penna/data/models/app_config.dart';
 import 'package:penna/data/services/character_store.dart';
+import 'package:penna/ui/core/widgets.dart';
 import 'package:penna/ui/features/characters/characters_page.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 
@@ -90,6 +91,8 @@ void main() {
           ),
         ),
       );
+      await tester.tap(find.widgetWithText(PennaChip, '内置'));
+      await tester.pumpAndSettle();
       expect(find.text('genshin impact'), findsOneWidget);
 
       await tester.tap(find.text('genshin impact'));
@@ -179,6 +182,77 @@ void main() {
       store.setImage(store.cards.first.id, [9]);
       expect(store.cards.first.image, endsWith('.webp'));
       expect(store.cards.first.prompt, 'a');
+    });
+  });
+
+  group('收藏内置的系列和角色', () {
+    test('点一下收藏、再点取消;新收藏的在前;重开读得回来;坏文件留底', () async {
+      final dir = Directory.systemTemp.createTempSync('penna_chars');
+      final store = CharacterStore(dir)..put(name: '小蓝', prompt: 'blue');
+      store.toggleSeries('vocaloid');
+      store.toggleSeries('genshin impact');
+      store.toggleCharacter('hatsune miku');
+      expect(store.favoriteSeries, ['genshin impact', 'vocaloid']);
+      expect(store.isFavoriteCharacter('hatsune miku'), isTrue);
+      store.toggleSeries('vocaloid');
+      expect(store.favoriteSeries, ['genshin impact']);
+
+      final again = CharacterStore(dir);
+      await again.load();
+      expect(again.favoriteSeries, ['genshin impact']);
+      expect(again.favoriteCharacters, ['hatsune miku']);
+      // 收藏另存一个文件,「我的」那份没被改成别的格式。
+      expect(
+        jsonDecode(File('${dir.path}/characters.json').readAsStringSync()),
+        isList,
+      );
+
+      File('${dir.path}/character_favorites.json').writeAsStringSync('{坏');
+      final broken = CharacterStore(dir);
+      await broken.load();
+      expect(broken.favoriteSeries, isEmpty);
+      expect(
+        dir.listSync().where((f) => f.path.contains('favorites.json.bad-')),
+        hasLength(1),
+      );
+    });
+
+    test('按名字取回内置的角色和系列的角色数', () {
+      final dict = CharacterDict.parse(_tsv);
+      expect(dict.byName('hatsune miku')!.series, 'vocaloid');
+      expect(dict.byName('没有这个'), isNull);
+      expect(dict.countOf('genshin impact'), 2);
+      expect(dict.countOf('没有这个'), 0);
+    });
+
+    testWidgets('「我的」「内置」「收藏」分开;收藏的系列和角色在收藏里', (tester) async {
+      final store = CharacterStore()..put(name: '小蓝', prompt: 'blue hair');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CharactersPage(store: store, dict: CharacterDict.parse(_tsv)),
+          ),
+        ),
+      );
+      expect(find.text('小蓝'), findsOneWidget);
+      expect(find.text('vocaloid'), findsNothing);
+
+      await tester.tap(find.widgetWithText(PennaChip, '内置'));
+      await tester.pumpAndSettle();
+      expect(find.text('小蓝'), findsNothing);
+      await tester.tap(find.byTooltip('收藏').first);
+      await tester.tap(find.text('vocaloid'));
+      await tester.pumpAndSettle();
+      // 系列头上一颗星,角色卡上一颗星。
+      await tester.tap(find.byTooltip('收藏').last);
+      await tester.pump();
+      expect(store.favoriteSeries, isNotEmpty);
+      expect(store.favoriteCharacters, isNotEmpty);
+
+      await tester.tap(find.widgetWithText(PennaChip, '收藏'));
+      await tester.pumpAndSettle();
+      expect(find.text('hatsune miku, vocaloid'), findsOneWidget);
+      expect(find.text('genshin impact'), findsOneWidget);
     });
   });
 

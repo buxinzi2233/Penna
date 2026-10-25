@@ -6,11 +6,15 @@ class _SeriesTile extends StatelessWidget {
     required this.name,
     required this.count,
     required this.onTap,
+    required this.favorite,
+    required this.onFavorite,
   });
 
   final String name;
   final int count;
   final VoidCallback onTap;
+  final bool favorite;
+  final VoidCallback onFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -27,15 +31,23 @@ class _SeriesTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Text(
-                      name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        height: 1.3,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              height: 1.3,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        _star(favorite, onFavorite),
+                      ],
                     ),
                   ),
                   Text(
@@ -133,6 +145,19 @@ typedef _MineActions = ({
   VoidCallback onDelete,
   VoidCallback onUpload,
 });
+
+/// 收藏的星标:收藏着是实心的。
+Widget _star(bool on, VoidCallback onPressed) => SizedBox.square(
+  dimension: 22,
+  child: IconButton(
+    tooltip: on ? tr('取消收藏') : tr('收藏'),
+    iconSize: 16,
+    padding: EdgeInsets.zero,
+    color: on ? PennaColors.amber : PennaColors.slate400,
+    icon: Icon(on ? Icons.star_rounded : Icons.star_outline_rounded),
+    onPressed: onPressed,
+  ),
+);
 
 /// 一个只有图标的小按钮。
 Widget _iconButton(IconData icon, String tip, VoidCallback onPressed) =>
@@ -279,9 +304,16 @@ class _MineCard extends StatelessWidget {
 }
 
 class _BuiltinCard extends StatelessWidget {
-  const _BuiltinCard({required this.hit, required this.onSave});
+  const _BuiltinCard({
+    required this.hit,
+    required this.onSave,
+    required this.favorite,
+    required this.onFavorite,
+  });
 
   final CharacterHit hit;
+  final bool favorite;
+  final VoidCallback onFavorite;
 
   /// 存一份到「我的」,之后可以自己改。
   final VoidCallback onSave;
@@ -326,6 +358,8 @@ class _BuiltinCard extends StatelessWidget {
                   ),
                 ),
               ),
+              _star(favorite, onFavorite),
+              const SizedBox(width: 4),
               PennaButton(
                 label: tr('复制'),
                 icon: Icons.content_copy,

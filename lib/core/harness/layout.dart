@@ -11,6 +11,7 @@ export 'camera.dart';
 export 'lighting.dart';
 export 'perspective.dart';
 
+part 'layout_cast.dart';
 part 'layout_shape.dart';
 part 'layout_tags.dart';
 
@@ -153,6 +154,7 @@ class LayoutBox {
 
 /// 一张布局:画布尺寸、整体描述([meta] 是逗号隔开的几个类型词)和各个元素。
 /// [style] 是画风(Agent 照参考图或描述反推的一段,同系列沿用),交出去时拼在 caption 前面。
+/// [cast] 是本系列的角色卡(名字 → 英文描述,同系列沿用),交出去时接在人物块前面(见 layout_cast.dart)。
 @immutable
 class Layout {
   const Layout({
@@ -160,6 +162,7 @@ class Layout {
     this.height = defaultLayoutHeight,
     this.caption = '',
     this.style = '',
+    this.cast = const {},
     this.meta = '',
     this.canvas = 'single',
     this.boxes = const [],
@@ -170,6 +173,7 @@ class Layout {
 
   final int width, height;
   final String caption, style, meta, canvas;
+  final Map<String, String> cast;
   final List<LayoutBox> boxes;
 
   /// 透视辅助线;null 是没开。
@@ -188,6 +192,7 @@ class Layout {
     int? height,
     String? caption,
     String? style,
+    Map<String, String>? cast,
     String? meta,
     String? canvas,
     List<LayoutBox>? boxes,
@@ -199,6 +204,7 @@ class Layout {
     height: height ?? this.height,
     caption: caption ?? this.caption,
     style: style ?? this.style,
+    cast: cast == null ? this.cast : Map.unmodifiable(cast),
     meta: meta ?? this.meta,
     canvas: canvas ?? this.canvas,
     boxes: boxes == null ? this.boxes : List.unmodifiable(boxes),
@@ -212,6 +218,7 @@ class Layout {
     'height': height,
     'caption': caption,
     if (style.isNotEmpty) 'style': style,
+    if (cast.isNotEmpty) 'cast': cast,
     'meta': meta,
     'canvas': canvas,
     'boxes': [for (final b in boxes) b.toJson()],
@@ -225,6 +232,7 @@ class Layout {
     height: _side(j['height'], defaultLayoutHeight),
     caption: j['caption'] as String? ?? '',
     style: j['style'] as String? ?? '',
+    cast: parseCast(j['cast']),
     meta: j['meta'] as String? ?? '',
     canvas: _pick(j['canvas'], layoutCanvases),
     boxes: List.unmodifiable([
@@ -236,17 +244,17 @@ class Layout {
   );
 }
 
-/// 交出去的 summary.caption:质量词、画风、整体描述连成一段,开着打光辅助时最后接上光影。
-/// 导入过交出去的 JSON 时整体描述里已经带着它们,不再加一遍。
+/// 交出去的 summary.caption:质量词、画风、整体描述、这页的角色卡连成一段,
+/// 开着打光辅助时最后接上光影。导入过交出去的 JSON 时整体描述里已经带着它们,不再加一遍。
 String _fullCaption(Layout l, String quality) {
   final caption = l.caption.trim();
-  String sentence(String s) =>
-      s.isEmpty || RegExp(r'[.!?。!?]$').hasMatch(s) ? s : '$s.';
+  final cast = _castLine(l);
   return appendLighting(
     [
       for (final s in [quality.trim(), l.style.trim()])
-        if (s.isNotEmpty && !caption.contains(s)) sentence(s),
+        if (s.isNotEmpty && !caption.contains(s)) _sentence(s),
       caption,
+      if (cast.isNotEmpty && !caption.contains(cast)) cast,
     ].where((s) => s.isNotEmpty).join(' '),
     l.lighting,
     l.camera,
@@ -294,7 +302,7 @@ String mossLayoutJson(Layout l, {bool draft = false, String quality = ''}) {
             if (draft && b.body != null) 'body': bodyHintJson(b.body!, view),
             if (draft) 'shape': ?b.draftShape,
             'label': b.label,
-            'caption': b.caption.trim(),
+            'caption': draft ? b.caption.trim() : _castCaption(l, b),
             if (b.label == 'text' && b.text.trim().isNotEmpty)
               'text': b.text.trim(),
             'bbox': draft
@@ -455,6 +463,7 @@ LayoutRead? readMossLayout(
     height: th,
     caption: summary['caption'] is String ? summary['caption'] as String : '',
     style: summary['style'] is String ? summary['style'] as String : '',
+    cast: parseCast(summary['cast']),
     meta: meta is List
         ? meta.whereType<String>().join(', ')
         : meta is String

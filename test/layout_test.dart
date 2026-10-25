@@ -186,6 +186,24 @@ void main() {
     expect(board.prompt, isNot(contains('超出画布')));
   });
 
+  test('画板:用户画了还没写描述的框,给 Agent 的提示里点名它们不能动', () {
+    final board = LayoutBoard()
+      ..addBox(const LayoutBox(left: 0, top: 0, right: 100, bottom: 100))
+      ..addBox(
+        const LayoutBox(
+          left: 0,
+          top: 120,
+          right: 100,
+          bottom: 200,
+          caption: 'a cat',
+        ),
+      );
+    // 只点名没写描述的那块(第 1 块写了 a cat)。
+    expect(board.prompt, contains('【画好的框】第 2 块是'));
+    board.updateBox(1, board.layout.boxes[1].copyWith(caption: 'a dog'));
+    expect(board.prompt, isNot(contains('【画好的框】')));
+  });
+
   test('画板:Agent 写的画布宽高和画板一横一竖时对调;别的比例不认,框缩放到画布上', () {
     final board = LayoutBoard()..setPerspective(1);
     expect(board.prompt, contains('竖构图'));

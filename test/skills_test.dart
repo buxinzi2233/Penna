@@ -216,10 +216,13 @@ void main() {
       expect(builtinSkillList.every((s) => s.body.trim().isNotEmpty), isTrue);
     });
 
-    test('漫画分格里的布局例子程序读得出来,人物和气泡都落在自己那一格', () {
+    test('漫画分格:例子程序读得出来,有斜切的格,人物和气泡都落在自己那一格的形状里', () {
       final body = builtinSkillList
           .firstWhere((s) => s.id == 'comic-page')
           .body;
+      // 用户画好了格时的做法、不排成一样高的通栏条带。
+      expect(body, contains('用户画好了格'));
+      expect(body, contains('通栏'));
       // 正文里也提到 <layout> 这个标签,例子是后面紧跟着 JSON 的那一处。
       final made = splitLayout(body.substring(body.indexOf('<layout>\n{')));
       expect(made.complete, isTrue);
@@ -232,21 +235,28 @@ void main() {
       final l = read.layout;
       expect(read.fixes, isEmpty);
       expect(l.canvas, 'multi_panel');
-      expect(l.boxes, hasLength(5));
-      expect(read.hints, hasLength(5));
+      expect(read.hints, hasLength(l.boxes.length));
       final panels = [
         for (final b in l.boxes)
           if (b.name.startsWith('第')) b,
       ];
-      expect(panels, hasLength(2));
+      expect(panels.length, greaterThanOrEqualTo(3));
+      expect(panels.where((p) => p.shape != null), isNotEmpty);
+      // 角色卡写在 summary.cast 里,每个人物块都对得上。
+      expect(l.cast, isNotEmpty);
+      expect(castMisses(l), isEmpty);
       for (final b in l.boxes.where((b) => !panels.contains(b))) {
+        final corners = [
+          (b.left, b.top),
+          (b.right, b.top),
+          (b.left, b.bottom),
+          (b.right, b.bottom),
+        ];
         expect(
           panels.where(
-            (p) =>
-                b.left >= p.left &&
-                b.right <= p.right &&
-                b.top >= p.top &&
-                b.bottom <= p.bottom,
+            (p) => corners.every(
+              (c) => p.covers(c.$1.toDouble(), c.$2.toDouble()),
+            ),
           ),
           hasLength(1),
           reason: b.name,

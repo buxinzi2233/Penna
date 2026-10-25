@@ -94,6 +94,7 @@ Drop in an image and a model turns it back into tags or a prompt. There are thre
 Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON, with a separate layout chat on the right. Shape tools above the canvas choose whether new regions are boxes, ellipses or polygons, and the pen traces any outline point by point; drag vertices to reshape. Export still writes each region as its bounding box, the Agent writes the shape into the caption, and it can draw shapes itself when laying out. The camera panel in 3D view includes a lighting assistant: 22 lighting presets, a light sphere for dragging each light's direction, with intensity, softness and color temperature, plus ambient light and atmosphere effects such as volumetric rays and haze; on export the lighting becomes a sentence appended to the overall caption, and the Agent can read and adjust it. With shading preview on, bodies and the canvas are lit and shaded by the lights. Layouts can be saved to the Region Control section of the Archive and reopen in Region Control.
 
 - Locked art style: the Agent infers a style paragraph (including the main palette) from a reference image or description, and every layout in the same series reuses it unchanged through edits. Exported JSON prefixes the overall caption with quality tags and the style; the quality tags default to `best quality, highres, newest, year 2026, 8k resolution, masterpiece, ultra-detailed` and can be edited in the properties panel.
+- Locked character cards: each character in a series has an English card (hair, eyes, hairstyle, signature items, outfit), editable in the properties panel. Exported JSON puts the card in front of every block of that character and lists the page's cast at the end of the overall caption, so features stay consistent across panels and pages.
 - Regions are listed as layers (foreground, middle ground, background) and dragged to reorder; one-, two- and three-point perspective guides are available.
 - The Agent receives computed spatial relations (where each region sits, which edges crop it, what overlaps what and by how much; in the 3D view, by distance from the camera, the projected outline of each volume and its visible faces) and writes them into the captions; with a reference image, it first reads the image's occlusion, cropping and camera angle before laying out regions.
 - When the reference image and the canvas differ in orientation, the canvas can swap width and height to match; layouts the Agent writes at another aspect ratio are scaled proportionally into the center of the canvas.
@@ -106,6 +107,18 @@ Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON
 - Layers can be hidden on the canvas without affecting the exported JSON; text layers are hidden by default in the 3D view.
 - The history lists each step — drawing, moving, turning the camera, the Agent placing a layout — and can roll back to before any of them.
 
+### Comics
+
+Region Control lays out multi-panel comic pages. Following the "Comic panels" Skill, the Agent first plans the panels: a page has key panels and smaller ones, with optional slanted gutters; each panel is one block, and every character and speech bubble inside it gets a block of its own. Panels drawn by hand on the canvas are kept as drawn, and the Agent fills them in one by one. Character cards follow the series, so each character keeps the same hair, eyes, hairstyle and outfit across panels and pages.
+
+A three-page comic laid out in Penna and rendered with MOSS-Image:
+
+<p align="center">
+  <img src="docs/comic-1.webp" width="32%" alt="Comic page 1">
+  <img src="docs/comic-2.webp" width="32%" alt="Comic page 2">
+  <img src="docs/comic-3.webp" width="32%" alt="Comic page 3">
+</p>
+
 ### Danbooru tags
 
 - About 76,000 common tags built in, with post counts and Chinese meanings, searchable offline.
@@ -116,7 +129,8 @@ Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON
 
 - About 74,000 Danbooru characters built in, ordered by popularity and searchable by English name, Chinese and Japanese aliases, or series name.
 - Each character's feature tags are split into **Looks** and **Outfit and other**, so the appearance can be used on its own.
-- Save your own characters: a name, a prompt and a picture.
+- Separate **Mine**, **Built-in** and **Favorites** tabs. **Mine** holds your own characters (a name, a prompt and a picture) and can be reordered by dragging.
+- Built-in series and characters can be added to **Favorites** for quick access.
 - The Agent can search the character library during a chat and save characters to it.
 
 ### Polish and translate
@@ -129,7 +143,7 @@ Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON
 
 A Skill is a writing guide (`SKILL.md`) that decides how the Agent writes prompts.
 
-- 14 are built in, all enabled by default, and each can be switched on or off. "Comic panels" handles multi-panel comic pages in a single image (panel layout, speech bubbles and speakers, consistency across panels) and can lay a comic page out in Region Control.
+- 14 are built in, all enabled by default, and each can be switched on or off. "Comic panels" handles multi-panel comic pages in a single image (panel layout, speech bubbles and speakers, consistency across panels) and can lay a comic page out in Region Control, with varied panel sizes and slanted gutters; panels drawn by hand on the canvas are kept as drawn and filled in one by one.
 - Import `.md` or `.zip` files, or write one directly in Settings.
 - Ask the Agent in chat to write a new Skill; it is added automatically when done.
 
