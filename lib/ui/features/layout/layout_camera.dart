@@ -179,6 +179,11 @@ class _CameraPanelState extends State<CameraPanel> {
               child: AnimatedSwitcher(
                 duration: Motion.of(context, Motion.base),
                 switchInCurve: Motion.swift,
+                // 默认把内容摆在正中、按内容高度:窗口要撑满整栏、从顶上排。
+                layoutBuilder: (current, previous) => Stack(
+                  fit: StackFit.expand,
+                  children: [...previous, ?current],
+                ),
                 child: KeyedSubtree(
                   key: ValueKey(_shown),
                   child: _shown == _Tab.camera

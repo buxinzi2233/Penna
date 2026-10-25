@@ -128,8 +128,9 @@ void main() {
 
   testWidgets('部件窗口:点图标换窗口、再点收起,摄像机和灯光各是各的', (tester) async {
     await panel(tester);
-    // 默认展开摄像机窗口,里面没有灯光。
+    // 默认展开摄像机窗口,里面没有灯光;内容从窗口顶上排(不是摆在正中)。
     expect(find.text('自由镜头'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('摄像机')).dy, lessThan(40));
     expect(find.byType(Switch), findsNothing);
     await tester.tap(find.byTooltip('灯光'));
     await tester.pumpAndSettle();
