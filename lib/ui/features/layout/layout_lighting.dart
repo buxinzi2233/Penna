@@ -165,6 +165,23 @@ class _LightingSectionState extends State<_LightingSection> {
         ),
       ),
       Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: ValueListenableBuilder(
+            valueListenable: board.shadePreview,
+            builder: (context, on, _) => Tooltip(
+              message: tr('体块和画布按灯光显示明暗'),
+              child: PennaChip(
+                label: tr('光影预览'),
+                selected: on,
+                onTap: () => board.shadePreview.value = !on,
+              ),
+            ),
+          ),
+        ),
+      ),
+      Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
         child: _LightBall(
           lighting: lg,

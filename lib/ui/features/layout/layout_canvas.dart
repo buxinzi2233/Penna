@@ -344,7 +344,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: _board,
+      listenable: Listenable.merge([_board, _board.shadePreview]),
       builder: (context, _) => LayoutBuilder(
         builder: (context, box) {
           final l = _board.layout;
@@ -421,6 +421,9 @@ class _LayoutCanvasState extends State<LayoutCanvas>
       b.right * scale,
       b.bottom * scale,
     );
+    // 光影预览:3D 视图里开着灯光时,体块的面和画布底色按灯光上明暗。
+    final lit =
+        _board.threeD && l.lighting.enabled && _board.shadePreview.value;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: PennaColors.card,
@@ -430,6 +433,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          if (lit) Positioned.fill(child: ColoredBox(color: litBackdrop(l))),
           // 中心的小十字:abs_centralized 的原点在这里。不画贯穿全画布的中线,
           // 那条横线和透视的地平线长得一样,关了透视还以为没关掉。
           Positioned.fill(
@@ -462,6 +466,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
                     scale,
                     layoutBodyColor,
                     _board.selected,
+                    lit: lit,
                   ),
                 ),
               ),

@@ -913,6 +913,8 @@ const en = <String, String>{
   '删除这一条?': 'Delete this note?',
   '内容会一起删掉。': 'Its content will be deleted too.',
   '内容': 'Content',
+  '光影预览': 'Shading preview',
+  '体块和画布按灯光显示明暗': 'Shade bodies and the canvas by the lights',
   'Agent 调整灯光': 'Agent adjusted lighting',
   '调整灯光': 'Adjust lighting',
   '灯光': 'Lighting',

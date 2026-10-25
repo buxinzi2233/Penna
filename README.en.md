@@ -91,7 +91,7 @@ Drop in an image and a model turns it back into tags or a prompt. There are thre
 
 ### Region Control
 
-Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON, with a separate layout chat on the right. Regions can be drawn as ellipses or polygons (drag vertices to reshape) for working out composition with the Agent; export still writes each region as its bounding box. The camera panel in 3D view includes a lighting assistant: 22 lighting presets, a light sphere for dragging each light's direction, with intensity, softness and color temperature, plus ambient light and atmosphere effects such as volumetric rays and haze; on export the lighting becomes a sentence appended to the overall caption, and the Agent can read and adjust it. Layouts can be saved to the Region Control section of the Archive and reopen in Region Control.
+Draw regions on a canvas and describe each one to produce MOSS-Image layout JSON, with a separate layout chat on the right. Regions can be drawn as ellipses or polygons (drag vertices to reshape) for working out composition with the Agent; export still writes each region as its bounding box. The camera panel in 3D view includes a lighting assistant: 22 lighting presets, a light sphere for dragging each light's direction, with intensity, softness and color temperature, plus ambient light and atmosphere effects such as volumetric rays and haze; on export the lighting becomes a sentence appended to the overall caption, and the Agent can read and adjust it. With shading preview on, bodies and the canvas are lit and shaded by the lights. Layouts can be saved to the Region Control section of the Archive and reopen in Region Control.
 
 - Locked art style: the Agent infers a style paragraph (including the main palette) from a reference image or description, and every layout in the same series reuses it unchanged through edits. Exported JSON prefixes the overall caption with quality tags and the style; the quality tags default to `best quality, highres, newest, year 2026, 8k resolution, masterpiece, ultra-detailed` and can be edited in the properties panel.
 - Regions are listed as layers (foreground, middle ground, background) and dragged to reorder; one-, two- and three-point perspective guides are available.
@@ -253,6 +253,7 @@ Every part of Penna is built on the work of the open-source community.
 | [SmilingWolf WD14 Tagger](https://huggingface.co/SmilingWolf) | Local taggers (downloaded on use) | Apache-2.0 |
 | [PixAI Tagger](https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx), [CL Tagger](https://huggingface.co/Nonene/cl_tagger), [OppaiOracle](https://huggingface.co/Grio43/OppaiOracle) | Local taggers (downloaded on use) | See each model page |
 | [Gemma 4](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF), [ToriiGate](https://huggingface.co/DraconicDragon/ToriiGate-0.5-GGUF), [JoyCaption](https://huggingface.co/concedo/llama-joycaption-beta-one-hf-llava-mmproj-gguf), [Florence-2](https://huggingface.co/onnx-community/Florence-2-base-ft) | Local vision models (downloaded on use) | See each model page |
+| lighting-kit (provided by 韶韵, ported from MOSS Prompt Studio) | Region Control lighting assistant: lighting presets, light direction math, lighting phrases and shading preview | — |
 
 ### Fonts
 

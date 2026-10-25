@@ -6,8 +6,10 @@ import 'package:penna/core/harness/layout.dart';
 import 'package:penna/core/harness/providers/openai_provider.dart';
 import 'package:penna/data/models/app_config.dart';
 import 'package:penna/ui/core/theme.dart';
+import 'package:penna/ui/features/layout/layout_bodies.dart';
 import 'package:penna/ui/features/layout/layout_board.dart';
 import 'package:penna/ui/features/layout/layout_camera.dart';
+import 'package:penna/ui/features/layout/layout_canvas.dart';
 import 'package:penna/ui/features/studio/studio_view_model.dart';
 
 import 'fixtures.dart';
@@ -66,6 +68,33 @@ void main() {
       sent.where((m) => m['role'] == 'assistant').single['content'],
       allOf(isNot(contains('<lighting>')), contains('调过一次灯光')),
     );
+  });
+
+  testWidgets('光影预览:3D 视图里开着灯光时画布底色按灯光变暗,关掉预览就恢复', (tester) async {
+    final board = LayoutBoard()
+      ..addBox(const LayoutBox(left: 200, top: 300, right: 600, bottom: 1100))
+      ..setThreeD(true);
+    board.setLighting(presetLighting('low_key', null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 416,
+            height: 608,
+            child: LayoutCanvas(board: board),
+          ),
+        ),
+      ),
+    );
+    final backdrop = find.byWidgetPredicate(
+      (w) => w is ColoredBox && w.color == litBackdrop(board.layout),
+    );
+    expect(backdrop, findsOneWidget);
+    // 低调光:画布底色明显比白纸暗。
+    expect(litBackdrop(board.layout).computeLuminance(), lessThan(0.5));
+    board.shadePreview.value = false;
+    await tester.pump();
+    expect(backdrop, findsNothing);
   });
 
   testWidgets('摄像机栏里打开灯光、拖灯光球上的手柄,灯换方向,下面的提示词跟着变', (tester) async {

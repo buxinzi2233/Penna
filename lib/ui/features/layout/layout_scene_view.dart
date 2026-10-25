@@ -276,7 +276,10 @@ class _SceneViewState extends State<SceneView> {
                     onPointerCancel: _up,
                     onPointerSignal: _scroll,
                     child: ListenableBuilder(
-                      listenable: _board,
+                      listenable: Listenable.merge([
+                        _board,
+                        _board.shadePreview,
+                      ]),
                       builder: (context, _) => CustomPaint(
                         size: c.biggest,
                         painter: _ScenePainter(
@@ -285,6 +288,9 @@ class _SceneViewState extends State<SceneView> {
                           selected: _board.selected,
                           grid: PennaColors.border,
                           text: PennaColors.slate500,
+                          lit:
+                              _board.layout.lighting.enabled &&
+                              _board.shadePreview.value,
                         ),
                       ),
                     ),
@@ -327,12 +333,16 @@ class _ScenePainter extends CustomPainter {
     required this.selected,
     required this.grid,
     required this.text,
+    required this.lit,
   });
 
   final Layout layout;
   final Camera cam;
   final int? selected;
   final Color grid, text;
+
+  /// 光影预览:按灯光给看得到的面上明暗(灯的方位照主镜头算,看得到哪几面照视口)。
+  final bool lit;
 
   static const _eyeColor = Color(0xFFF59E0B);
 
@@ -382,12 +392,9 @@ class _ScenePainter extends CustomPainter {
       final color = layout.boxes[i].offscreen
           ? Color.lerp(layoutBodyColor(i), grid, 0.6)!
           : layoutBodyColor(i);
-      paintCuboid(
-        canvas,
-        [for (final p in pts) p!],
-        color,
-        width: i == selected ? 2.4 : 1.2,
-      );
+      final screen = [for (final p in pts) p!];
+      if (lit) paintLitFaces(canvas, body, screen, view.eye, color, layout);
+      paintCuboid(canvas, screen, color, width: i == selected ? 2.4 : 1.2);
       final top = at((x: body.x, y: body.y - body.h / 2, z: body.z));
       if (top != null) _label(canvas, '${i + 1}', top, layoutBoxColor(i));
     }
@@ -498,5 +505,6 @@ class _ScenePainter extends CustomPainter {
       old.layout != layout ||
       old.cam != cam ||
       old.selected != selected ||
-      old.grid != grid;
+      old.grid != grid ||
+      old.lit != lit;
 }

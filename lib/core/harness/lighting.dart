@@ -10,7 +10,8 @@ part 'lighting_phrase.dart';
 
 /// 打光辅助:几盏灯(主光、补光、轮廓光……)加环境光和氛围,本质是一句光影提示词,
 /// 交出去时接在 summary.caption 后面;灯光球、手柄只是方便用户和 Agent 看。
-/// 照 MOSS Prompt Studio 的 lighting-kit 移植(数据、算法、短语逐字一致,单测用它的样例校验)。
+/// 照 MOSS Prompt Studio 的 lighting-kit 移植(数据、算法、短语逐字一致,单测用它的样例校验);
+/// lighting-kit 由朋友韶韵提供。
 ///
 /// 方向:azimuth 是水平方位(0 = 从初始机位一侧照向主体,正 = 画面右侧,±180 = 背后),
 /// elevation 是高度角(正 = 从上往下照)。存的是世界方位(固定在场景里);
@@ -574,11 +575,71 @@ String colorWord(Light l, {required bool zh}) {
   return zh ? '冷蓝色' : 'cold blue';
 }
 
-// ---------- 灯光球的像素 ----------
+// ---------- 光影预览(给体块的面、背景板上明暗) ----------
 
 /// 曝光曲线:亮度加起来再压回 0–1,亮处不会一下子过曝。
 double _tone(double x) =>
     math.pow(1 - math.exp(-1.5 * math.max(0, x)), 1.7).toDouble();
+
+/// 开着的灯在世界里的方向(从主体指向灯)、颜色和强弱。
+List<(_V3, Rgb, Light)> _worldLights(Lighting lg, Camera? cam) => [
+  for (final l in lg.active)
+    (_lightVec(_worldAzimuth(l, lg, cam), l.elevation), lightRgb(l), l),
+];
+
+/// 环境光加上各盏灯照来的颜色,再过曝光曲线;[base] 是本来的颜色(0–1)。
+Rgb _lit(Rgb base, Rgb ambient, Iterable<(Rgb, double)> lights) {
+  var (r, g, b) = ambient;
+  for (final (c, k) in lights) {
+    r += c.$1 * k;
+    g += c.$2 * k;
+    b += c.$3 * k;
+  }
+  return (base.$1 * _tone(r), base.$2 * _tone(g), base.$3 * _tone(b));
+}
+
+/// 朝 [normal](世界坐标的单位向量)的一个面在这套灯光下的颜色:漫反射带柔光包裹,
+/// 背景光只带一半,加环境光。[cam] 是主镜头(灯跟着镜头时按它算方位)。
+Rgb shade(Vec3 normal, Rgb base, Lighting lg, Camera? cam) {
+  final n = (normal.x, normal.y, normal.z);
+  final amb = kelvinRgb(lg.ambientKelvin);
+  return _lit(
+    base,
+    (amb.$1 * lg.ambient, amb.$2 * lg.ambient, amb.$3 * lg.ambient),
+    [
+      for (final (dir, rgb, l) in _worldLights(lg, cam))
+        (
+          rgb,
+          math.max(
+                0,
+                (_dot(n, dir) + l.softness * 0.6) / (1 + l.softness * 0.6),
+              ) *
+              l.intensity *
+              (l.role == 'bg' ? 0.5 : 1),
+        ),
+    ],
+  );
+}
+
+/// 背景板(画面底色)的亮度:背景光照亮它,别的灯只带一点。
+Rgb backdropShade(Rgb base, Lighting lg, Camera? cam) {
+  final amb = kelvinRgb(lg.ambientKelvin);
+  final a = lg.ambient * 1.1;
+  return _lit(
+    base,
+    (amb.$1 * a, amb.$2 * a, amb.$3 * a),
+    [
+      for (final (dir, rgb, l) in _worldLights(lg, cam))
+        (
+          rgb,
+          l.intensity *
+              (l.role == 'bg' ? 0.9 : 0.22 + 0.15 * math.max(0, -dir.$3)),
+        ),
+    ],
+  );
+}
+
+// ---------- 灯光球的像素 ----------
 
 /// 被灯照亮的球(RGBA,[size] × [size]),球外是透明的。灯光球用。
 Uint8List renderLitSphere(int size, Lighting lg, Camera? cam) {

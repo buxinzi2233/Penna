@@ -80,6 +80,9 @@ class LayoutBoard extends ChangeNotifier {
   String exportJson(Layout l) =>
       mossLayoutJson(l, quality: quality?.call() ?? '');
   bool get threeD => _threeD;
+
+  /// 光影预览:3D 视图里开着灯光时,按灯光给体块和画布上明暗(灯光面板里切换,不存盘)。
+  final shadePreview = ValueNotifier(true);
   bool get freeCam => _freeCam;
 
   /// 第 [i] 块眼下在画布上画不画(见 [LayoutBox.shownIn])。

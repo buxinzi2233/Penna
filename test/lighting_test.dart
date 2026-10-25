@@ -129,6 +129,20 @@ void main() {
     expect(applyLightingSpec('不是 JSON', dim, cam), isNull);
   });
 
+  test('光影预览:朝灯的面比背灯的面亮,背景光照亮背景板', () {
+    // 分割光的主光在画面左边(方位 -90、高 10°):朝它的面是 -x 那边。
+    final lg = presetLighting('split', null);
+    const white = (1.0, 1.0, 1.0);
+    final lit = shade((x: -0.985, y: -0.174, z: 0.0), white, lg, null);
+    final dark = shade((x: 0.985, y: 0.174, z: 0.0), white, lg, null);
+    expect(lit.$1, greaterThan(dark.$1 * 2));
+    final withBg = addLight(lg, 'bg', null);
+    expect(
+      backdropShade(white, withBg, null).$2,
+      greaterThan(backdropShade(white, lg, null).$2),
+    );
+  });
+
   test('标签:拆出最后一个,半截的不显示;旧回复里换成一句话', () {
     final r = splitLighting('好的。<lighting>{"preset": "noon"}</lighting>');
     expect((r.prose, r.spec), ('好的。', '{"preset": "noon"}'));
