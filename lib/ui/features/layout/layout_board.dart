@@ -532,8 +532,9 @@ class LayoutBoard extends ChangeNotifier {
     );
   }
 
-  /// 只收 Agent 写的描述([LayoutKeep.captions])或体块([LayoutKeep.bodies]):
-  /// 按名字对上每一块(没名字按先后),框、图层、名字、画布都照旧。
+  /// 只收 Agent 写的描述,和程序猜的那几块的体块([LayoutKeep.describe];
+  /// 用户调过、Agent 估过的体块不动,免得每交一次就漂一点):
+  /// 按名字对上每一块(没名字按先后),框、形状、图层、名字、画布都照旧。
   bool _applyOnly(LayoutRead read, LayoutKeep keep) {
     final old = _layout;
     final got = read.layout.boxes;
@@ -554,24 +555,18 @@ class LayoutBoard extends ChangeNotifier {
       final j = match(b, k);
       if (j == null) continue;
       final hint = read.hints[j];
-      boxes[i] = switch (keep) {
-        LayoutKeep.captions => b.copyWith(
-          caption: got[j].caption.trim().isEmpty ? null : got[j].caption,
-          text: got[j].text.trim().isEmpty ? null : got[j].text,
-        ),
-        _ when hint != null && b.label != 'text' => liftBox(b, old, hint),
-        _ => b,
-      };
+      final described = b.copyWith(
+        caption: got[j].caption.trim().isEmpty ? null : got[j].caption,
+        text: got[j].text.trim().isEmpty ? null : got[j].text,
+      );
+      boxes[i] = hint != null && b.label != 'text' && (b.body?.guessed ?? true)
+          ? liftBox(described, old, hint)
+          : described;
     }
     final caption = read.layout.caption.trim();
     _selected = null;
     _set(
-      old.copyWith(
-        boxes: boxes,
-        caption: keep == LayoutKeep.captions && caption.isNotEmpty
-            ? caption
-            : null,
-      ),
+      old.copyWith(boxes: boxes, caption: caption.isNotEmpty ? caption : null),
       rebuild: true,
       action: tr('Agent 放上布局'),
     );

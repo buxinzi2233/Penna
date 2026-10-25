@@ -244,7 +244,6 @@ void main() {
       ..setThreeD(true)
       // 不选中:选中时摄像机栏下面多出体块那一截,按钮会被挤出测试窗口。
       ..select(null);
-    var redescribed = 0;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -257,11 +256,7 @@ void main() {
               ),
               ListenableBuilder(
                 listenable: board,
-                builder: (context, _) => CameraPanel(
-                  board: board,
-                  onRedescribe: () => redescribed++,
-                  onEstimate: () {},
-                ),
+                builder: (context, _) => CameraPanel(board: board),
               ),
             ],
           ),
@@ -278,9 +273,9 @@ void main() {
     await tester.tap(find.byIcon(Icons.chevron_right).first);
     await tester.pump();
     expect(board.layout.camera.orbit, closeTo(orbit + 15, 1e-9));
-    await tester.tap(find.text('按视角改描述'));
-    expect(redescribed, 1);
-    await tester.tap(find.byIcon(Icons.restart_alt));
+    // 交给 Agent 统一在画布上面那一个按钮,摄像机栏里没有了。
+    expect(find.text('按视角改描述'), findsNothing);
+    await tester.tap(find.byIcon(Icons.restart_alt).first);
     await tester.pump();
     expect(board.layout.camera.isDefault, isTrue);
     expect(tester.takeException(), isNull);
@@ -469,11 +464,7 @@ void main() {
             height: 1200,
             child: ListenableBuilder(
               listenable: board,
-              builder: (context, _) => CameraPanel(
-                board: board,
-                onRedescribe: () {},
-                onEstimate: () {},
-              ),
+              builder: (context, _) => CameraPanel(board: board),
             ),
           ),
         ),
@@ -509,8 +500,6 @@ void main() {
               context,
               board: board,
               onToggle3D: () => board.setThreeD(!board.threeD),
-              onRedescribe: () {},
-              onEstimate: () {},
             ),
             child: const Text('open'),
           ),

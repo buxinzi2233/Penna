@@ -27,8 +27,8 @@ LayoutShape? shapeFor(ShapeToolState s) => switch (s.tool) {
   _ => null,
 };
 
-/// 画布区上面那一行:左边是形状工具(有异形时多一个交给 Agent 按形状写描述),
-/// 右边是自由摄像机(3D 视图)和全屏。
+/// 画布区上面那一行:左边是形状工具和「交给 Agent」(唯一一个交给 Agent 写描述的按钮:
+/// 形状、视角、灯光、体块都设好之后点它),右边是自由摄像机(3D 视图)和全屏。
 class CanvasTools extends StatelessWidget {
   const CanvasTools({
     super.key,
@@ -36,35 +36,33 @@ class CanvasTools extends StatelessWidget {
     required this.scene,
     required this.onScene,
     required this.onFullscreen,
-    required this.onAskShapes,
+    required this.onHandOver,
   });
 
   final LayoutBoard board;
 
   /// 自由摄像机开着没有。
   final bool scene;
-  final VoidCallback onScene, onFullscreen, onAskShapes;
+  final VoidCallback onScene, onFullscreen, onHandOver;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         _ShapeToolbar(board: board),
-        if (board.layout.boxes.any((b) => b.shape != null && !b.offscreen)) ...[
-          const SizedBox(width: 6),
-          Tooltip(
-            message: shapeRequest,
-            child: TextButton.icon(
-              onPressed: onAskShapes,
-              icon: const Icon(Icons.auto_fix_high, size: 15),
-              label: Text(tr('按形状写描述'), style: const TextStyle(fontSize: 12)),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                foregroundColor: PennaColors.primary,
-              ),
+        const SizedBox(width: 8),
+        Tooltip(
+          message: handOverRequest(board),
+          child: FilledButton.icon(
+            onPressed: board.layout.isEmpty ? null : onHandOver,
+            icon: const Icon(Icons.auto_awesome_outlined, size: 15),
+            label: Text(tr('交给 Agent'), style: const TextStyle(fontSize: 12)),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              backgroundColor: PennaColors.primary,
             ),
           ),
-        ],
+        ),
         const Spacer(),
         if (board.threeD)
           IconButton(

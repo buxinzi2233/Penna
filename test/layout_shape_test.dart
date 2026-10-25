@@ -109,6 +109,33 @@ void main() {
     expect(board.layout.boxes, hasLength(2));
   });
 
+  testWidgets('3D 视图里异形挤成柱体画,框只是外框:转着镜头、开着光影预览也画得出,按框点得中', (tester) async {
+    final board = LayoutBoard()
+      ..setSize(400, 400)
+      ..addBox(
+        const LayoutBox(
+          left: 40,
+          top: 40,
+          right: 180,
+          bottom: 180,
+          shape: LayoutShape.ellipse(),
+        ),
+      )
+      ..addBox(_tri.copyWith(shape: () => LayoutShape.regular(5)))
+      ..setThreeD(true);
+    board.setLighting(presetLighting('rembrandt', null));
+    board.setCamera(const Camera(orbit: 40, pitch: 15));
+    final o = await _canvas(tester, board);
+    expect(tester.takeException(), isNull);
+    // 椭圆框的左上角(椭圆外面):3D 里按框点,也选得中它。
+    final oval = board.layout.boxes.indexWhere((b) => b.shape!.isEllipse);
+    final b = board.layout.boxes[oval];
+    board.select(null);
+    await tester.tapAt(o + Offset(b.left + 3.0, b.top + 3.0));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(board.selected, oval);
+  });
+
   test('交给 Agent:系统提示里有【形状】,按形状改描述只收描述', () {
     final board = LayoutBoard()
       ..setSize(400, 400)
@@ -117,7 +144,10 @@ void main() {
     expect(board.prompt, contains('【形状】'));
     expect(board.prompt, contains('山:三角形'));
     expect(describeShapes(const Layout()), isEmpty);
-    expect(layoutKeepFor(shapeRequest), LayoutKeep.captions);
+    // 有异形时,「交给 Agent」那句话点名要它照【形状】写;回复只收描述。
+    final request = handOverRequest(board);
+    expect(request, contains('【形状】'));
+    expect(layoutKeepFor(request), LayoutKeep.describe);
     expect(boxFromPolygon(const [(0, 0), (10, 0), (20, 0)]), isNull);
   });
 

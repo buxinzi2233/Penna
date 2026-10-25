@@ -16,31 +16,20 @@ Future<void> showFullCanvas(
   BuildContext context, {
   required LayoutBoard board,
   required VoidCallback onToggle3D,
-  required VoidCallback onRedescribe,
-  required VoidCallback onEstimate,
 }) => showGeneralDialog(
   context: context,
   barrierDismissible: false,
   barrierLabel: tr('全屏摆放'),
   transitionDuration: Motion.snap,
-  pageBuilder: (context, _, _) => _FullCanvas(
-    board: board,
-    onToggle3D: onToggle3D,
-    onRedescribe: onRedescribe,
-    onEstimate: onEstimate,
-  ),
+  pageBuilder: (context, _, _) =>
+      _FullCanvas(board: board, onToggle3D: onToggle3D),
 );
 
 class _FullCanvas extends StatelessWidget {
-  const _FullCanvas({
-    required this.board,
-    required this.onToggle3D,
-    required this.onRedescribe,
-    required this.onEstimate,
-  });
+  const _FullCanvas({required this.board, required this.onToggle3D});
 
   final LayoutBoard board;
-  final VoidCallback onToggle3D, onRedescribe, onEstimate;
+  final VoidCallback onToggle3D;
 
   @override
   Widget build(BuildContext context) {
@@ -100,12 +89,7 @@ class _FullCanvas extends StatelessWidget {
                           child: LayoutCanvas(board: board),
                         ),
                       ),
-                      if (board.threeD)
-                        CameraPanel(
-                          board: board,
-                          onRedescribe: onRedescribe,
-                          onEstimate: onEstimate,
-                        ),
+                      if (board.threeD) CameraPanel(board: board),
                     ],
                   ),
                 ),

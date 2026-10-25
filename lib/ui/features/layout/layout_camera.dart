@@ -27,23 +27,12 @@ const _orbitPerPx = 0.6, _pitchPerPx = 0.4;
 /// 3D 视图里画布右边的部件窗口(不盖住画布):最右一条图标栏一直在,摄像机、灯光
 /// 各一个窗口,点图标展开、再点收起、点另一个就换过去(宽度和内容都有过渡),
 /// 下面是自由镜头和复位。摄像机窗口:自由镜头的开关、小场景(拖着转镜头、滚轮推拉)、
-/// 一行一个参数(箭头一步一步调,按住中间左右拖着调)、选中块的体块、交给 Agent 的两件事。
-/// 灯光窗口见 [_LightingSection]。
+/// 一行一个参数(箭头一步一步调,按住中间左右拖着调)、选中块的体块。交给 Agent 写描述
+/// 只在画布上面那一个「交给 Agent」(用户要求统一成一个按钮)。灯光窗口见 [_LightingSection]。
 class CameraPanel extends StatefulWidget {
-  const CameraPanel({
-    super.key,
-    required this.board,
-    required this.onRedescribe,
-    required this.onEstimate,
-  });
+  const CameraPanel({super.key, required this.board});
 
   final LayoutBoard board;
-
-  /// 镜头转过了:让 Agent 照新视角改描述。
-  final VoidCallback onRedescribe;
-
-  /// 有体块是程序猜的:让 Agent 估。
-  final VoidCallback onEstimate;
 
   @override
   State<CameraPanel> createState() => _CameraPanelState();
@@ -299,30 +288,6 @@ class _CameraPanelState extends State<CameraPanel> {
             ),
           ),
           ?_bodySection(),
-          if (board.cameraMoved || board.guessedBodies) ...[
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 6,
-                children: [
-                  if (board.cameraMoved)
-                    _AgentButton(
-                      icon: Icons.edit_note,
-                      label: tr('按视角改描述'),
-                      onTap: widget.onRedescribe,
-                    ),
-                  if (board.guessedBodies)
-                    _AgentButton(
-                      icon: Icons.view_in_ar_outlined,
-                      label: tr('让 Agent 估体块'),
-                      onTap: widget.onEstimate,
-                    ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -739,28 +704,4 @@ class _FreeCamButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _AgentButton extends StatelessWidget {
-  const _AgentButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
-    onPressed: onTap,
-    icon: Icon(icon, size: 15),
-    label: Text(label, style: const TextStyle(fontSize: 12)),
-    style: OutlinedButton.styleFrom(
-      visualDensity: VisualDensity.compact,
-      foregroundColor: PennaColors.primary,
-      side: BorderSide(color: PennaColors.primaryBorder),
-    ),
-  );
 }

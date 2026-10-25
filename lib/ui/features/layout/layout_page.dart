@@ -172,9 +172,10 @@ class _LayoutPageState extends State<LayoutPage> {
     widget.onOpenStudio();
   }
 
-  void _ask() {
-    final problem = widget.chat.send(tr('照布局画板完善整体描述和每个框的描述,框的位置不动'));
-    if (problem != null) showToast(context, problem, warn: true);
+  /// 「交给 Agent」:照画板现在的形状、视角、灯光、体块写描述(唯一的入口,见 [handOverRequest])。
+  void _handOver() {
+    setState(() => _answered = board.layout.camera);
+    _send(handOverRequest(board));
   }
 
   /// 对话里放进一张参考图:它和画布一横一竖时,问一句要不要把画布对调
@@ -206,10 +207,10 @@ class _LayoutPageState extends State<LayoutPage> {
           context,
           tr('视角变了,描述要跟着改吗?'),
           tr('框已按新视角算好,描述里的朝向和位置关系还是原来的。'),
-          action: tr('按视角改描述'),
+          action: tr('交给 Agent'),
         );
         if (!mounted) return;
-        redo ? _redescribe() : setState(() => _answered = board.layout.camera);
+        redo ? _handOver() : setState(() => _answered = board.layout.camera);
       }
       return board.setThreeD(false);
     }
@@ -224,19 +225,12 @@ class _LayoutPageState extends State<LayoutPage> {
         )) {
       return;
     }
-    _estimate();
+    _handOver();
   }
 
   void _send(String text) {
     final problem = widget.chat.send(text);
     if (problem != null) showToast(context, problem, warn: true);
-  }
-
-  void _estimate() => _send(estimateRequest);
-
-  void _redescribe() {
-    setState(() => _answered = board.layout.camera);
-    _send(redescribeRequest);
   }
 
   /// 画布区:开着自由摄像机时和视口按画布比例摆成上下或左右两块。
@@ -312,7 +306,6 @@ class _LayoutPageState extends State<LayoutPage> {
                             config: widget.config,
                             onDiscuss: _discuss,
                             onToDraft: _toDraft,
-                            onAsk: _ask,
                             cardKey: _cardKey,
                             fieldFocus: _fieldFocus,
                             isOpen: _open.contains,
@@ -370,10 +363,8 @@ class _LayoutPageState extends State<LayoutPage> {
                                           context,
                                           board: board,
                                           onToggle3D: _toggle3D,
-                                          onRedescribe: _redescribe,
-                                          onEstimate: _estimate,
                                         ),
-                                        onAskShapes: () => _send(shapeRequest),
+                                        onHandOver: _handOver,
                                       ),
                                     ),
                                     if (_stale)
@@ -383,7 +374,7 @@ class _LayoutPageState extends State<LayoutPage> {
                                         bottom: 12,
                                         child: Center(
                                           child: _StaleViewNote(
-                                            onRedescribe: _redescribe,
+                                            onHandOver: _handOver,
                                             onLater: () => setState(
                                               () => _answered =
                                                   board.layout.camera,
@@ -398,12 +389,7 @@ class _LayoutPageState extends State<LayoutPage> {
                           ),
                         ),
                         // 3D 视图的摄像机一栏贴在画布右边,不盖住画布。
-                        if (board.threeD)
-                          CameraPanel(
-                            board: board,
-                            onRedescribe: _redescribe,
-                            onEstimate: _estimate,
-                          ),
+                        if (board.threeD) CameraPanel(board: board),
                         Container(
                           width: _chatWidth,
                           decoration: BoxDecoration(border: Border(left: side)),
@@ -446,11 +432,11 @@ class _LayoutPageState extends State<LayoutPage> {
   }
 }
 
-/// 画布下面的提醒:镜头调好了,描述还是原来视角的。
+/// 画布下面的提醒:镜头调好了,描述还是原来视角的。按钮就是统一的「交给 Agent」。
 class _StaleViewNote extends StatelessWidget {
-  const _StaleViewNote({required this.onRedescribe, required this.onLater});
+  const _StaleViewNote({required this.onHandOver, required this.onLater});
 
-  final VoidCallback onRedescribe, onLater;
+  final VoidCallback onHandOver, onLater;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -474,9 +460,9 @@ class _StaleViewNote extends StatelessWidget {
             style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
           ),
           FilledButton.icon(
-            onPressed: onRedescribe,
-            icon: const Icon(Icons.edit_note, size: 16),
-            label: Text(tr('按视角改描述'), style: const TextStyle(fontSize: 12)),
+            onPressed: onHandOver,
+            icon: const Icon(Icons.auto_awesome_outlined, size: 16),
+            label: Text(tr('交给 Agent'), style: const TextStyle(fontSize: 12)),
             style: FilledButton.styleFrom(
               visualDensity: VisualDensity.compact,
               backgroundColor: PennaColors.primary,

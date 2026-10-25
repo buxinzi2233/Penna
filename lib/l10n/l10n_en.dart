@@ -913,12 +913,20 @@ const en = <String, String>{
   '删除这一条?': 'Delete this note?',
   '内容会一起删掉。': 'Its content will be deleted too.',
   '内容': 'Content',
-  '照【形状】改每块的描述:把形状写成画面里看得出的轮廓和占的位置(交出去只有方框),框、形状和图层都不动':
-      'Rewrite each block\'s caption from its shape: describe the visible outline and the area it takes (only the box is exported); keep boxes, shapes and layers as they are',
+  '照【形状】改每块的描述:把形状写成画面里看得出的轮廓和占的位置(交出去只有方框),框、形状和图层都不动': 'Rewrite each block\'s caption from its shape: describe the visible outline and the area it takes (only the box is exported); keep boxes, shapes and layers as they are',
   '按形状写描述': 'Describe shapes',
-  '钢笔:点出顶点,点回起点或回车封口,Esc 取消':
-      'Pen: click to add points, click the first point or press Enter to close, Esc to cancel',
-  '人像':'Portrait',
+  '钢笔:点出顶点,点回起点或回车封口,Esc 取消': 'Pen: click to add points, click the first point or press Enter to close, Esc to cancel',
+  '照画板现在的样子写好整体描述和每一块的描述': 'Write the overall caption and every block\'s caption from the board as it is now',
+  '形状照【形状】写成轮廓和占的位置':
+      'turn each shape in 【形状】 into its outline and the area it takes',
+  '照现在的视角写朝向、露出哪一面和谁挡着谁':
+      'write facing, visible sides and who blocks whom from the current view',
+  '受光面、阴影和投影方向照【灯光】':
+      'lit sides, shadows and cast-shadow direction follow 【灯光】',
+  '程序猜的体块顺便估好(body)': 'also estimate the guessed bodies (body)',
+  '框、形状和图层都不动': 'keep boxes, shapes and layers unchanged',
+  ';': '; ',
+  '人像': 'Portrait',
   '自然与时段': 'Daylight and time',
   '氛围': 'Mood',
   '光影预览': 'Shading preview',

@@ -56,24 +56,39 @@ void main() {
     expect([for (final b in board.layout.boxes) (b.name, b.left)], placed);
   });
 
-  test('按视角改描述:只收描述,框、图层、名字照旧', () {
-    final board = _two();
+  test('交给 Agent:只收描述和程序猜的体块,框、图层、名字和用户调过的体块照旧', () {
+    final board = _two()..setThreeD(true);
+    // B 的体块是用户在摄像机栏里调过的,不再算猜的。
+    final iB = board.layout.boxes.indexWhere((b) => b.name == 'B');
+    board.setBody(iB, board.layout.boxes[iB].body!.copyWith(z: 1.4));
     final before = board.layout.boxes;
+    final bodyB = before.firstWhere((b) => b.name == 'B').body;
+    final request = handOverRequest(board);
+    expect(request, contains('程序猜的体块'));
     expect(
       board.apply(
         _draft(
-          '{"name": "B", "caption": "B from the side", "bbox": [0, 0, 10, 10]}, '
-          '{"name": "A", "caption": "A seen from above", "bbox": [0, 0, 10, 10]}',
+          '{"name": "B", "caption": "B from the side", "bbox": [0, 0, 10, 10], '
+          '"body": {"distance": 3, "depth": 1, "yaw": 40}}, '
+          '{"name": "A", "caption": "A seen from above", "bbox": [0, 0, 10, 10], '
+          '"body": {"distance": 3, "depth": 1, "yaw": 40}}',
         ),
-        keep: layoutKeepFor(redescribeRequest),
+        keep: layoutKeepFor(request),
       ),
       isTrue,
     );
     final after = board.layout.boxes;
     expect([for (final b in after) b.name], [for (final b in before) b.name]);
-    expect([for (final b in after) b.left], [for (final b in before) b.left]);
-    expect(after.firstWhere((b) => b.name == 'A').caption, 'A seen from above');
-    expect(after.firstWhere((b) => b.name == 'B').caption, 'B from the side');
+    expect(
+      [for (final b in after) (b.left, b.top, b.right, b.bottom)],
+      [for (final b in before) (b.left, b.top, b.right, b.bottom)],
+    );
+    final a = after.firstWhere((b) => b.name == 'A');
+    expect(a.caption, 'A seen from above');
+    expect(a.body!.guessed, isFalse);
+    final b = after.firstWhere((b) => b.name == 'B');
+    expect(b.caption, 'B from the side');
+    expect(b.body, bodyB);
     expect(board.layout.caption, 'new scene');
     expect(layoutKeepFor('随便说的话'), LayoutKeep.none);
   });

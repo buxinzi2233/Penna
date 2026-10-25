@@ -196,17 +196,19 @@ class _LayoutCanvasState extends State<LayoutCanvas>
       ).inflate(_handle / 2 / scale);
       // 异形按形状点(椭圆里套着别的块时点得中里面那块),右下角拉大小的把手照样算。
       final corner = (p - r.bottomRight).distance * scale <= _handle;
-      if (b.shape == null ? r.contains(p) : b.covers(p.dx, p.dy) || corner) {
+      // 3D 视图里框是投出来的外框,按框点。
+      final flat = b.shape == null || _board.threeD;
+      if (flat ? r.contains(p) : b.covers(p.dx, p.dy) || corner) {
         return i;
       }
     }
     return null;
   }
 
-  /// 按在选中的那个多边形的哪个顶点上;没按中是 null。
+  /// 按在选中的那个多边形的哪个顶点上;没按中是 null。顶点只在平面视图里拖。
   int? _hitVertex(Offset p, double scale) {
     final i = _board.selected;
-    if (i == null || !_board.shown(i)) return null;
+    if (i == null || !_board.shown(i) || _board.threeD) return null;
     for (final (k, (x, y)) in _board.layout.boxes[i].shapePoints.indexed) {
       if ((p - Offset(x, y)).distance * scale <= _handle) return k;
     }
@@ -582,7 +584,8 @@ class _BoxView extends StatelessWidget {
               style: TextStyle(fontSize: 11, color: PennaColors.text),
             ),
           );
-    final shape = box.shape;
+    // 3D 视图里形状由体块挤成柱体画出来(见 paintBody),框只是投出来的外框。
+    final shape = threeD ? null : box.shape;
     return Stack(
       clipBehavior: Clip.none,
       children: [

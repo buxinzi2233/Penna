@@ -112,11 +112,7 @@ void main() {
               height: 2400,
               child: ListenableBuilder(
                 listenable: board,
-                builder: (context, _) => CameraPanel(
-                  board: board,
-                  onRedescribe: () {},
-                  onEstimate: () {},
-                ),
+                builder: (context, _) => CameraPanel(board: board),
               ),
             ),
           ),

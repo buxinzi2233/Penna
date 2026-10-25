@@ -386,15 +386,20 @@ class _ScenePainter extends CustomPainter {
             .compareTo(view.toCamera(a.$2.center).z),
       );
     for (final (i, body) in order) {
-      final pts = [for (final c in body.corners) at(c)];
-      if (pts.contains(null)) continue;
       // 在主镜头外面的(主画布上看不到)画淡一点。
       final color = layout.boxes[i].offscreen
           ? Color.lerp(layoutBodyColor(i), grid, 0.6)!
           : layoutBodyColor(i);
-      final screen = [for (final p in pts) p!];
-      if (lit) paintLitFaces(canvas, body, screen, view.eye, color, layout);
-      paintCuboid(canvas, screen, color, width: i == selected ? 2.4 : 1.2);
+      paintBody(
+        canvas,
+        body,
+        layout.boxes[i].shape,
+        at,
+        color,
+        width: i == selected ? 2.4 : 1.2,
+        lit: lit ? layout : null,
+        eye: view.eye,
+      );
       final top = at((x: body.x, y: body.y - body.h / 2, z: body.z));
       if (top != null) _label(canvas, '${i + 1}', top, layoutBoxColor(i));
     }

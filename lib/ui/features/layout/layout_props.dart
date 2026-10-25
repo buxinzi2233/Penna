@@ -9,7 +9,6 @@ class _Properties extends StatelessWidget {
     required this.config,
     required this.onDiscuss,
     required this.onToDraft,
-    required this.onAsk,
     required this.cardKey,
     required this.fieldFocus,
     required this.isOpen,
@@ -26,7 +25,6 @@ class _Properties extends StatelessWidget {
   /// 带着第几块去右边的对话里改。
   final ValueChanged<int> onDiscuss;
   final VoidCallback onToDraft;
-  final VoidCallback onAsk;
 
   /// 第几块的卡片和它正文输入框的焦点:画布上点框、双击框时用。
   final GlobalKey Function(int) cardKey;
@@ -52,7 +50,7 @@ class _Properties extends StatelessWidget {
           child: ListenableBuilder(
             listenable: config,
             builder: (context, _) =>
-                _JsonCard(board: board, onToDraft: onToDraft, onAsk: onAsk),
+                _JsonCard(board: board, onToDraft: onToDraft),
           ),
         ),
         Expanded(
@@ -425,15 +423,10 @@ class _BoxCard extends StatelessWidget {
 const _jsonMaxHeight = 240.0;
 
 class _JsonCard extends StatelessWidget {
-  const _JsonCard({
-    required this.board,
-    required this.onToDraft,
-    required this.onAsk,
-  });
+  const _JsonCard({required this.board, required this.onToDraft});
 
   final LayoutBoard board;
   final VoidCallback onToDraft;
-  final VoidCallback onAsk;
 
   /// 把剪贴板里的一份布局 JSON 换到画板上(别处写好的、带名字的都行)。
   Future<void> _paste(BuildContext context) async {
@@ -469,13 +462,6 @@ class _JsonCard extends StatelessWidget {
                 label: tr('放到成稿'),
                 icon: Icons.south_west,
                 onPressed: onToDraft,
-              ),
-              PennaButton(
-                label: tr('交给 Agent'),
-                icon: Icons.auto_awesome_outlined,
-                background: PennaColors.primary,
-                foreground: Colors.white,
-                onPressed: onAsk,
               ),
             ],
           ),
