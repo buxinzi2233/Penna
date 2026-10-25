@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -9,10 +10,12 @@ import '../../../core/harness/layout.dart';
 import '../../core/theme.dart';
 import 'layout_bodies.dart';
 import 'layout_board.dart';
+import 'layout_canvas_tools.dart';
 import 'layout_perspective.dart';
 import '../../../l10n/l10n.dart';
 
 part 'layout_navigation.dart';
+part 'layout_pen.dart';
 
 /// 框的颜色按先后轮换。用中间色调,深浅两套配色上都看得清。
 const _boxColors = [
@@ -111,6 +114,13 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   /// 上一帧是不是自由镜头:刚打开时把焦点拿到画布上,WASD 才收得到。
   bool _wasFree = false;
 
+  /// 钢笔已经点下的顶点(画布像素)和鼠标现在的位置(画还没落下的那一段),见 [_Pen]。
+  final _pen = <Offset>[];
+  Offset? _hover;
+
+  /// 给扩展里用的 setState(它是受保护的,扩展里直接调会被分析器警告)。
+  void _redraw(VoidCallback change) => setState(change);
+
   LayoutBoard get _board => widget.board;
 
   @override
@@ -135,6 +145,7 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   }
 
   KeyEventResult _key(FocusNode _, KeyEvent e) {
+    if (_penKey(e) == KeyEventResult.handled) return KeyEventResult.handled;
     if (_navKey(e) == KeyEventResult.handled) return KeyEventResult.handled;
     final i = _board.selected;
     if (e is! KeyDownEvent || i == null) return KeyEventResult.ignored;
@@ -235,6 +246,8 @@ class _LayoutCanvasState extends State<LayoutCanvas>
       return setState(() {});
     }
     final i = _hit(p, scale);
+    // 钢笔是一下一下点顶点,空白处拖动不画框。
+    if (i == null && _board.shapeTool.value.tool == ShapeTool.pen) return;
     if (i == null) {
       _drag = _Drag.draw;
       _drawing = Rect.fromPoints(p, p);
@@ -321,12 +334,14 @@ class _LayoutCanvasState extends State<LayoutCanvas>
     final r = _drawing;
     if (_drag == _Drag.draw && r != null) {
       if (r.width >= _minBox && r.height >= _minBox) {
+        // 形状照工具栏选的(像 PS 的形状工具),框是它的外框。
         _board.addBox(
           LayoutBox(
             left: r.left.round(),
             top: r.top.round(),
             right: r.right.round(),
             bottom: r.bottom.round(),
+            shape: shapeFor(_board.shapeTool.value),
           ),
         );
       }
@@ -344,7 +359,11 @@ class _LayoutCanvasState extends State<LayoutCanvas>
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([_board, _board.shadePreview]),
+      listenable: Listenable.merge([
+        _board,
+        _board.shadePreview,
+        _board.shapeTool,
+      ]),
       builder: (context, _) => LayoutBuilder(
         builder: (context, box) {
           final l = _board.layout;
@@ -384,12 +403,14 @@ class _LayoutCanvasState extends State<LayoutCanvas>
                     cursor: _board.freeCam
                         ? SystemMouseCursors.move
                         : SystemMouseCursors.precise,
+                    onHover: (e) => _penHover(toCanvas(e.localPosition)),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       // 从按下的那一点算起,不是挪过一小段之后。
                       dragStartBehavior: DragStartBehavior.down,
-                      onTapUp: (d) =>
-                          _tap(_hit(toCanvas(d.localPosition), scale)),
+                      onTapUp: (d) => _penOn
+                          ? _penTap(toCanvas(d.localPosition), scale)
+                          : _tap(_hit(toCanvas(d.localPosition), scale)),
                       onPanStart: (d) => _start(
                         toCanvas(d.localPosition),
                         scale,
@@ -479,10 +500,33 @@ class _LayoutCanvasState extends State<LayoutCanvas>
                 _drawing!.right * scale,
                 _drawing!.bottom * scale,
               ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: PennaColors.primary.withValues(alpha: 0.08),
-                  border: Border.all(color: PennaColors.primary, width: 1.5),
+              // 拖的时候就照工具画出那个形状。
+              child: switch (shapeFor(_board.shapeTool.value)) {
+                null => DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: PennaColors.primary.withValues(alpha: 0.08),
+                    border: Border.all(color: PennaColors.primary, width: 1.5),
+                  ),
+                ),
+                final s => CustomPaint(
+                  painter: _ShapePainter(
+                    s,
+                    PennaColors.primary,
+                    PennaColors.primary.withValues(alpha: 0.08),
+                    false,
+                  ),
+                ),
+              },
+            ),
+          if (_penOn && _pen.isNotEmpty)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _PenPainter(
+                    [for (final p in _pen) p * scale],
+                    _hover == null ? null : _hover! * scale,
+                    PennaColors.primary,
+                  ),
                 ),
               ),
             ),

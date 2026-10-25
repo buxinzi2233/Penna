@@ -913,7 +913,12 @@ const en = <String, String>{
   '删除这一条?': 'Delete this note?',
   '内容会一起删掉。': 'Its content will be deleted too.',
   '内容': 'Content',
-  '人像': 'Portrait',
+  '照【形状】改每块的描述:把形状写成画面里看得出的轮廓和占的位置(交出去只有方框),框、形状和图层都不动':
+      'Rewrite each block\'s caption from its shape: describe the visible outline and the area it takes (only the box is exported); keep boxes, shapes and layers as they are',
+  '按形状写描述': 'Describe shapes',
+  '钢笔:点出顶点,点回起点或回车封口,Esc 取消':
+      'Pen: click to add points, click the first point or press Enter to close, Esc to cancel',
+  '人像':'Portrait',
   '自然与时段': 'Daylight and time',
   '氛围': 'Mood',
   '光影预览': 'Shading preview',

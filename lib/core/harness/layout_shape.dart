@@ -1,7 +1,7 @@
 part of 'layout.dart';
 
-/// 多边形的顶点数范围。
-const minShapePoints = 3, maxShapePoints = 12;
+/// 多边形的顶点数范围(钢笔勾的轮廓也算)。
+const minShapePoints = 3, maxShapePoints = 16;
 
 /// 框里的异形:椭圆(内切在框里)或多边形。框还是它的外框,交出去的 JSON 只有这个方框;
 /// 形状只在 Penna 里用,用户画、和 Agent 商量构图时更直观。
@@ -66,7 +66,7 @@ double _round4(double v) => (v * 10000).round() / 10000;
 List<(double, double)>? _pairs(Object? j) {
   if (j is! List || j.length < minShapePoints) return null;
   final out = <(double, double)>[];
-  for (final p in j.take(maxShapePoints * 2)) {
+  for (final p in j.take(maxShapePoints)) {
     if (p is! List || p.length < 2 || p[0] is! num || p[1] is! num) return null;
     out.add(((p[0] as num).toDouble(), (p[1] as num).toDouble()));
   }
@@ -147,4 +147,53 @@ extension LayoutBoxShape on LayoutBox {
       for (final (x, y) in shapePoints) [x.round(), y.round()],
     ],
   };
+}
+
+/// 一串画布上的点(钢笔勾的、Agent 写的)→ 以它们的外框为框、带着多边形形状的一块。
+/// 点不够、挤成一条线(外框有一边不到 [minSide] 像素)时是 null。
+LayoutBox? boxFromPolygon(List<(double, double)> pts, {int minSide = 2}) {
+  if (pts.length < minShapePoints) return null;
+  final xs = pts.map((p) => p.$1), ys = pts.map((p) => p.$2);
+  final l = xs.reduce(math.min).round(), r = xs.reduce(math.max).round();
+  final t = ys.reduce(math.min).round(), b = ys.reduce(math.max).round();
+  if (r - l < minSide || b - t < minSide) return null;
+  return LayoutBox(
+    left: l,
+    top: t,
+    right: r,
+    bottom: b,
+    shape: LayoutShape.polygon(_normalize(pts.take(maxShapePoints).toList())),
+  );
+}
+
+String _pct(double v) => '${(v * 100).round()}%';
+
+/// 形状说成一句话,给 Agent 看。
+String _shapeWords(LayoutShape s) {
+  if (s.isEllipse) return '椭圆(内切在框里,四个角是空的)';
+  final n = s.points.length;
+  final name = switch (n) {
+    3 => '三角形',
+    4 => '四边形',
+    _ => '$n 边形',
+  };
+  return '$name,顶点按顺序在框里的位置(左右、上下的百分比,0% 是框的左边、上边):'
+      '${s.points.map((p) => '(${_pct(p.$1)},${_pct(p.$2)})').join('、')}';
+}
+
+/// 给 Agent 看的【形状】(发给模型的话,不翻译):哪几块画成了异形、是什么样,
+/// 并说明交出去只有方框、形状要写进描述。没有异形时是空串。
+String describeShapes(Layout l) {
+  final rows = [
+    for (final (i, b) in l.boxes.indexed)
+      if (b.shape case final s? when !b.offscreen)
+        '${i + 1}. ${b.name.isEmpty ? '(没起名)' : b.name}:${_shapeWords(s)}',
+  ];
+  if (rows.isEmpty) return '';
+  return '【形状】下面这几块是用户(或你)画成的异形,画板 JSON 里的 "shape" 就是它。'
+      'MOSS-Image 只认 bbox 那个方框,看不到形状,所以形状要写进这一块的 caption:'
+      '说清它在画面里的轮廓(圆形、椭圆形、三角形、斜切的、弧形的……)、朝哪个方向斜、'
+      '占了框里的哪一部分(例如山尖朝上、底边铺满框底;地面从左下往右上抬起;圆形的窗框住人物的上半身);'
+      '框里形状外面的那几个角是别的块或背景,不要写成这一块的东西。'
+      '用户画了形状却没写描述时,照形状把描述写出来。\n${rows.join('\n')}';
 }

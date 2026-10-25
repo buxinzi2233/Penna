@@ -21,6 +21,7 @@ import '../studio/studio_view_model.dart';
 import 'layout_board.dart';
 import 'layout_camera.dart';
 import 'layout_canvas.dart';
+import 'layout_canvas_tools.dart';
 import 'layout_fullscreen.dart';
 import 'layout_scene_view.dart';
 import 'layout_json_view.dart';
@@ -346,43 +347,33 @@ class _LayoutPageState extends State<LayoutPage> {
                                   children: [
                                     Positioned.fill(
                                       child: Padding(
-                                        padding: const EdgeInsets.all(24),
+                                        padding: const EdgeInsets.fromLTRB(
+                                          24,
+                                          48,
+                                          24,
+                                          24,
+                                        ),
                                         child: _canvasArea(),
                                       ),
                                     ),
-                                    if (board.threeD)
-                                      Positioned(
-                                        top: 0,
-                                        right: 36,
-                                        child: IconButton(
-                                          tooltip: tr('自由摄像机'),
-                                          iconSize: 18,
-                                          isSelected: _scene,
-                                          color: _scene
-                                              ? PennaColors.primary
-                                              : null,
-                                          icon: const Icon(
-                                            Icons.videocam_outlined,
-                                          ),
-                                          onPressed: () =>
-                                              setState(() => _scene = !_scene),
-                                        ),
-                                      ),
-                                    // 全屏摆放:画布铺满整个软件窗口,方便转镜头、挪框。
+                                    // 形状工具、自由摄像机、全屏。
                                     Positioned(
-                                      top: 0,
+                                      top: 6,
+                                      left: 24,
                                       right: 0,
-                                      child: IconButton(
-                                        tooltip: tr('全屏摆放'),
-                                        iconSize: 18,
-                                        icon: const Icon(Icons.fullscreen),
-                                        onPressed: () => showFullCanvas(
+                                      child: CanvasTools(
+                                        board: board,
+                                        scene: _scene,
+                                        onScene: () =>
+                                            setState(() => _scene = !_scene),
+                                        onFullscreen: () => showFullCanvas(
                                           context,
                                           board: board,
                                           onToggle3D: _toggle3D,
                                           onRedescribe: _redescribe,
                                           onEstimate: _estimate,
                                         ),
+                                        onAskShapes: () => _send(shapeRequest),
                                       ),
                                     ),
                                     if (_stale)

@@ -150,7 +150,11 @@ class AppSection extends StatelessWidget {
   }
 }
 
-/// 对话相关的开关:压缩大图、自动审批、内置角色预览图。
+/// 「内置角色预览图」先藏起来(用户要求):预览图仓库还没建,开了也下不到图。
+/// 建好仓库后改成 true 就回来了,设置里的值和译文都还留着。
+const _characterPreviewsReady = false;
+
+/// 对话相关的开关:压缩大图、自动审批(内置角色预览图先藏着)。
 class _ChatOptions extends StatelessWidget {
   const _ChatOptions({required this.service});
 
@@ -199,13 +203,16 @@ class _ChatOptions extends StatelessWidget {
           cfg.autoApprove,
           (v) => service.update(service.config.copyWith(autoApprove: v)),
         ),
-        gap,
-        _toggle(
-          tr('内置角色预览图'),
-          tr('角色库下载内置角色的图'),
-          cfg.characterPreviews,
-          (v) => service.update(service.config.copyWith(characterPreviews: v)),
-        ),
+        if (_characterPreviewsReady) ...[
+          gap,
+          _toggle(
+            tr('内置角色预览图'),
+            tr('角色库下载内置角色的图'),
+            cfg.characterPreviews,
+            (v) =>
+                service.update(service.config.copyWith(characterPreviews: v)),
+          ),
+        ],
       ],
     );
   }

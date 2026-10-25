@@ -3,12 +3,124 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:penna/core/harness/layout.dart';
+import 'package:flutter/services.dart';
 import 'package:penna/ui/features/layout/layout_board.dart';
 import 'package:penna/ui/features/layout/layout_canvas.dart';
+import 'package:penna/ui/features/layout/layout_canvas_tools.dart';
 
 const _tri = LayoutBox(left: 100, top: 100, right: 300, bottom: 300);
 
+/// 一块 400×400 的画布,屏幕上一比一,返回它左上角在屏幕上的位置。
+Future<Offset> _canvas(WidgetTester tester, LayoutBoard board) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 400,
+            height: 400,
+            child: LayoutCanvas(board: board),
+          ),
+        ),
+      ),
+    ),
+  );
+  return tester.getTopLeft(find.byType(LayoutCanvas));
+}
+
 void main() {
+  testWidgets('形状工具:选椭圆、多边形后在空白处拖出来的就是那个形状,框是外框', (tester) async {
+    final board = LayoutBoard()..setSize(400, 400);
+    final o = await _canvas(tester, board);
+    Future<void> drag(Offset a, Offset b) async {
+      final g = await tester.startGesture(o + a);
+      await g.moveTo(o + (a + b) / 2);
+      await g.moveTo(o + b);
+      await g.up();
+      await tester.pump();
+    }
+
+    board.shapeTool.value = (tool: ShapeTool.ellipse, sides: 5);
+    await drag(const Offset(20, 20), const Offset(120, 100));
+    final oval = board.layout.boxes.single;
+    expect(oval.shape!.isEllipse, isTrue);
+    expect((oval.left, oval.top, oval.right, oval.bottom), (20, 20, 120, 100));
+
+    board.shapeTool.value = (tool: ShapeTool.polygon, sides: 6);
+    await drag(const Offset(200, 200), const Offset(380, 380));
+    expect(
+      board.layout.boxes.where((b) => b.shape == LayoutShape.regular(6)),
+      hasLength(1),
+    );
+  });
+
+  testWidgets('钢笔:点出顶点,点回起点封口成一块;回车也能封口,Esc 取消', (tester) async {
+    final board = LayoutBoard()..setSize(400, 400);
+    final o = await _canvas(tester, board);
+    board.shapeTool.value = (tool: ShapeTool.pen, sides: 5);
+    await tester.pump();
+    for (final p in const [
+      Offset(50, 300),
+      Offset(150, 100),
+      Offset(250, 300),
+    ]) {
+      await tester.tapAt(o + p);
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    expect(board.layout.boxes, isEmpty);
+    // 点回起点:封口。
+    await tester.tapAt(o + const Offset(52, 298));
+    await tester.pump();
+    final tri = board.layout.boxes.single;
+    expect((tri.left, tri.top, tri.right, tri.bottom), (50, 100, 250, 300));
+    expect(tri.shape!.points, hasLength(3));
+    expect(tri.shapePoints[1], (150.0, 100.0));
+
+    // 回车封口;退格删掉多点的那个。
+    for (final p in const [
+      Offset(300, 20),
+      Offset(390, 20),
+      Offset(390, 90),
+      Offset(10, 10),
+    ]) {
+      await tester.tapAt(o + p);
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(board.layout.boxes, hasLength(2));
+    expect(
+      board.layout.boxes.where((b) => b.left == 300 && b.right == 390),
+      hasLength(1),
+    );
+
+    // Esc 取消,什么都不加。
+    await tester.tapAt(o + const Offset(200, 200));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.tapAt(o + const Offset(220, 220));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tapAt(o + const Offset(240, 200));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(board.layout.boxes, hasLength(2));
+  });
+
+  test('交给 Agent:系统提示里有【形状】,按形状改描述只收描述', () {
+    final board = LayoutBoard()
+      ..setSize(400, 400)
+      ..addBox(_tri.copyWith(name: '山', shape: () => LayoutShape.regular(3)))
+      ..addBox(const LayoutBox(left: 0, top: 0, right: 50, bottom: 50));
+    expect(board.prompt, contains('【形状】'));
+    expect(board.prompt, contains('山:三角形'));
+    expect(describeShapes(const Layout()), isEmpty);
+    expect(layoutKeepFor(shapeRequest), LayoutKeep.captions);
+    expect(boxFromPolygon(const [(0, 0), (10, 0), (20, 0)]), isNull);
+  });
+
   test('正多边形撑满框;椭圆和多边形按形状判断点在不在里面', () {
     final s = LayoutShape.regular(3);
     expect(s.points, hasLength(3));
