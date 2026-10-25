@@ -4,9 +4,11 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'camera.dart';
+import 'lighting.dart';
 import 'perspective.dart';
 
 export 'camera.dart';
+export 'lighting.dart';
 export 'perspective.dart';
 
 part 'layout_shape.dart';
@@ -163,6 +165,7 @@ class Layout {
     this.boxes = const [],
     this.perspective,
     this.camera = const Camera(),
+    this.lighting = const Lighting(),
   });
 
   final int width, height;
@@ -174,6 +177,9 @@ class Layout {
 
   /// 3D 视图的摄像机;没转过是默认的(正对着画布)。
   final Camera camera;
+
+  /// 打光辅助(关着是默认的);交出去时写成一句光影接在 summary.caption 后面。
+  final Lighting lighting;
 
   bool get isEmpty => boxes.isEmpty && caption.trim().isEmpty;
 
@@ -187,6 +193,7 @@ class Layout {
     List<LayoutBox>? boxes,
     Perspective? Function()? perspective,
     Camera? camera,
+    Lighting? lighting,
   }) => Layout(
     width: width ?? this.width,
     height: height ?? this.height,
@@ -197,6 +204,7 @@ class Layout {
     boxes: boxes == null ? this.boxes : List.unmodifiable(boxes),
     perspective: perspective == null ? this.perspective : perspective(),
     camera: camera ?? this.camera,
+    lighting: lighting ?? this.lighting,
   );
 
   Map<String, Object> toJson() => {
@@ -209,6 +217,7 @@ class Layout {
     'boxes': [for (final b in boxes) b.toJson()],
     'perspective': ?perspective?.toJson(),
     if (!camera.isDefault) 'camera': camera.toJson(),
+    if (lighting != const Lighting()) 'lighting': lighting.toJson(),
   };
 
   static Layout fromJson(Map<String, dynamic> j) => Layout(
@@ -223,20 +232,25 @@ class Layout {
     ]),
     perspective: Perspective.fromJson(j['perspective']),
     camera: Camera.fromJson(j['camera']),
+    lighting: Lighting.fromJson(j['lighting']),
   );
 }
 
-/// 交出去的 summary.caption:质量词、画风、整体描述连成一段。导入过交出去的 JSON 时
-/// 整体描述开头已经带着它们,不再加一遍。
+/// 交出去的 summary.caption:质量词、画风、整体描述连成一段,开着打光辅助时最后接上光影。
+/// 导入过交出去的 JSON 时整体描述里已经带着它们,不再加一遍。
 String _fullCaption(Layout l, String quality) {
   final caption = l.caption.trim();
   String sentence(String s) =>
       s.isEmpty || RegExp(r'[.!?。!?]$').hasMatch(s) ? s : '$s.';
-  return [
-    for (final s in [quality.trim(), l.style.trim()])
-      if (s.isNotEmpty && !caption.contains(s)) sentence(s),
-    caption,
-  ].where((s) => s.isNotEmpty).join(' ');
+  return appendLighting(
+    [
+      for (final s in [quality.trim(), l.style.trim()])
+        if (s.isNotEmpty && !caption.contains(s)) sentence(s),
+      caption,
+    ].where((s) => s.isNotEmpty).join(' '),
+    l.lighting,
+    l.camera,
+  );
 }
 
 String _pick(Object? v, List<String> allowed) =>

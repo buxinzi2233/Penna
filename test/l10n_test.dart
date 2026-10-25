@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:penna/core/harness/lighting.dart';
 import 'package:penna/core/harness/local/caption_catalog.dart';
 import 'package:penna/core/harness/local/tagger_catalog.dart';
 import 'package:penna/data/models/app_config.dart';
@@ -63,6 +64,9 @@ void main() {
         for (final f in e.fields) f.label,
       ],
       for (final p in factoryPresets) p.name,
+      for (final p in lightPresets) p.name,
+      for (final e in lightExtras) e.label,
+      for (final r in lightRoleInfo.values) r.zh,
       uncategorized,
     ].where(_han.hasMatch);
     for (final MapEntry(key: lang, value: table) in tables.entries) {

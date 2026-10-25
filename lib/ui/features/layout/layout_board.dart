@@ -10,6 +10,8 @@ import '../../../core/harness/layout_3d.dart';
 import '../../../core/harness/layout_relations.dart';
 import '../../../l10n/l10n.dart';
 
+part 'layout_board_lighting.dart';
+
 /// 存下来的一个画布尺寸。
 typedef LayoutSize = ({int width, int height});
 
@@ -141,6 +143,7 @@ class LayoutBoard extends ChangeNotifier {
                   '<current-layout>\n${mossLayoutJson(l, draft: true)}\n</current-layout>'}'
         '\n\n${l.perspective?.describe(l.width, l.height) ?? '【透视辅助】现在关着。'}'
         '\n\n${describeCamera(l, threeD: _threeD)}'
+        '\n\n${describeLighting(l.lighting, l.camera)}'
         // 3D 视图开着时,用户在 3D 里摆的就是构图:关系按 3D 场景算,不按 2D 的框。
         '${l.isEmpty ? '' : '\n\n${_threeD ? sceneRelations(l) : layoutRelations(l)}'}';
   }
@@ -610,6 +613,7 @@ class LayoutBoard extends ChangeNotifier {
     final parsed = read.layout.copyWith(
       camera: old.camera,
       style: read.layout.style.trim().isEmpty ? old.style : null,
+      lighting: old.lighting,
     );
     final sx = parsed.width / old.width, sy = parsed.height / old.height;
     // Agent 常把 name、layer 漏掉:按名字或位置把原来的接上(见 inheritNames)。

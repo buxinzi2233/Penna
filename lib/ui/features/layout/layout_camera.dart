@@ -1,14 +1,19 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/harness/layout.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../../l10n/l10n.dart';
 import 'layout_bodies.dart';
 import 'layout_board.dart';
 import 'layout_canvas.dart';
+
+part 'layout_lighting.dart';
 
 const _panelWidth = 232.0;
 const _railWidth = 40.0;
@@ -198,6 +203,7 @@ class _CameraPanelState extends State<CameraPanel> {
               ),
             ),
             ?_bodySection(),
+            _LightingSection(board: board),
             if (board.cameraMoved || board.guessedBodies) ...[
               const Divider(height: 1),
               Padding(
@@ -518,8 +524,8 @@ class _Dial extends StatefulWidget {
 class _DialState extends State<_Dial> {
   double _from = 0, _dx = 0;
 
-  String get _text => widget.unit == '°'
-      ? '${widget.value.round()}°'
+  String get _text => widget.unit == '°' || widget.unit == 'K'
+      ? '${widget.value.round()}${widget.unit}'
       : widget.value.toStringAsFixed(2);
 
   @override

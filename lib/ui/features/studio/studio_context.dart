@@ -242,6 +242,24 @@ extension StudioContext on StudioViewModel {
     );
   }
 
+  /// 回复里写了灯光(`<lighting>`):改画板上的打光辅助,并在这条回复上记一笔。
+  void _deliverLighting() {
+    final board = layout;
+    if (board == null || _messages.isEmpty) return;
+    final spec = splitLighting(_messages.last.text).spec;
+    if (spec == null || !board.applyLighting(spec)) return;
+    final lg = board.layout.lighting;
+    final preset = findPreset(lg.preset);
+    final note = !lg.enabled
+        ? tr('已关掉灯光')
+        : preset != null
+        ? tr('已调整灯光 · {0}', [tr(preset.name)])
+        : tr('已调整灯光 · {0} 盏灯', [lg.active.length]);
+    _updateReply(
+      (m) => m.copyWith(toolSummary: [?m.toolSummary, note].join(' · ')),
+    );
+  }
+
   /// 把排布局的活交给区域控制的 Agent([layoutAgent]):在那边开一场新对话发过去
   /// (用户发的图一起转过去),等它把布局放到画板上,再把 JSON 放进成稿区新建的系列。
   /// [run] 是这一轮工具的编号:等的时候用户点了停止,就不往成稿里放了。

@@ -174,13 +174,15 @@ extension StudioChat on StudioViewModel {
               for (final s in skills?.all ?? const <UserSkill>[])
                 if (!cfg.disabledSkills.contains(s.id)) s.id,
             })) {
-              // 自己以前写的布局、透视不重发:画板可能已被用户改过。
+              // 自己以前写的布局、透视、灯光不重发:画板可能已被用户改过。
               // 后面紧跟着工具结果的是查资料的那条,里面的布局没放上画板。
-              final text when !m.fromUser => forgetPerspectives(
-                forgetLayers(
-                  forgetLayouts(
-                    text,
-                    placed: i + 1 >= sent.length || !sent[i + 1].tool,
+              final text when !m.fromUser => forgetLighting(
+                forgetPerspectives(
+                  forgetLayers(
+                    forgetLayouts(
+                      text,
+                      placed: i + 1 >= sent.length || !sent[i + 1].tool,
+                    ),
                   ),
                 ),
               ),
@@ -236,6 +238,8 @@ extension StudioChat on StudioViewModel {
             // 透视在 _deliverLayout 里先放(没有布局时它自己放)。
             _deliverLayout();
             _deliverLayers();
+            // 放在布局后面:换布局时灯光照旧,这条回复写的灯光才不会被盖回去。
+            _deliverLighting();
             unawaited(_deliverSkill());
             _sendNext();
           },
